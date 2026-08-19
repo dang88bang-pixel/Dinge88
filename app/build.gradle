@@ -6,6 +6,11 @@ plugins {
     id 'kotlin-parcelize'
 }
 
+// Signing wird nur aktiviert, wenn der Keystore im CI vorhanden ist
+// (Datei app/secureguard-keystore.jks) und die Secrets gesetzt sind.
+def releaseKeystoreFile = rootProject.file('app/secureguard-keystore.jks')
+def hasReleaseKeystore = releaseKeystoreFile.exists()
+
 android {
     namespace 'com.secureguard.enterprise'
     compileSdk 34
@@ -20,10 +25,24 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile releaseKeystoreFile
+                storePassword System.getenv('KEYSTORE_PASSWORD') ?: ''
+                keyAlias System.getenv('KEY_ALIAS') ?: ''
+                keyPassword System.getenv('KEY_PASSWORD') ?: ''
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             minifyEnabled false

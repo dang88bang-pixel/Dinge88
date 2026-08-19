@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # GitHub Actions auf dem neuesten Stand halten (Sicherheit + Performance).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+
+  # Gradle-Wrapper + Maven-Abhängigkeiten (AndroidX, Kotlin, Compose, Hilt, …).
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "gradle"
