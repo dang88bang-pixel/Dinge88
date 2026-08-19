@@ -11,16 +11,21 @@ import androidx.core.content.ContextCompat
 import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Verwaltet die Benachrichtigungen für den Agenten.
+ *
+ * Respektiert den App-Schalter "Push-Benachrichtigungen"
+ * (SettingsRepository.notifications) zusätzlich zur System-Berechtigung.
  */
 @Singleton
 class NotificationService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val settingsRepository: SettingsRepository
 ) {
     private val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -36,6 +41,7 @@ class NotificationService @Inject constructor(
     }
 
     fun sendActionNotification(asset: Asset, actionName: String, success: Boolean) {
+        if (!settingsRepository.actionNotifications.value) return
         if (!canNotify()) return
         val title = if (success) "✅ ${asset.shortName}" else "❌ ${asset.shortName}"
         val content = "${asset.shortName}: Aktion '$actionName' " +
@@ -66,6 +72,8 @@ class NotificationService @Inject constructor(
     }
 
     private fun canNotify(): Boolean {
+        // App-interner Hauptschalter (Einstellungen -> Push-Benachrichtigungen).
+        if (!settingsRepository.notifications.value) return false
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context, android.Manifest.permission.POST_NOTIFICATIONS

@@ -43,6 +43,17 @@ class SettingsRepository @Inject constructor(
     )
     val location: StateFlow<Boolean> = _location.asStateFlow()
 
+    // --- Aktionen / Fernsteuerung ---
+    private val _recoverResend = MutableStateFlow(prefs.getBoolean(KEY_RECOVER_RESEND, false))
+    val recoverResend: StateFlow<Boolean> = _recoverResend.asStateFlow()
+
+    private val _commandLogging = MutableStateFlow(prefs.getBoolean(KEY_COMMAND_LOGGING, true))
+    val commandLogging: StateFlow<Boolean> = _commandLogging.asStateFlow()
+
+    private val _actionNotifications =
+        MutableStateFlow(prefs.getBoolean(KEY_ACTION_NOTIFICATIONS, true))
+    val actionNotifications: StateFlow<Boolean> = _actionNotifications.asStateFlow()
+
     // --- Backend-Endpunkte (Pilot-Projekt) ---
     private val _loRaUrl = MutableStateFlow(prefs.getString(KEY_LORA_URL, "").orEmpty())
     val loRaUrl: StateFlow<String> = _loRaUrl.asStateFlow()
@@ -96,6 +107,21 @@ class SettingsRepository @Inject constructor(
         _location.value = value
     }
 
+    fun setRecoverResend(value: Boolean) {
+        prefs.edit().putBoolean(KEY_RECOVER_RESEND, value).apply()
+        _recoverResend.value = value
+    }
+
+    fun setCommandLogging(value: Boolean) {
+        prefs.edit().putBoolean(KEY_COMMAND_LOGGING, value).apply()
+        _commandLogging.value = value
+    }
+
+    fun setActionNotifications(value: Boolean) {
+        prefs.edit().putBoolean(KEY_ACTION_NOTIFICATIONS, value).apply()
+        _actionNotifications.value = value
+    }
+
     fun setLoRaUrl(value: String) {
         prefs.edit().putString(KEY_LORA_URL, value).apply()
         _loRaUrl.value = value
@@ -143,6 +169,9 @@ class SettingsRepository @Inject constructor(
         private const val KEY_BLUETOOTH = "bluetooth"
         private const val KEY_WIFI = "wifi"
         private const val KEY_LOCATION = "location"
+        private const val KEY_RECOVER_RESEND = "recover_resend"
+        private const val KEY_COMMAND_LOGGING = "command_logging"
+        private const val KEY_ACTION_NOTIFICATIONS = "action_notifications"
         private const val KEY_LORA_URL = "lora_url"
         private const val KEY_OPTICAL_URL = "optical_url"
         private const val KEY_URBAN_URL = "urban_url"

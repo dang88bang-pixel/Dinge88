@@ -66,6 +66,10 @@ fun ActionsScreen(
     val commandLog by viewModel.commandLog.collectAsState()
     val isExecuting by viewModel.isExecuting.collectAsState()
 
+    val recoverResend by viewModel.settings.recoverResend.collectAsState()
+    val commandLogging by viewModel.settings.commandLogging.collectAsState()
+    val actionNotifications by viewModel.settings.actionNotifications.collectAsState()
+
     var dropdownExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -244,9 +248,21 @@ fun ActionsScreen(
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                             Text("⚙️ Einstellungen", style = MaterialTheme.typography.titleSmall)
-                            SettingCheckboxRow("Recover/Resend aktivieren", true)
-                            SettingCheckboxRow("Steuerlog aufzeichnen", false)
-                            SettingCheckboxRow("Automatische Benachrichtigung", false)
+                            SettingCheckboxRow(
+                                label = "Recover/Resend aktivieren",
+                                checked = recoverResend,
+                                onCheckedChange = viewModel.settings::setRecoverResend
+                            )
+                            SettingCheckboxRow(
+                                label = "Steuerlog aufzeichnen",
+                                checked = commandLogging,
+                                onCheckedChange = viewModel.settings::setCommandLogging
+                            )
+                            SettingCheckboxRow(
+                                label = "Automatische Benachrichtigung",
+                                checked = actionNotifications,
+                                onCheckedChange = viewModel.settings::setActionNotifications
+                            )
 
                             if (isExecuting) {
                                 Row(
@@ -328,10 +344,13 @@ fun ActionsScreen(
 }
 
 @Composable
-private fun SettingCheckboxRow(label: String, initiallyChecked: Boolean) {
-    var checked by remember { mutableStateOf(initiallyChecked) }
+private fun SettingCheckboxRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = checked, onCheckedChange = { checked = it })
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
         Text(label, modifier = Modifier.padding(top = 8.dp))
     }
 }
