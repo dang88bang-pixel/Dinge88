@@ -121,6 +121,26 @@ fun AgentConfigScreen(
                             progress = { uiState.progress / 100f },
                             modifier = Modifier.fillMaxWidth()
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { viewModel.startAgent() },
+                                enabled = !uiState.agentRunning,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("▶️ Start")
+                            }
+                            Button(
+                                onClick = { viewModel.stopAgent() },
+                                enabled = uiState.agentRunning,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("⏹️ Stop")
+                            }
+                        }
                     }
                 }
             }

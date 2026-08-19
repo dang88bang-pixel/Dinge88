@@ -117,15 +117,24 @@ class AgentViewModel @Inject constructor(
 
     fun saveSettings() {
         val state = _uiState.value
-        val settings = AgentSettings(
-            interval = state.interval,
-            dynamicPriority = state.dynamicPriority,
-            learningMode = state.learningMode,
-            offlineOnly = true,
-            externalSources = false
-        )
-        agentService.start(settings)
+        agentService.start(buildSettings(state))
     }
+
+    fun startAgent() {
+        agentService.start(buildSettings(_uiState.value))
+    }
+
+    fun stopAgent() {
+        agentService.stop()
+    }
+
+    private fun buildSettings(state: AgentUiState): AgentSettings = AgentSettings(
+        interval = state.interval,
+        dynamicPriority = state.dynamicPriority,
+        learningMode = state.learningMode,
+        offlineOnly = true,
+        externalSources = false
+    )
 }
 
 data class AgentUiState(
