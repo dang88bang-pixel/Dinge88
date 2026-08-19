@@ -3,6 +3,7 @@ package com.secureguard.enterprise.presentation.ui.agent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.AgentSettings
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import com.secureguard.enterprise.services.AgentService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +15,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AgentViewModel @Inject constructor(
-    private val agentService: AgentService
+    private val agentService: AgentService,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AgentUiState())
@@ -31,21 +33,47 @@ class AgentViewModel @Inject constructor(
                     state.copy(
                         agentRunning = status.running,
                         runtime = calculateRuntime(status.running),
-                        progress = 85f // Simuliert
+                        progress = calculateProgress(status.running)
                     )
                 }
             }
         }
     }
 
+    /** Echte Laufzeit aus dem persistierten Startzeitpunkt. */
     private fun calculateRuntime(running: Boolean): String {
-        if (!running) return "0h 0m"
-        // TODO: Echte Laufzeit aus Persistenz berechnen.
-        return "12d 4h 32m"
+        val start = settingsRepository.agentStartTime.value
+        if (!running || start <= 0L) return "0h 0m"
+        val totalSec = (System.currentTimeMillis() - start) / 1000
+        val d = totalSec / 86400
+        val h = (totalSec % 86400) / 3600
+        val m = (totalSec % 3600) / 60
+        return if (d > 0) "${d}d ${h}h ${m}m" else "${h}h ${m}m"
+    }
+
+    /**
+     * Fortschritt der eingestellten Gesamtdauer (0..100).
+     * Bei unbegrenzter Dauer (0) gibt es kein Fortschrittsziel.
+     */
+    private fun calculateProgress(running: Boolean): Float {
+        val start = settingsRepository.agentStartTime.value
+        val durationSec = settingsRepository.agentDurationSeconds.value
+        if (!running || start <= 0L || durationSec <= 0L) return 0f
+        val elapsedSec = (System.currentTimeMillis() - start) / 1000
+        return (elapsedSec.toFloat() / durationSec).coerceIn(0f, 1f) * 100f
     }
 
     fun setDuration(duration: String) {
         _uiState.update { state -> state.copy(duration = duration) }
+        settingsRepository.setAgentDurationSeconds(
+            when (duration) {
+                "1h" -> 3_600L
+                "6h" -> 21_600L
+                "24h" -> 86_400L
+                "1w" -> 604_800L
+                else -> 0L // unbegrenzt
+            }
+        )
     }
 
     fun setCustomDays(days: Int) {
@@ -56,6 +84,7 @@ class AgentViewModel @Inject constructor(
         val days = _uiState.value.customDays
         if (days > 0) {
             _uiState.update { state -> state.copy(duration = "custom") }
+            settingsRepository.setAgentDurationSeconds(days * 86_400L)
         }
     }
 

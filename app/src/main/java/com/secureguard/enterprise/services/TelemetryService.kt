@@ -111,14 +111,26 @@ class TelemetryService @Inject constructor(
     }
 
     /**
-     * Liest die letzte Telemetrie für ein Asset (Platzhalter).
+     * Liest die letzte Telemetrie für ein Asset über BLE-GATT-Read.
      *
-     * TODO: Telemetrie (Batterie, Motor, GPS, ...) über BLE-GATT-Read abrufen.
-     * Aktuell wird `null` zurückgegeben; die UI zeigt dann "Unbekannt".
+     * Verbindet sich mit dem Gerät und liest die erste lesbare Charakteristik
+     * (erwartet JSON-Telemetrie). Fehlertolerant: ohne Gerät/Verbindung oder
+     * bei nicht lesbarer Telemetrie wird `null` zurückgegeben.
      */
     suspend fun getLatestTelemetry(mac: String): Telemetry? {
-        // TODO: GATT-Read für Telemetrie-Charakteristik implementieren.
-        return null
+        if (mac.isBlank()) return null
+        if (!hasBleConnectPermission()) return null
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return null
+        if (!adapter.isEnabled) return null
+        val device = runCatching { adapter.getRemoteDevice(mac) }.getOrNull() ?: return null
+
+        return withTimeoutOrNull(GATT_TIMEOUT_MS) {
+            try {
+                commandConnector.readTelemetry(device)
+            } catch (e: Exception) {
+                null
+            }
+        } ?: null
     }
 
     private fun hasBleConnectPermission(): Boolean {

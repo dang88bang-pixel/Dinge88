@@ -17,6 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -41,6 +42,11 @@ fun SettingsScreen(
     val bluetooth by viewModel.repository.bluetooth.collectAsState()
     val wifi by viewModel.repository.wifi.collectAsState()
     val location by viewModel.repository.location.collectAsState()
+
+    val loRaUrl by viewModel.repository.loRaUrl.collectAsState()
+    val opticalUrl by viewModel.repository.opticalUrl.collectAsState()
+    val urbanUrl by viewModel.repository.urbanUrl.collectAsState()
+    val crowdUrl by viewModel.repository.crowdUrl.collectAsState()
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Einstellungen") }) }
@@ -96,6 +102,25 @@ fun SettingsScreen(
                 }
             }
 
+            item { SectionTitle("Backend-Endpunkte (Pilot)") }
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "Leer lassen, wenn die Quelle (noch) nicht verfügbar ist. " +
+                                "Die App fragt nur konfigurierte Endpunkte ab.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        UrlField("LoRa / LoRaWAN", loRaUrl, viewModel.repository::setLoRaUrl)
+                        UrlField("Optik (YOLO)", opticalUrl, viewModel.repository::setOpticalUrl)
+                        UrlField("Urbane Infrastruktur", urbanUrl, viewModel.repository::setUrbanUrl)
+                        UrlField("Crowd (Find My)", crowdUrl, viewModel.repository::setCrowdUrl)
+                    }
+                }
+            }
+
             item { SectionTitle("Agent") }
             item {
                 Card(
@@ -131,14 +156,6 @@ fun SettingsScreen(
                     }
                 }
             }
-
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "🔒 DSGVO-konform – Betriebsvereinbarung nach § 87 BetrVG.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
         }
     }
 }
@@ -169,4 +186,21 @@ private fun SettingRow(
         )
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
+}
+
+@Composable
+private fun UrlField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = true,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    )
 }

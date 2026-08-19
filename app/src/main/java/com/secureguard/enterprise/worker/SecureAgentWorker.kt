@@ -4,13 +4,13 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.secureguard.enterprise.data.model.AgentSettings
 import com.secureguard.enterprise.services.AgentService
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
 /**
- * Periodischer Worker, der den Agenten anstößt (WorkManager).
+ * Periodischer Worker, der einen kompletten Agent-Suchzyklus ausführt
+ * (WorkManager).
  */
 @HiltWorker
 class SecureAgentWorker @AssistedInject constructor(
@@ -21,8 +21,7 @@ class SecureAgentWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            agentService.start(AgentSettings())
-            // Kurze Laufzeit, dann stoppen, damit der Worker sauber endet.
+            agentService.runCycleOnce()
             Result.success()
         } catch (e: Exception) {
             Result.retry()

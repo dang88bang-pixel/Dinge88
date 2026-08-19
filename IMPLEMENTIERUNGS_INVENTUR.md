@@ -1,6 +1,10 @@
 # 🔍 Implementierungs-Inventur – SecureGuard Enterprise
 
-**Stand:** laufende Prüfung. Legende: ✅ real & ausführbar · 🟡 teilweise / abhängig von Hardware-Berechtigung · 🔧 Mock / Platzhalter / Demo
+**Stand:** laufende Prüfung. Legende: ✅ real & ausführbar · 🟡 real, aber von Hardware-/Backend-Verfügbarkeit abhängig · 🔧 Mock / Platzhalter / Demo
+
+> **Betriebsvereinbarung:** Ist eine **Blaupause** (Pilot-Projekt) – sie wird nur hinterlegt
+> ([`BETRIEBSVEREINBARUNG.md`](./BETRIEBSVEREINBARUNG.md)), aber **nicht an die App angebunden**
+> (keine Anzeige, keine aktive Geltung).
 
 ---
 
@@ -9,27 +13,27 @@
 | Komponente | Datei | Status | Kommentar |
 |---|---|---|---|
 | BLE-Scan | `TelemetryService.searchAsset()` | 🟡 | **Echte** `BluetoothLeScanner`-Suche; findet nur bei vorhandenem Gerät + Berechtigung etwas. |
-| WiFi (ScanResults) | `WifiService.searchAsset()` | 🟡 | **Neu implementiert** (`WifiManager` + BSSID-Abgleich). Findet nur mit Standort-/NEARBY-Permission etwas. Probe-Requests sind per öffentlichem API nicht passiv abhörbar. |
-| LoRa/LoRaWAN | `LoraService.searchAsset()` | 🔧 | Gibt immer `null` zurück (TODO). Kein Backend. |
-| Optik (Webcams/YOLO) | `OpticalService.searchAsset()` | 🔧 | Gibt immer `null` zurück (TODO). |
-| Urban | `UrbanService.searchAsset()` | 🔧 | Gibt immer `null` zurück (TODO). |
-| Crowd (Apple/Google) | `CrowdService.searchAsset()` | 🔧 | Gibt immer `null` zurück (TODO) – korrekt nur mit Einwilligung. |
-| Satellit/GPS | `SatelliteService.searchAsset()` | 🟡 | **Neu implementiert** (echte GPS-Position via `FusedLocationProviderClient`). Liefert die Geräteposition als Detection-Referenz. |
+| WiFi (ScanResults) | `WifiService.searchAsset()` | 🟡 | **Echt** (`WifiManager` + BSSID-Abgleich). Findet nur mit Standort-/NEARBY-Permission etwas. Probe-Requests sind per öffentlichem API nicht passiv abhörbar. |
+| LoRa/LoRaWAN | `LoraService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren LoRaWAN-Backend-Endpunkt (`RemoteDetectionFetcher`); ohne konfigurierte URL → `null`. |
+| Optik (Webcams/YOLO) | `OpticalService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren YOLO-Inferenz-Endpunkt; ohne URL → `null`. |
+| Urban | `UrbanService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren Open-Data-/Infrastruktur-Endpunkt; ohne URL → `null`. |
+| Crowd (Apple/Google) | `CrowdService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren Find-My-Proxy, nur mit `externalAllowed`; ohne URL → `null`. |
+| Satellit/GPS | `SatelliteService.searchAsset()` | 🟡 | **Echt** (GPS-Position via `FusedLocationProviderClient`). |
 
 ## 2. Fernsteuerung / Telemetrie
 
 | Funktion | Datei | Status | Kommentar |
 |---|---|---|---|
-| `sendCommand()` (Alarm/Motor/Batterie/…) | `TelemetryService.sendCommand()` | 🟡 | **Neu implementiert** (echter BLE-GATT-Write via `BleCommandConnector`). Funktioniert nur mit verbindbarem BLE-Gerät. |
-| `getLatestTelemetry()` | `TelemetryService.getLatestTelemetry()` | 🔧 | Gibt weiter `null` zurück (GATT-Read noch offen). |
+| `sendCommand()` (Alarm/Motor/Batterie/…) | `TelemetryService.sendCommand()` | 🟡 | **Echt** (BLE-GATT-Write via `BleCommandConnector`). Funktioniert nur mit verbindbarem BLE-Gerät. |
+| `getLatestTelemetry()` | `TelemetryService.getLatestTelemetry()` | 🟡 | **Echt** (BLE-GATT-Read via `BleCommandConnector.readTelemetry`, JSON-Telemetrie). Ohne Gerät → `null`. |
 
 ## 3. Anzeige-Werte (gefälschte/Demo-Daten)
 
 | Stelle | Datei | Status | Kommentar |
 |---|---|---|---|
-| Batterie | `DashboardViewModel` → `batteryLevel` | ✅ | **Echter Akkustand** (BatteryManager) statt 87 %. |
-| Telemetrie-Raster | `AssetDetailScreen` | ✅ | Demo-Zahlen ersetzt durch ehrliches „–" (echte Telemetrie erfordert BLE-GATT-Read, noch offen). |
-| Agent-Fortschritt | `AgentViewModel` → `progress = 85f`, `runtime = "12d 4h 32m"` | 🔧 | Simuliert / hartkodiert (offen). |
+| Batterie | `DashboardViewModel` → `batteryLevel` | ✅ | **Echter Akkustand** (BatteryManager). |
+| Telemetrie-Raster | `AssetDetailScreen` | 🟡 | Zeigt ehrlich „–" bis eine echte BLE-GATT-Telemetrie gelesen wurde (Implementierung vorhanden). |
+| Agent-Laufzeit | `AgentViewModel` → `runtime`/`progress` | ✅ | **Echt**: Laufzeit aus persistiertem Startzeitpunkt, Fortschritt aus eingestellter Gesamtdauer. |
 
 ## 4. UI-Aktionen ohne echte Wirkung
 
@@ -37,8 +41,10 @@
 |---|---|---|---|
 | Karten-Zoom/Zentrieren | `MapScreen` | ✅ | An `MapView` angebunden (`setZoom`/`animateTo`). |
 | Einstellungen-Schalter | `SettingsScreen` + `SettingsRepository` | ✅ | Persistiert (SharedPreferences); steuern den Agenten (BLE/WiFi/GPS). |
-| QR-Scan | `ScanScreen` | ✅ | **Neu implementiert** (CameraX + ML Kit Barcode), inkl. Berechtigungsfluss. |
-| Profil-Daten | `SettingsScreen` („SecureGuard Admin", „Muster GmbH") | 🔧 | Statisch. |
+| Backend-Endpunkte | `SettingsScreen` + `SettingsRepository` | ✅ | Konfigurierbare URLs für LoRa/Optik/Urban/Crowd (Pilot) – damit sind alle Quellen aktivierbar. |
+| QR-Scan | `ScanScreen` | ✅ | **Echt** (CameraX + ML Kit Barcode), inkl. Berechtigungsfluss. |
+| Agent-Worker | `SecureAgentWorker` | ✅ | Führt `runCycleOnce()` aus (einen echten Suchzyklus). |
+| Profil-Daten | `SettingsScreen` („SecureGuard Admin", „Muster GmbH") | 🔧 | Statisch (Platzhalter). |
 | Navigations-Stubs | `DashboardViewModel.navigateToDetail/…` | 🟡 | Unkritisch – Navigation wird direkt im UI über `navController` erledigt. |
 | `SecureAgentWorker` | `worker/SecureAgentWorker.kt` | 🟡 | Startet den Agenten nur an; führt die Schleife nicht im Worker aus. |
 
@@ -67,17 +73,19 @@
 - [x] 6. **Fake-Werte** → Dashboard liest echten Akkustand (BatteryManager); Asset-Detail-Telemetrie zeigt ehrlich „–" statt Demo-Zahlen; Agent-Fortschritt bleibt simuliert (siehe offen)
 - [x] 7. **QR-Scan** → echte Kamera-Erfassung (CameraX + ML Kit Barcode), Berechtigungsfluss + Ergebnisanzeige
 
-### ⏳ Noch offen
-- [ ] `AgentViewModel.progress` (85f) + `runtime` („12d 4h 32m") sind noch simuliert → echtes Laufzeit-Tracking in Persistenz
-- [ ] `TelemetryService.getLatestTelemetry()` gibt weiter `null` zurück (echte BLE-GATT-Read-Telemetrie)
-- [ ] `SecureAgentWorker` startet den Agenten nur an (kein Foreground-Service)
-- [ ] **Infrastruktur-abhängig (ohne externes Backend nicht ausführbar):**
-  - `LoraService` (LoRaWAN-Backend/Gateway)
-  - `OpticalService` (YOLO + Webcam-Stream / Kamera-Server)
-  - `CrowdService` (Apple/Google Find My API)
-  - `UrbanService` (Smart-City-/Open-Data-APIs)
-  - Profil-Daten („SecureGuard Admin" / „Muster GmbH") statisch
+### ✅ Aktiv (alle Teile funktional bereitgestellt)
+Alle Ortungsquellen, Fernsteuerung, Telemetrie, Kartensteuerung, Einstellungen, QR-Scan,
+Agent-Laufzeit und Worker sind **aktiv implementiert**. Die remote-/backend-abhängigen
+Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs**
+(Einstellungen → „Backend-Endpunkte") aktiviert; ohne URL geben sie sauber `null` zurück.
 
-> **Wichtiger Hinweis:** Die Infrastruktur-quellen können ohne echtes Backend nicht
-> "echt" gemacht werden. Mit echter Hardware-Vorort-Logik sind **BLE, GPS, WiFi und
-> Befehlsübertragung** vollständig ausführbar.
+### ⏳ Noch offen / bewusst zurückgestellt
+- **Profil-Daten** („SecureGuard Admin" / „Muster GmbH") sind statische Platzhalter.
+- **Betriebsvereinbarung**: Als **Blaupause hinterlegt, aber bewusst nicht angebunden**
+  (Pilot-Projekt). Keine Anzeige im App-, keine aktive Geltung.
+
+> **Wichtiger Hinweis zu Backend-Quellen:** Für echte Detektionen aus LoRa/Optik/Urban/Crowd
+> muss jeweils ein passender Endpunkt im Pilot laufen (LoRaWAN-Gateway/Proxy, YOLO-Server,
+> Open-Data-API, Find-My-Proxy) und unter „Backend-Endpunkte" konfiguriert werden.
+> **Vor Ort ohne Backend** sind **BLE, GPS, WiFi, Befehlsübertragung und Telemetrie** vollständig
+> ausführbar.

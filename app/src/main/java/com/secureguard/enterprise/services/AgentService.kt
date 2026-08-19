@@ -59,12 +59,35 @@ class AgentService @Inject constructor(
         this.settings = settings
         if (isRunning) return // Idempotent: verhindert doppelte Suchschleifen.
         isRunning = true
+        settingsRepository.setAgentStartTime(System.currentTimeMillis())
         scope.launch { runBackgroundLoop() }
         scope.launch { emitStatus() }
     }
 
     fun stop() {
         isRunning = false
+        settingsRepository.setAgentStartTime(0L)
+    }
+
+    /**
+     * Führt genau einen Suchzyklus über alle Assets aus und kehrt zurück.
+     * Wird vom Worker verwendet.
+     */
+    suspend fun runCycleOnce() {
+        try {
+            val assets = repository.getWhitelistedAssets().first()
+            assets.forEach { asset ->
+                if (asset.status != AssetStatus.MAINTENANCE) {
+                    val result = comprehensiveSearch(asset)
+                    handleSearchResult(asset, result)
+                }
+            }
+            if (settings.learningMode) {
+                learnFromExperience()
+            }
+        } catch (e: Exception) {
+            // Zyklus fehlertolerant beenden.
+        }
     }
 
     private suspend fun emitStatus() {
@@ -77,22 +100,9 @@ class AgentService @Inject constructor(
 
     private suspend fun runBackgroundLoop() {
         while (isRunning) {
-            try {
-                val assets = repository.getWhitelistedAssets().first()
-                assets.forEach { asset ->
-                    if (asset.status != AssetStatus.MAINTENANCE) {
-                        val result = comprehensiveSearch(asset)
-                        handleSearchResult(asset, result)
-                    }
-                }
-                if (settings.learningMode) {
-                    learnFromExperience()
-                }
-                val interval = calculateAdaptiveInterval()
-                delay(interval * 1000L)
-            } catch (e: Exception) {
-                delay(60_000L)
-            }
+            runCycleOnce()
+            val interval = calculateAdaptiveInterval()
+            delay(interval * 1000L)
         }
     }
 

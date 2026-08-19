@@ -3,7 +3,7 @@
 **Professionelles Sicherheits- & Ortungssystem für Unternehmen**
 
 Selbstlernender Ortungs-Agent für Firmen-Assets (Fahrzeuge, Anlagen, Geräte).
-100 % lokale Datenhaltung (Room/SQLite), DSGVO-konform, mit Betriebsvereinbarung.
+100 % lokale Datenhaltung (Room/SQLite), DSGVO-konform. *(Pilot-Projekt: Betriebsvereinbarung ist als Blaupause hinterlegt, aber noch nicht angebunden.)*
 
 ## 📱 Funktionen
 
@@ -16,7 +16,7 @@ Selbstlernender Ortungs-Agent für Firmen-Assets (Fahrzeuge, Anlagen, Geräte).
 - 🌍 **Apple/Google Crowdsourcing** – nur mit expliziter Einwilligung
 - 🏙️ **Urbane Infrastruktur** (ÖPNV, Laternen, Paketstationen, Wetterstationen)
 - 📡 **GPS / GLONASS / Galileo** (Satellitenortung)
-- 🔒 **DSGVO-konform** (Betriebsvereinbarung nach § 87 BetrVG, BDSG)
+- 🔒 **DSGVO-konform** (Pilot: Betriebsvereinbarung als Blaupause hinterlegt)
 
 ## 🛠️ Technologie-Stack
 
@@ -72,9 +72,13 @@ auf `main`/`develop` und erstellt bei Tags (`v*`) ein GitHub Release mit APK.
 > **Hinweis:** Ohne gesetzte Secrets wird das APK **unsigned** gebaut und hochgeladen.
 > Für die Verteilung signierst du das APK bitte mit deinem eigenen Keystore.
 
-## 🧭 Rechtlicher Rahmen
+## 🧭 Rechtlicher Rahmen (Pilot-Projekt)
 
-- Betriebsvereinbarung nach **§ 87 BetrVG** – siehe [`BETRIEBSVEREINBARUNG.md`](./BETRIEBSVEREINBARUNG.md)
+> **Hinweis:** Dies ist aktuell ein **Pilot-Projekt**. Die Betriebsvereinbarung ist eine
+> **Blaupause** und wird lediglich hinterlegt, aber **noch nicht an die App angebunden**
+> (keine Anzeige, keine aktive Geltung). Siehe
+> [`BETRIEBSVEREINBARUNG.md`](./BETRIEBSVEREINBARUNG.md).
+
 - **DSGVO-konform**: keine Personenüberwachung, ausschließlich Firmen-Assets
 - **Einwilligungspflicht** für externe Quellen (Apple/Google Find My Crowdsourcing)
 - Daten werden lokal gespeichert und standardmäßig nach 30 Tagen automatisch gelöscht
