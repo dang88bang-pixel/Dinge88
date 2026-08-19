@@ -88,18 +88,6 @@ class AssetListViewModel @Inject constructor(
         _selectedStatus.value = null
         applyFilters()
     }
-
-    fun navigateToDetail(assetId: String) {
-        // Wird in der UI behandelt
-    }
-
-    fun navigateToAddAsset() {
-        // Wird in der UI behandelt
-    }
-
-    fun startQRScan() {
-        // Wird in der UI behandelt
-    }
 }
 
 data class AssetListUiState(

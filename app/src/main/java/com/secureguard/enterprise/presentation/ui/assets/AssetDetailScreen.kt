@@ -28,6 +28,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +41,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -62,11 +67,13 @@ fun AssetDetailScreen(
     val isSearching by viewModel.isSearching.collectAsState()
     val searchResult by viewModel.searchResult.collectAsState()
     val actionResult by viewModel.actionResult.collectAsState()
+    val telemetry by viewModel.telemetry.collectAsState()
 
     LaunchedEffect(assetId) {
         viewModel.loadAsset(assetId)
     }
 
+    var menuOpen by remember { mutableStateOf(false) }
     val a = asset
 
     Scaffold(
@@ -82,8 +89,41 @@ fun AssetDetailScreen(
                     IconButton(onClick = { viewModel.refreshTelemetry() }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Aktualisieren")
                     }
-                    IconButton(onClick = { /* Menü */ }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "Menü")
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "Menü")
+                        }
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Als Online markieren") },
+                                onClick = { menuOpen = false; viewModel.setStatus(AssetStatus.ONLINE) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Als Wartung markieren") },
+                                onClick = { menuOpen = false; viewModel.setStatus(AssetStatus.MAINTENANCE) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Als Offline markieren") },
+                                onClick = { menuOpen = false; viewModel.setStatus(AssetStatus.OFFLINE) }
+                            )
+                            if (a != null) {
+                                DropdownMenuItem(
+                                    text = { Text(if (a.externalAllowed) "Externe Quellen sperren" else "Externe Quellen erlauben") },
+                                    onClick = { menuOpen = false; viewModel.setExternalAllowed(!a.externalAllowed) }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Asset löschen") },
+                                onClick = {
+                                    menuOpen = false
+                                    viewModel.deleteAsset()
+                                    navController.navigateUp()
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -201,8 +241,11 @@ fun AssetDetailScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = "Echte Telemetrie (Batterie, Motor, …) wird nach " +
-                                    "erfolgreicher BLE-Verbindung angezeigt. Aktuell: –",
+                                text = if (telemetry == null) {
+                                    "Noch keine Telemetrie gelesen. Tippe oben auf Aktualisieren (↻)."
+                                } else {
+                                    "Telemetrie zuletzt über BLE-GATT gelesen."
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -210,17 +253,23 @@ fun AssetDetailScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                TelemetryItem("🔋 Batterie", "–")
-                                TelemetryItem("⛽ Kraftstoff", "–")
-                                TelemetryItem("🔧 Motor", "–")
+                                TelemetryItem("🔋 Batterie", telemetry?.battery?.let { "$it%" } ?: "–")
+                                TelemetryItem("⛽ Kraftstoff", telemetry?.fuel?.let { "$it%" } ?: "–")
+                                TelemetryItem("🔧 Motor", telemetry?.engineOk?.let { if (it) "OK" else "FEHLER" } ?: "–")
                                 TelemetryItem("🛞 Reifen", "–")
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                TelemetryItem("⏱ Betriebsstd.", "–")
-                                TelemetryItem("📏 Kilometer", "–")
+                                TelemetryItem(
+                                    "⏱ Betriebsstd.",
+                                    telemetry?.operatingHours?.let { "%.1f h".format(it) } ?: "–"
+                                )
+                                TelemetryItem(
+                                    "📏 Kilometer",
+                                    telemetry?.distanceKm?.let { "%.0f km".format(it) } ?: "–"
+                                )
                             }
                         }
                     }
@@ -324,23 +373,45 @@ fun AssetDetailScreen(
                                 }
                                 Button(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { /* Externe Quellen */ },
-                                    enabled = a.externalAllowed
+                                    onClick = { viewModel.searchExternal() },
+                                    enabled = a.externalAllowed && !isSearching
                                 ) {
                                     Text("🌍 Extern")
                                 }
                                 Button(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { /* Satellit */ }
+                                    onClick = { viewModel.searchSatellite() },
+                                    enabled = !isSearching
                                 ) {
                                     Text("📡 Satellit")
                                 }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { viewModel.searchBluetooth() },
+                                    enabled = !isSearching
+                                ) {
+                                    Text("📶 Bluetooth")
+                                }
+                                Text(
+                                    text = "Einzelne Quelle antippen, um gezielt zu suchen.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .weight(1.4f)
+                                        .align(Alignment.CenterVertically)
+                                )
                             }
                             val sres = searchResult
                             if (sres != null) {
                                 Text(
                                     text = if (sres.found) {
-                                        "✅ Gefunden! RSSI: ${sres.detection?.rssi} dBm"
+                                        "✅ Gefunden via ${sres.detection?.sourceType?.name} | " +
+                                            "RSSI: ${sres.detection?.rssi} dBm"
                                     } else {
                                         "❌ Nicht gefunden"
                                     },

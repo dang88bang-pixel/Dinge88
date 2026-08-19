@@ -14,8 +14,10 @@ import com.secureguard.enterprise.services.LoraService
 import com.secureguard.enterprise.services.NotificationService
 import com.secureguard.enterprise.services.OpticalService
 import com.secureguard.enterprise.services.SatelliteService
+import com.secureguard.enterprise.services.Telemetry
 import com.secureguard.enterprise.services.TelemetryService
 import com.secureguard.enterprise.services.UrbanService
+import com.secureguard.enterprise.services.WifiService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +30,7 @@ import javax.inject.Inject
 class AssetDetailViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
     private val telemetryService: TelemetryService,
+    private val wifiService: WifiService,
     private val loraService: LoraService,
     private val opticalService: OpticalService,
     private val urbanService: UrbanService,
@@ -51,6 +54,9 @@ class AssetDetailViewModel @Inject constructor(
     private val _actionResult = MutableStateFlow<ActionResult?>(null)
     val actionResult: StateFlow<ActionResult?> = _actionResult.asStateFlow()
 
+    private val _telemetry = MutableStateFlow<Telemetry?>(null)
+    val telemetry: StateFlow<Telemetry?> = _telemetry.asStateFlow()
+
     fun loadAsset(assetId: String) {
         viewModelScope.launch {
             val found = repository.getAssetById(assetId)
@@ -66,6 +72,40 @@ class AssetDetailViewModel @Inject constructor(
             repository.getDetections(mac).collect { detectionList ->
                 _detections.value = detectionList
             }
+        }
+    }
+
+    // ============ STATUS / ASSET ============
+
+    fun setStatus(status: AssetStatus) {
+        viewModelScope.launch {
+            val asset = _asset.value ?: return@launch
+            val updated = asset.copy(status = status)
+            repository.updateAsset(updated)
+            _asset.value = updated
+            _actionResult.value = ActionResult(true, "Status auf ${status.name} gesetzt")
+        }
+    }
+
+    fun setExternalAllowed(enabled: Boolean) {
+        viewModelScope.launch {
+            val asset = _asset.value ?: return@launch
+            val updated = asset.copy(externalAllowed = enabled)
+            repository.updateAsset(updated)
+            _asset.value = updated
+            _actionResult.value = ActionResult(
+                true,
+                if (enabled) "Externe Quellen erlaubt" else "Externe Quellen gesperrt"
+            )
+        }
+    }
+
+    fun deleteAsset() {
+        viewModelScope.launch {
+            val asset = _asset.value ?: return@launch
+            repository.deleteAsset(asset)
+            _actionResult.value = ActionResult(true, "Asset gelöscht")
+            _asset.value = null
         }
     }
 
@@ -139,31 +179,70 @@ class AssetDetailViewModel @Inject constructor(
             return if (success) {
                 ActionResult(true, successMessage)
             } else {
-                ActionResult(false, "Keine Verbindung")
+                ActionResult(false, "Keine Verbindung zum Gerät")
             }
         }
-        return ActionResult(false, "Keine MAC-Adresse")
+        return ActionResult(false, "Keine MAC-Adresse hinterlegt")
     }
 
     // ============ SUCHE ============
 
     fun startSearch() {
+        val asset = _asset.value ?: return
+        runSearch(
+            asset,
+            listOf(
+                { telemetryService.searchAsset(asset) },
+                { wifiService.searchAsset(asset) },
+                { loraService.searchAsset(asset) },
+                { opticalService.searchAsset(asset) },
+                { urbanService.searchAsset(asset) },
+                { if (asset.externalAllowed) crowdService.searchAsset(asset) else null },
+                { satelliteService.searchAsset(asset) }
+            )
+        )
+    }
+
+    fun searchExternal() {
+        val asset = _asset.value ?: return
+        runSearch(
+            asset,
+            listOf(
+                { if (asset.externalAllowed) crowdService.searchAsset(asset) else null }
+            )
+        )
+    }
+
+    fun searchSatellite() {
+        val asset = _asset.value ?: return
+        runSearch(asset, listOf({ satelliteService.searchAsset(asset) }))
+    }
+
+    fun searchBluetooth() {
+        val asset = _asset.value ?: return
+        runSearch(asset, listOf({ telemetryService.searchAsset(asset) }))
+    }
+
+    private fun runSearch(asset: Asset, searches: List<suspend () -> Detection?>) {
         viewModelScope.launch {
             _isSearching.value = true
-            val asset = _asset.value ?: return@launch
+            _searchResult.value = null
 
-            val results = listOf(
-                telemetryService.searchAsset(asset),
-                loraService.searchAsset(asset),
-                opticalService.searchAsset(asset),
-                urbanService.searchAsset(asset),
-                if (asset.externalAllowed) crowdService.searchAsset(asset) else null,
-                satelliteService.searchAsset(asset)
-            )
-
+            val results = searches.map { runCatching { it() }.getOrNull() }
             val best = results.filterNotNull().minByOrNull { it.rssi }
             _searchResult.value = if (best != null) {
                 repository.insertDetection(best)
+                // Asset sofort als online markieren.
+                val updated = asset.copy(
+                    status = AssetStatus.ONLINE,
+                    lastSeen = Date(),
+                    latitude = best.latitude ?: asset.latitude,
+                    longitude = best.longitude ?: asset.longitude,
+                    rssi = best.rssi
+                )
+                repository.updateAsset(updated)
+                _asset.value = updated
+                loadDetections(asset.mac)
                 SearchResult(true, best)
             } else {
                 SearchResult(false)
@@ -172,10 +251,13 @@ class AssetDetailViewModel @Inject constructor(
         }
     }
 
+    // ============ TELEMETRIE ============
+
     fun refreshTelemetry() {
         viewModelScope.launch {
             val asset = _asset.value ?: return@launch
             val telemetry = telemetryService.getLatestTelemetry(asset.mac)
+            _telemetry.value = telemetry
             if (telemetry != null) {
                 repository.updateAssetStatus(
                     mac = asset.mac,
@@ -184,13 +266,12 @@ class AssetDetailViewModel @Inject constructor(
                     lat = telemetry.latitude,
                     lon = telemetry.longitude
                 )
+                _actionResult.value = ActionResult(true, "Telemetrie aktualisiert")
                 loadAsset(asset.id)
+            } else {
+                _actionResult.value = ActionResult(false, "Keine Telemetrie verfügbar (kein Gerät erreichbar)")
             }
         }
-    }
-
-    fun navigateBack() {
-        // Wird in der UI behandelt
     }
 
     override fun onCleared() {
