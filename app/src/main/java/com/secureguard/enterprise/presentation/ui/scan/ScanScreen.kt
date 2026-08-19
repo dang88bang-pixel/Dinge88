@@ -44,23 +44,30 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
+import com.secureguard.enterprise.data.repository.ScanResultStore
 import java.util.concurrent.Executors
 
 /**
  * QR-/Barcode-Erfassung über CameraX + ML Kit.
  *
  * Erfordert die CAMERA-Berechtigung. Beim Erkennen eines Codes wird der Wert
- * angezeigt und kann übernommen werden.
+ * angezeigt und in den geteilten ScanResultStore geschrieben, damit ihn das
+ * "Asset hinzufügen"-Formular automatisch übernehmen kann.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScanScreen(navController: NavController) {
+fun ScanScreen(
+    navController: NavController,
+    viewModel: ScanViewModel = hiltViewModel()
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scanStore = viewModel.scanResultStore
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -80,7 +87,7 @@ fun ScanScreen(navController: NavController) {
     // ML-Kit Scanner einmalig anlegen.
     val scanner: BarcodeScanner = remember { BarcodeScanning.getClient() }
 
-    val analyzer = remember(scanner) {
+    val analyzer = remember(scanner, scanStore) {
         object : ImageAnalysis.Analyzer {
             override fun analyze(imageProxy: ImageProxy) {
                 val mediaImage = imageProxy.image
@@ -94,6 +101,8 @@ fun ScanScreen(navController: NavController) {
                             val raw = barcodes.firstOrNull { it.rawValue != null }?.rawValue
                             if (raw != null && scannedValue == null) {
                                 scannedValue = raw
+                                // Ergebnis für das "Asset hinzufügen"-Formular bereitstellen.
+                                scanStore.setScannedValue(raw)
                             }
                         }
                         .addOnCompleteListener { imageProxy.close() }
