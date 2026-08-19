@@ -6,6 +6,13 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Keystore from environment (CI) or local.properties; falls back to the debug
+// keystore so `assembleRelease` always produces an installable signed APK.
+val keystoreFile = rootProject.file("secureguard-keystore.jks")
+val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+val keyAlias = System.getenv("KEY_ALIAS") ?: "secureguard"
+val keyPassword = System.getenv("KEY_PASSWORD") ?: keystorePassword
+
 android {
     namespace = "com.secureguard.enterprise"
     compileSdk = 34
@@ -23,9 +30,29 @@ android {
         }
     }
 
+    val releaseSigning = signingConfigs.create("release") {
+        if (keystoreFile.exists()) {
+            storeFile = keystoreFile
+            storePassword = keystorePassword
+            this.keyAlias = keyAlias
+            keyPassword = keyPassword
+        } else {
+            // No release keystore supplied — sign with the debug key so the
+            // release APK is installable. Override via KEYSTORE_* in CI.
+            val debugKeystore = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            if (debugKeystore.exists()) {
+                storeFile = debugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = releaseSigning
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
