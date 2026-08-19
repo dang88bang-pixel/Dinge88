@@ -42,6 +42,11 @@ Selbstlernender Ortungs-Agent für Firmen-Assets (Fahrzeuge, Anlagen, Geräte).
 4. Laufzeit-Berechtigungen erteilen (Bluetooth, Standort, Benachrichtigungen)
 5. Agent starten
 
+> **Hinweis zum lokalen Build in dieser Sandbox:** Siehe
+> [`TOOLCHAIN.md`](./TOOLCHAIN.md) – hier ist nur eine JDK-Runtime (ohne `javac`)
+> erreichbar; Maven/Google/Gradle-Server sind gefirewallt, daher ist der **Build über
+> GitHub Actions** der vorgesehene Weg.
+
 ## 🔧 Lokaler Build
 
 ```bash
