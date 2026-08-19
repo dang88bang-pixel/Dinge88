@@ -21,6 +21,9 @@ interface AssetDao {
     @Query("SELECT * FROM assets WHERE mac = :mac")
     suspend fun getByMac(mac: String): Asset?
 
+    @Query("SELECT * FROM assets WHERE id = :id")
+    suspend fun getById(id: String): Asset?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(asset: Asset)
 

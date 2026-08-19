@@ -54,6 +54,7 @@ class AgentService @Inject constructor(
 
     fun start(settings: AgentSettings) {
         this.settings = settings
+        if (isRunning) return // Idempotent: verhindert doppelte Suchschleifen.
         isRunning = true
         scope.launch { runBackgroundLoop() }
         scope.launch { emitStatus() }

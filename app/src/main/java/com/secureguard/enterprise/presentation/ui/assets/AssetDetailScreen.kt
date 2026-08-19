@@ -1,6 +1,8 @@
 package com.secureguard.enterprise.presentation.ui.assets
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,14 +10,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -23,90 +39,376 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
 import com.secureguard.enterprise.data.model.AssetStatus
-import com.secureguard.enterprise.util.formatDateTime
+import com.secureguard.enterprise.presentation.components.ActionButton
+import java.text.SimpleDateFormat
+import java.util.Locale
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssetDetailScreen(
+    navController: NavController,
     assetId: String,
-    viewModel: AssetViewModel = hiltViewModel()
+    viewModel: AssetDetailViewModel = hiltViewModel()
 ) {
-    LaunchedEffect(assetId) { viewModel.selectAsset(assetId) }
-
-    val asset by viewModel.selectedAsset.collectAsState()
+    val asset by viewModel.asset.collectAsState()
     val detections by viewModel.detections.collectAsState()
+    val isSearching by viewModel.isSearching.collectAsState()
+    val searchResult by viewModel.searchResult.collectAsState()
+    val actionResult by viewModel.actionResult.collectAsState()
+
+    LaunchedEffect(assetId) {
+        viewModel.loadAsset(assetId)
+    }
+
+    val a = asset
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(asset?.shortName ?: "Asset") },
+                title = { Text(a?.shortName ?: "Asset Detail") },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.clearSelection() }) {
+                    IconButton(onClick = { navController.navigateUp() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.refreshTelemetry() }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Aktualisieren")
+                    }
+                    IconButton(onClick = { /* Menü */ }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "Menü")
                     }
                 }
             )
         }
     ) { paddingValues ->
-        val a = asset
         if (a == null) {
-            Text(
-                text = "Asset nicht gefunden.",
-                modifier = Modifier.padding(paddingValues).padding(24.dp)
-            )
-            return@Scaffold
-        }
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(a.name, style = MaterialTheme.typography.titleLarge)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Status: ${a.status.name}", style = MaterialTheme.typography.bodyMedium)
-                        Text("MAC: ${a.mac}", style = MaterialTheme.typography.bodyMedium)
-                        Text("Position: ${a.latitude ?: "–"}, ${a.longitude ?: "–"}", style = MaterialTheme.typography.bodyMedium)
-                        a.lastSeen?.let {
-                            Text("Zuletzt gesehen: ${it.formatDateTime()}", style = MaterialTheme.typography.bodyMedium)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Status-Header
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = when (a.status) {
+                                AssetStatus.ONLINE -> Color.Green.copy(alpha = 0.1f)
+                                AssetStatus.MAINTENANCE -> Color(0xFFFFA000).copy(alpha = 0.1f)
+                                AssetStatus.OFFLINE -> Color.Red.copy(alpha = 0.1f)
+                                else -> Color.Gray.copy(alpha = 0.1f)
+                            }
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .background(
+                                                color = statusColor(a.status),
+                                                shape = CircleShape
+                                            )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        a.status.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = statusColor(a.status)
+                                    )
+                                }
+                                Text(
+                                    "📶 ${a.rssi} dBm",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "📍 ${a.latitude ?: "Unbekannt"}, ${a.longitude ?: "Unbekannt"}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                "⏱ Letzte Aktualisierung: ${
+                                    a.lastSeen?.let {
+                                        SimpleDateFormat("HH:mm", Locale.getDefault()).format(it)
+                                    } ?: "Nie"
+                                }",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { viewModel.setStatus(a.id, AssetStatus.ONLINE) }) {
-                                Text("Online")
-                            }
-                            OutlinedButton(onClick = { viewModel.setStatus(a.id, AssetStatus.MAINTENANCE) }) {
-                                Text("Wartung")
-                            }
-                            OutlinedButton(onClick = { viewModel.setStatus(a.id, AssetStatus.OFFLINE) }) {
-                                Text("Offline")
+                    }
+                }
+
+                // Kartenvorschau
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "🗺️ Karte mit Position",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (a.latitude != null && a.longitude != null) {
+                                    Text(
+                                        "📍 ${a.latitude}, ${a.longitude}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
-            item { Text("Detections", style = MaterialTheme.typography.titleMedium) }
-            if (detections.isEmpty()) {
-                item { Text("Keine Detections vorhanden.") }
-            } else {
-                items(detections.size) { index ->
-                    val d = detections[index]
+
+                // Telemetrie
+                item {
+                    Text("📊 Telemetrie", style = MaterialTheme.typography.titleMedium)
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("Quelle: ${d.sourceType.name}", style = MaterialTheme.typography.bodyMedium)
-                            Text("RSSI: ${d.rssi} dBm | ${d.timestamp.formatDateTime()}", style = MaterialTheme.typography.bodySmall)
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                TelemetryItem("🔋 Batterie", "78%")
+                                TelemetryItem("⛽ Kraftstoff", "45%")
+                                TelemetryItem("🔧 Motor", "OK")
+                                TelemetryItem("🛞 Reifen", "OK")
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                TelemetryItem("⏱ Betriebsstd.", "12.456 h")
+                                TelemetryItem("📏 Kilometer", "234.567 km")
+                            }
+                        }
+                    }
+                }
+
+                // Aktionen
+                item {
+                    Text("🎯 Aktionen", style = MaterialTheme.typography.titleMedium)
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                ActionButton(
+                                    modifier = Modifier.weight(1f),
+                                    icon = Icons.Filled.Warning,
+                                    label = "🔔 Alarm",
+                                    onClick = { viewModel.executeAction(ActionType.ALARM) },
+                                    enabled = a.status == AssetStatus.ONLINE
+                                )
+                                ActionButton(
+                                    modifier = Modifier.weight(1f),
+                                    icon = Icons.Filled.Lightbulb,
+                                    label = "💡 Blinken",
+                                    onClick = { viewModel.executeAction(ActionType.LIGHT) },
+                                    enabled = a.status == AssetStatus.ONLINE
+                                )
+                                ActionButton(
+                                    modifier = Modifier.weight(1f),
+                                    icon = Icons.Filled.PowerSettingsNew,
+                                    label = "🔇 Motor",
+                                    onClick = { viewModel.executeAction(ActionType.MOTOR_OFF) },
+                                    enabled = a.status == AssetStatus.ONLINE
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                ActionButton(
+                                    modifier = Modifier.weight(1f),
+                                    icon = Icons.Filled.BatteryAlert,
+                                    label = "🔋 Batterie",
+                                    onClick = { viewModel.executeAction(ActionType.BATTERY) },
+                                    enabled = a.status == AssetStatus.ONLINE
+                                )
+                                ActionButton(
+                                    modifier = Modifier.weight(1f),
+                                    icon = Icons.Filled.Message,
+                                    label = "📝 Nachricht",
+                                    onClick = { viewModel.executeAction(ActionType.MESSAGE) },
+                                    enabled = a.status == AssetStatus.ONLINE
+                                )
+                                ActionButton(
+                                    modifier = Modifier.weight(1f),
+                                    icon = Icons.Filled.LocationOn,
+                                    label = "📍 Position",
+                                    onClick = { viewModel.executeAction(ActionType.POSITION) },
+                                    enabled = a.status == AssetStatus.ONLINE
+                                )
+                            }
+                            val res = actionResult
+                            if (res != null && res != ActionResult.Processing) {
+                                Text(
+                                    text = if (res.success) "✅ ${res.message}" else "❌ ${res.message}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (res.success) Color.Green else Color.Red,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Weitere Suchoptionen
+                item {
+                    Text("🔍 Weitere Suchoptionen", style = MaterialTheme.typography.titleMedium)
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { viewModel.startSearch() },
+                                    enabled = !isSearching
+                                ) {
+                                    if (isSearching) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                    } else {
+                                        Text("🔄 Suche starten")
+                                    }
+                                }
+                                Button(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { /* Externe Quellen */ },
+                                    enabled = a.externalAllowed
+                                ) {
+                                    Text("🌍 Extern")
+                                }
+                                Button(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { /* Satellit */ }
+                                ) {
+                                    Text("📡 Satellit")
+                                }
+                            }
+                            val sres = searchResult
+                            if (sres != null) {
+                                Text(
+                                    text = if (sres.found) {
+                                        "✅ Gefunden! RSSI: ${sres.detection?.rssi} dBm"
+                                    } else {
+                                        "❌ Nicht gefunden"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Historie
+                item {
+                    Text("📋 Historien (${detections.size})", style = MaterialTheme.typography.titleMedium)
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (detections.isEmpty()) {
+                                Text(
+                                    "Keine Historieneinträge",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                detections.take(10).forEach { detection ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            SimpleDateFormat("HH:mm", Locale.getDefault())
+                                                .format(detection.timestamp),
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Text(
+                                            "${detection.sourceType.name} | 📶 ${detection.rssi} dBm",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        if (detection.latitude != null) {
+                                            Text(
+                                                "📍 ${"%.4f".format(detection.latitude)}, ${
+                                                    "%.4f".format(detection.longitude)
+                                                }",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun TelemetryItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+private fun statusColor(status: AssetStatus): Color = when (status) {
+    AssetStatus.ONLINE -> Color.Green
+    AssetStatus.MAINTENANCE -> Color(0xFFFFA000)
+    AssetStatus.OFFLINE -> Color.Red
+    else -> Color.Gray
 }

@@ -1,5 +1,10 @@
 package com.secureguard.enterprise.presentation.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Map
@@ -22,11 +27,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.secureguard.enterprise.presentation.ui.actions.ActionsScreen
+import com.secureguard.enterprise.presentation.ui.addasset.AddAssetScreen
 import com.secureguard.enterprise.presentation.ui.agent.AgentConfigScreen
+import com.secureguard.enterprise.presentation.ui.alerts.AlertsScreen
 import com.secureguard.enterprise.presentation.ui.assets.AssetDetailScreen
 import com.secureguard.enterprise.presentation.ui.assets.AssetListScreen
 import com.secureguard.enterprise.presentation.ui.dashboard.DashboardScreen
 import com.secureguard.enterprise.presentation.ui.map.MapScreen
+import com.secureguard.enterprise.presentation.ui.scan.ScanScreen
 import com.secureguard.enterprise.presentation.ui.settings.SettingsScreen
 
 sealed class NavItem(val route: String, val label: String, val icon: ImageVector) {
@@ -79,18 +87,44 @@ fun SecureGuardNavHost() {
             startDestination = NavItem.Dashboard.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(NavItem.Dashboard.route) { DashboardScreen() }
+            // Hauptziele
+            composable(NavItem.Dashboard.route) { DashboardScreen(navController) }
             composable(NavItem.Assets.route) { AssetListScreen(navController) }
-            composable(NavItem.Map.route) { MapScreen() }
-            composable(NavItem.Actions.route) { ActionsScreen() }
+            composable(NavItem.Map.route) { MapScreen(navController) }
+            composable(NavItem.Actions.route) { ActionsScreen(navController) }
             composable(NavItem.Settings.route) { SettingsScreen(navController) }
-            composable("asset_detail/{assetId}") { backStackEntry ->
+
+            // Detailziele mit Slide-Übergang
+            composable(
+                route = "asset_detail/{assetId}",
+                enterTransition = { slideInHorizontally(tween(300)) { it } },
+                exitTransition = { slideOutHorizontally(tween(300)) { -it } }
+            ) { backStackEntry ->
                 val assetId = backStackEntry.arguments?.getString("assetId")
                 if (assetId != null) {
-                    AssetDetailScreen(assetId)
+                    AssetDetailScreen(navController, assetId)
                 }
             }
-            composable("agent_config") { AgentConfigScreen() }
+            composable(
+                route = "agent_config",
+                enterTransition = { fadeIn(tween(250)) },
+                exitTransition = { fadeOut(tween(250)) }
+            ) { AgentConfigScreen(navController) }
+            composable(
+                route = "alerts",
+                enterTransition = { fadeIn(tween(250)) },
+                exitTransition = { fadeOut(tween(250)) }
+            ) { AlertsScreen(navController) }
+            composable(
+                route = "add_asset",
+                enterTransition = { slideInHorizontally(tween(300)) { it } },
+                exitTransition = { slideOutHorizontally(tween(300)) { -it } }
+            ) { AddAssetScreen(navController) }
+            composable(
+                route = "scan",
+                enterTransition = { slideInHorizontally(tween(300)) { it } },
+                exitTransition = { slideOutHorizontally(tween(300)) { -it } }
+            ) { ScanScreen(navController) }
         }
     }
 }

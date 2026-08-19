@@ -82,7 +82,39 @@ class TelemetryService @Inject constructor(
         return ContextCompat.checkSelfPermission(context, perm) == PackageManager.PERMISSION_GRANTED
     }
 
+    /**
+     * Sendet einen Befehl an das Asset (Platzhalter).
+     *
+     * TODO: Echte Umsetzung z. B. über BLE-GATT-Write, LoRa-Backend oder
+     * Fernsteuerungs-Server. Aktuell wird immer `false` zurückgegeben.
+     */
+    suspend fun sendCommand(mac: String, command: String): Boolean {
+        // TODO: Befehl an das Gerät senden.
+        return false
+    }
+
+    /**
+     * Liest die letzte Telemetrie für ein Asset (Platzhalter).
+     */
+    suspend fun getLatestTelemetry(mac: String): Telemetry? {
+        // TODO: Telemetrie (Batterie, Motor, GPS, ...) abrufen.
+        return null
+    }
+
     companion object {
         private const val SCAN_TIMEOUT_MS = 4_000L
     }
 }
+
+/**
+ * Telemetriedaten eines Assets.
+ */
+data class Telemetry(
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val battery: Int? = null,
+    val fuel: Int? = null,
+    val engineOk: Boolean = true,
+    val distanceKm: Double? = null,
+    val operatingHours: Double? = null
+)

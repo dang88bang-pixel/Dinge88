@@ -31,6 +31,19 @@ class NotificationService @Inject constructor(
         notificationManager.createNotificationChannel(channel)
     }
 
+    fun sendActionNotification(asset: Asset, actionName: String, success: Boolean) {
+        val title = if (success) "✅ ${asset.shortName}" else "❌ ${asset.shortName}"
+        val content = "${asset.shortName}: Aktion '$actionName' " +
+            (if (success) "erfolgreich ausgeführt." else "fehlgeschlagen.")
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setAutoCancel(true)
+            .build()
+        notificationManager.notify("${asset.id}-$actionName".hashCode(), notification)
+    }
+
     fun sendFoundNotification(asset: Asset, detection: Detection) {
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle("🛡️ ${asset.shortName} gefunden!")

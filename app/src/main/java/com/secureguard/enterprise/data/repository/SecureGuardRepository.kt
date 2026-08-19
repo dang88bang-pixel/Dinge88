@@ -20,6 +20,7 @@ class SecureGuardRepository @Inject constructor(
     fun getAllAssets(): Flow<List<Asset>> = database.assetDao().getAll()
     fun getWhitelistedAssets(): Flow<List<Asset>> = database.assetDao().getWhitelisted()
     suspend fun getAssetByMac(mac: String): Asset? = database.assetDao().getByMac(mac)
+    suspend fun getAssetById(id: String): Asset? = database.assetDao().getById(id)
     suspend fun insertAsset(asset: Asset) = database.assetDao().insert(asset)
     suspend fun updateAsset(asset: Asset) = database.assetDao().update(asset)
     suspend fun deleteAsset(asset: Asset) = database.assetDao().delete(asset)
