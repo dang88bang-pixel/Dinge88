@@ -241,6 +241,34 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            item { SectionTitle("Über die App") }
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("SecureGuard Enterprise", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Version 1.0.0",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "🧠 Selbstlernender Ortungs-Agent für Firmen-Assets. " +
+                                "Alle Daten werden lokal gespeichert.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            "🔒 DSGVO-konform – Pilot-Projekt. " +
+                                "Die Betriebsvereinbarung ist als Blaupause hinterlegt, aber noch nicht angebunden.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }
