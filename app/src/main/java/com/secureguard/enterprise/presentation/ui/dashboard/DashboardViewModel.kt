@@ -1,5 +1,9 @@
 package com.secureguard.enterprise.presentation.ui.dashboard
 
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.AgentSettings
@@ -8,6 +12,7 @@ import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.services.AgentService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +25,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: SecureGuardRepository,
     private val agentService: AgentService
 ) : ViewModel() {
@@ -37,6 +43,21 @@ class DashboardViewModel @Inject constructor(
         loadAssets()
         monitorAgentStatus()
         startAgent()
+        loadBatteryLevel()
+    }
+
+    /** Liest den echten Akkuladestand des Geräts. */
+    private fun loadBatteryLevel() {
+        val batteryStatus = context.registerReceiver(
+            null,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        ) ?: return
+        val level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+        if (level >= 0 && scale > 0) {
+            val percent = (level * 100 / scale).coerceIn(0, 100)
+            _uiState.update { it.copy(batteryLevel = percent) }
+        }
     }
 
     private fun loadAssets() {
@@ -133,6 +154,6 @@ data class DashboardUiState(
     val activeSearches: Int = 0,
     val alertCount: Int = 0,
     val agentRunning: Boolean = false,
-    val batteryLevel: Int = 87,
+    val batteryLevel: Int = -1,
     val lastSyncTime: String = "--:--"
 )

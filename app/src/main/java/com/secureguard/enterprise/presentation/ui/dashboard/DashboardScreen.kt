@@ -126,7 +126,14 @@ fun DashboardScreen(
                         "📶 ${uiState.onlineAssets}/${uiState.totalAssets} Assets",
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    Text("🔋 ${uiState.batteryLevel}%", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = if (uiState.batteryLevel >= 0) {
+                            "🔋 ${uiState.batteryLevel}%"
+                        } else {
+                            "🔋 –"
+                        },
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                     Text("⏱ ${uiState.lastSyncTime}", style = MaterialTheme.typography.bodySmall)
                 }
             }

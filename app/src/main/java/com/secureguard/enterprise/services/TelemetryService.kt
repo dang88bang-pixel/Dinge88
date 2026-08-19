@@ -15,6 +15,7 @@ import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -26,7 +27,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class TelemetryService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val commandConnector: BleCommandConnector
 ) {
     private val _detections = MutableSharedFlow<Detection>(extraBufferCapacity = 100)
     val detections = _detections.asSharedFlow()
@@ -83,26 +85,55 @@ class TelemetryService @Inject constructor(
     }
 
     /**
-     * Sendet einen Befehl an das Asset (Platzhalter).
+     * Sendet einen Befehl an das Asset über BLE-GATT (Write).
      *
-     * TODO: Echte Umsetzung z. B. über BLE-GATT-Write, LoRa-Backend oder
-     * Fernsteuerungs-Server. Aktuell wird immer `false` zurückgegeben.
+     * Verbindet sich mit der MAC-Adresse, durchsucht die Services und schreibt
+     * den Befehl in die erste beschreibbare Charakteristik (WRITE oder
+     * WRITE_NO_RESPONSE). Fehlertolerant: ohne Gerät/Verbindung wird `false`
+     * zurückgegeben, ohne zu crashen.
      */
     suspend fun sendCommand(mac: String, command: String): Boolean {
-        // TODO: Befehl an das Gerät senden.
-        return false
+        if (mac.isBlank()) return false
+        if (!hasBleConnectPermission()) return false
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
+        if (!adapter.isEnabled) return false
+        // getRemoteDevice wirft bei ungültiger MAC eine IllegalArgumentException.
+        val device = runCatching { adapter.getRemoteDevice(mac) }.getOrNull() ?: return false
+
+        return withTimeoutOrNull(GATT_TIMEOUT_MS) {
+            try {
+                val result = commandConnector.execute(device, command)
+                result
+            } catch (e: Exception) {
+                false
+            }
+        } ?: false
     }
 
     /**
      * Liest die letzte Telemetrie für ein Asset (Platzhalter).
+     *
+     * TODO: Telemetrie (Batterie, Motor, GPS, ...) über BLE-GATT-Read abrufen.
+     * Aktuell wird `null` zurückgegeben; die UI zeigt dann "Unbekannt".
      */
     suspend fun getLatestTelemetry(mac: String): Telemetry? {
-        // TODO: Telemetrie (Batterie, Motor, GPS, ...) abrufen.
+        // TODO: GATT-Read für Telemetrie-Charakteristik implementieren.
         return null
+    }
+
+    private fun hasBleConnectPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+                PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) ==
+                PackageManager.PERMISSION_GRANTED
+        }
     }
 
     companion object {
         private const val SCAN_TIMEOUT_MS = 4_000L
+        private const val GATT_TIMEOUT_MS = 8_000L
     }
 }
 

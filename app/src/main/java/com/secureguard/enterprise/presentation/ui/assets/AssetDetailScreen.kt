@@ -200,21 +200,27 @@ fun AssetDetailScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            Text(
+                                text = "Echte Telemetrie (Batterie, Motor, …) wird nach " +
+                                    "erfolgreicher BLE-Verbindung angezeigt. Aktuell: –",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                TelemetryItem("🔋 Batterie", "78%")
-                                TelemetryItem("⛽ Kraftstoff", "45%")
-                                TelemetryItem("🔧 Motor", "OK")
-                                TelemetryItem("🛞 Reifen", "OK")
+                                TelemetryItem("🔋 Batterie", "–")
+                                TelemetryItem("⛽ Kraftstoff", "–")
+                                TelemetryItem("🔧 Motor", "–")
+                                TelemetryItem("🛞 Reifen", "–")
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                TelemetryItem("⏱ Betriebsstd.", "12.456 h")
-                                TelemetryItem("📏 Kilometer", "234.567 km")
+                                TelemetryItem("⏱ Betriebsstd.", "–")
+                                TelemetryItem("📏 Kilometer", "–")
                             }
                         }
                     }

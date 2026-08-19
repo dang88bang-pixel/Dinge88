@@ -29,6 +29,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -55,6 +58,9 @@ fun MapScreen(
     val lastUpdate by viewModel.lastUpdate.collectAsState()
     val context = LocalContext.current
 
+    // Referenz auf die MapView für Zoom-/Zentrier-Steuerung.
+    var mapViewRef by remember { mutableStateOf<MapView?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -68,13 +74,27 @@ fun MapScreen(
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Aktualisieren")
                     }
-                    IconButton(onClick = { viewModel.zoomIn() }) {
+                    IconButton(onClick = {
+                        mapViewRef?.let { it.controller.setZoom(it.zoomLevelDouble + 1) }
+                    }) {
                         Icon(Icons.Filled.ZoomIn, contentDescription = "Vergrößern")
                     }
-                    IconButton(onClick = { viewModel.zoomOut() }) {
+                    IconButton(onClick = {
+                        mapViewRef?.let { it.controller.setZoom(it.zoomLevelDouble - 1) }
+                    }) {
                         Icon(Icons.Filled.ZoomOut, contentDescription = "Verkleinern")
                     }
-                    IconButton(onClick = { viewModel.centerOnAssets() }) {
+                    IconButton(onClick = {
+                        val mapView = mapViewRef ?: return@IconButton
+                        val first = assets.firstOrNull {
+                            it.latitude != null && it.longitude != null
+                        }
+                        if (first != null && first.latitude != null && first.longitude != null) {
+                            mapView.controller.animateTo(
+                                GeoPoint(first.latitude, first.longitude)
+                            )
+                        }
+                    }) {
                         Icon(Icons.Filled.CenterFocusStrong, contentDescription = "Zentrieren")
                     }
                 }
@@ -94,10 +114,12 @@ fun MapScreen(
                         setMultiTouchControls(true)
                         controller.setZoom(15.0)
                         controller.setCenter(GeoPoint(52.52, 13.40))
+                        mapViewRef = this
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
                 update = { mapView ->
+                    mapViewRef = mapView
                     mapView.overlays.clear()
 
                     assets.forEach { asset ->

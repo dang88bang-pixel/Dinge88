@@ -10,6 +10,7 @@ import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,8 +38,10 @@ import javax.inject.Singleton
 class AgentService @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: SecureGuardRepository,
+    private val settingsRepository: SettingsRepository,
     private val loraService: LoraService,
     private val telemetryService: TelemetryService,
+    private val wifiService: WifiService,
     private val opticalService: OpticalService,
     private val urbanService: UrbanService,
     private val crowdService: CrowdService,
@@ -97,7 +100,20 @@ class AgentService @Inject constructor(
         val results = coroutineScope {
             listOf(
                 async { loraService.searchAsset(asset) },
-                async { telemetryService.searchAsset(asset) },
+                async {
+                    if (settingsRepository.bluetooth.value) {
+                        telemetryService.searchAsset(asset)
+                    } else {
+                        null
+                    }
+                },
+                async {
+                    if (settingsRepository.wifi.value) {
+                        wifiService.searchAsset(asset)
+                    } else {
+                        null
+                    }
+                },
                 async { opticalService.searchAsset(asset) },
                 async { urbanService.searchAsset(asset) },
                 async {
@@ -107,7 +123,13 @@ class AgentService @Inject constructor(
                         null
                     }
                 },
-                async { satelliteService.searchAsset(asset) }
+                async {
+                    if (settingsRepository.location.value) {
+                        satelliteService.searchAsset(asset)
+                    } else {
+                        null
+                    }
+                }
             ).awaitAll()
         }
         val best = results.filterNotNull().minByOrNull { it.rssi }

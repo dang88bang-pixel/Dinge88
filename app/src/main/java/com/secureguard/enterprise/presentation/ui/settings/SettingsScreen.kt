@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -21,22 +22,25 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(navController: NavController) {
-    var notifications by remember { mutableStateOf(true) }
-    var bluetooth by remember { mutableStateOf(true) }
-    var wifi by remember { mutableStateOf(false) }
-    var location by remember { mutableStateOf(true) }
+fun SettingsScreen(
+    navController: NavController,
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
+    val notifications by viewModel.repository.notifications.collectAsState()
+    val vibration by viewModel.repository.vibration.collectAsState()
+    val bluetooth by viewModel.repository.bluetooth.collectAsState()
+    val wifi by viewModel.repository.wifi.collectAsState()
+    val location by viewModel.repository.location.collectAsState()
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Einstellungen") }) }
@@ -55,13 +59,13 @@ fun SettingsScreen(navController: NavController) {
                         SettingRow(
                             label = "Push-Benachrichtigungen",
                             checked = notifications,
-                            onCheckedChange = { notifications = it }
+                            onCheckedChange = viewModel.repository::setNotifications
                         )
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         SettingRow(
                             label = "Vibration",
-                            checked = true,
-                            onCheckedChange = {}
+                            checked = vibration,
+                            onCheckedChange = viewModel.repository::setVibration
                         )
                     }
                 }
@@ -74,19 +78,19 @@ fun SettingsScreen(navController: NavController) {
                         SettingRow(
                             label = "Bluetooth / BLE",
                             checked = bluetooth,
-                            onCheckedChange = { bluetooth = it }
+                            onCheckedChange = viewModel.repository::setBluetooth
                         )
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         SettingRow(
-                            label = "WiFi (Probe Requests)",
+                            label = "WiFi (ScanResults)",
                             checked = wifi,
-                            onCheckedChange = { wifi = it }
+                            onCheckedChange = viewModel.repository::setWifi
                         )
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         SettingRow(
-                            label = "Standort",
+                            label = "Standort (GPS)",
                             checked = location,
-                            onCheckedChange = { location = it }
+                            onCheckedChange = viewModel.repository::setLocation
                         )
                     }
                 }

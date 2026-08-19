@@ -46,16 +46,4 @@ class MapViewModel @Inject constructor(
     fun refresh() {
         loadAssets()
     }
-
-    fun zoomIn() {
-        // Wird in der UI behandelt
-    }
-
-    fun zoomOut() {
-        // Wird in der UI behandelt
-    }
-
-    fun centerOnAssets() {
-        // Wird in der UI behandelt
-    }
 }
