@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -19,7 +20,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class BleCommandConnector @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     /** Schreibsignale der laufenden GATT-Sitzung. */
     private class GattSignals {
