@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Basis-Theme für die Aktivität. Compose übernimmt danach das eigentliche
+        Theme (SecureGuardTheme). Parent ist das platformeigene Material-Theme,
+        damit keine zusätzliche Material-Android-Abhängigkeit nötig ist.
+    -->
+    <style name="Theme.SecureGuard" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/brand_primary</item>
+        <item name="android:navigationBarColor">@color/brand_primary</item>
+        <item name="android:windowBackground">@color/brand_background_light</item>
+    </style>
+</resources>
