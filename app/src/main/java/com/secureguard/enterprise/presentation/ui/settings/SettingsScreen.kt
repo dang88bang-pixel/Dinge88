@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -60,6 +59,9 @@ fun SettingsScreen(
     val opticalUrl by viewModel.repository.opticalUrl.collectAsState()
     val urbanUrl by viewModel.repository.urbanUrl.collectAsState()
     val crowdUrl by viewModel.repository.crowdUrl.collectAsState()
+    val externalSources by viewModel.repository.externalSources.collectAsState()
+    val profileName by viewModel.repository.profileName.collectAsState()
+    val profileCompany by viewModel.repository.profileCompany.collectAsState()
 
     val context = LocalContext.current
 
@@ -73,12 +75,16 @@ fun SettingsScreen(
     val notifPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { _ -> }
+    val cameraPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ -> }
 
     // Aktualisiert die angezeigten Berechtigungs-Status nach der Systemrückgabe.
     var permissionTick by remember { mutableStateOf(0) }
     val locationGranted = remember(permissionTick) { hasLocationPermission(context) }
     val bluetoothGranted = remember(permissionTick) { hasBluetoothPermission(context) }
     val notifGranted = remember(permissionTick) { hasNotificationPermission(context) }
+    val cameraGranted = remember(permissionTick) { hasCameraPermission(context) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Einstellungen") }) }
@@ -122,7 +128,12 @@ fun SettingsScreen(
                                             Manifest.permission.BLUETOOTH_CONNECT
                                         )
                                     } else {
-                                        arrayOf(Manifest.permission.BLUETOOTH)
+                                        // Android 11: BLE-Scan braucht Standort + BLUETOOTH
+                                        arrayOf(
+                                            Manifest.permission.BLUETOOTH,
+                                            Manifest.permission.BLUETOOTH_ADMIN,
+                                            Manifest.permission.ACCESS_FINE_LOCATION
+                                        )
                                     }
                                 )
                                 permissionTick++
@@ -136,6 +147,15 @@ fun SettingsScreen(
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                     notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 }
+                                permissionTick++
+                            }
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        PermissionRow(
+                            label = "Kamera (QR-Scan)",
+                            granted = cameraGranted,
+                            onClick = {
+                                cameraPermLauncher.launch(Manifest.permission.CAMERA)
                                 permissionTick++
                             }
                         )
@@ -182,6 +202,12 @@ fun SettingsScreen(
                             label = "Standort (GPS)",
                             checked = location,
                             onCheckedChange = viewModel.repository::setLocation
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        SettingRow(
+                            label = "Externe Quellen (Crowd / Find My)",
+                            checked = externalSources,
+                            onCheckedChange = viewModel.repository::setExternalSources
                         )
                     }
                 }
@@ -236,8 +262,30 @@ fun SettingsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Name: SecureGuard Admin", style = MaterialTheme.typography.bodyMedium)
-                        Text("Firma: Muster GmbH", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Diese Angaben erscheinen in Berichten und Protokollen.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = profileName,
+                            onValueChange = viewModel.repository::setProfileName,
+                            label = { Text("Ihr Name") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        )
+                        OutlinedTextField(
+                            value = profileCompany,
+                            onValueChange = viewModel.repository::setProfileCompany,
+                            label = { Text("Firma") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        )
                     }
                 }
             }
@@ -251,7 +299,7 @@ fun SettingsScreen(
                     ) {
                         Text("SecureGuard Enterprise", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Version 1.0.0",
+                            "Version 1.1.0 · Android 11+",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -373,3 +421,7 @@ private fun hasNotificationPermission(context: Context): Boolean =
     } else {
         true
     }
+
+private fun hasCameraPermission(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+        PackageManager.PERMISSION_GRANTED

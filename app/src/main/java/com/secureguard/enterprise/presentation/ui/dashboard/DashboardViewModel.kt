@@ -107,7 +107,7 @@ class DashboardViewModel @Inject constructor(
         dynamicPriority = true,
         learningMode = true,
         offlineOnly = true,
-        externalSources = false
+        externalSources = true
     )
 
     private fun startAgent() {
@@ -129,7 +129,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        agentService.stop()
+        // Agent bleibt aktiv, wenn das Dashboard verlassen wird.
         super.onCleared()
     }
 }

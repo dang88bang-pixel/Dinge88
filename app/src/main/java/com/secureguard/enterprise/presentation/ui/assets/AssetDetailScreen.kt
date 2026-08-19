@@ -292,21 +292,21 @@ fun AssetDetailScreen(
                                     icon = Icons.Filled.Warning,
                                     label = "🔔 Alarm",
                                     onClick = { viewModel.executeAction(ActionType.ALARM) },
-                                    enabled = a.status == AssetStatus.ONLINE
+                                    enabled = true
                                 )
                                 ActionButton(
                                     modifier = Modifier.weight(1f),
                                     icon = Icons.Filled.Lightbulb,
                                     label = "💡 Blinken",
                                     onClick = { viewModel.executeAction(ActionType.LIGHT) },
-                                    enabled = a.status == AssetStatus.ONLINE
+                                    enabled = true
                                 )
                                 ActionButton(
                                     modifier = Modifier.weight(1f),
                                     icon = Icons.Filled.PowerSettingsNew,
                                     label = "🔇 Motor",
                                     onClick = { viewModel.executeAction(ActionType.MOTOR_OFF) },
-                                    enabled = a.status == AssetStatus.ONLINE
+                                    enabled = true
                                 )
                             }
                             Row(
@@ -318,21 +318,21 @@ fun AssetDetailScreen(
                                     icon = Icons.Filled.BatteryAlert,
                                     label = "🔋 Batterie",
                                     onClick = { viewModel.executeAction(ActionType.BATTERY) },
-                                    enabled = a.status == AssetStatus.ONLINE
+                                    enabled = true
                                 )
                                 ActionButton(
                                     modifier = Modifier.weight(1f),
                                     icon = Icons.Filled.Message,
                                     label = "📝 Nachricht",
                                     onClick = { viewModel.executeAction(ActionType.MESSAGE) },
-                                    enabled = a.status == AssetStatus.ONLINE
+                                    enabled = true
                                 )
                                 ActionButton(
                                     modifier = Modifier.weight(1f),
                                     icon = Icons.Filled.LocationOn,
                                     label = "📍 Position",
                                     onClick = { viewModel.executeAction(ActionType.POSITION) },
-                                    enabled = a.status == AssetStatus.ONLINE
+                                    enabled = true
                                 )
                             }
                             val res = actionResult

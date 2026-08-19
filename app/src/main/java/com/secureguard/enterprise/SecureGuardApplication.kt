@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import com.secureguard.enterprise.worker.SecureAgentWorker
 import dagger.hilt.android.HiltAndroidApp
 import org.osmdroid.config.Configuration as OsmdroidConfiguration
+import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -26,11 +27,22 @@ class SecureGuardApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        // osmdroid verlangt einen User-Agent (Pflicht), sonst wirft er eine Exception.
-        OsmdroidConfiguration.getInstance().userAgentValue =
-            "SecureGuard-Enterprise/${BuildConfig.VERSION_NAME}"
-
+        configureOsmdroid()
         scheduleAgentWorker()
+    }
+
+    /**
+     * osmdroid auf Android 11 (scoped storage): nur App-privates Verzeichnis,
+     * sonst schlägt der Kachel-Cache fehl.
+     */
+    private fun configureOsmdroid() {
+        val base = File(filesDir, "osmdroid").apply { mkdirs() }
+        val tiles = File(base, "tiles").apply { mkdirs() }
+        val cfg = OsmdroidConfiguration.getInstance()
+        cfg.osmdroidBasePath = base
+        cfg.osmdroidTileCache = tiles
+        cfg.userAgentValue = "SecureGuard-Enterprise/${BuildConfig.VERSION_NAME}"
+        cfg.load(this, getSharedPreferences("osmdroid", MODE_PRIVATE))
     }
 
     /**

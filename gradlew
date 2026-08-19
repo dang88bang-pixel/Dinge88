@@ -50,7 +50,8 @@ if [ ! -f "$WRAPPER_PROPS" ]; then
   exit 1
 fi
 
-DIST_URL=`sed -n 's/^distributionUrl=//p' "$WRAPPER_PROPS" | tr -d '\r\n'`
+# Properties-Dateien escapen ':' als '\:' – Escape-Backslashes entfernen.
+DIST_URL=`sed -n 's/^distributionUrl=//p' "$WRAPPER_PROPS" | tr -d '\r\n' | tr -d '\\\\'`
 if [ -z "$DIST_URL" ]; then
   echo "ERROR: distributionUrl not found in $WRAPPER_PROPS" >&2
   exit 1

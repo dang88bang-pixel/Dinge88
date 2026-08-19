@@ -1,93 +1,59 @@
-# 🛡️ SecureGuard Enterprise
+# SecureGuard Enterprise
 
-**Professionelles Sicherheits- & Ortungssystem für Unternehmen**
+Professionelles Sicherheits- und Ortungssystem für Firmen-Assets
+(Fahrzeuge, Anlagen, Geräte). 100 % lokale Datenhaltung (Room/SQLite).
 
-Selbstlernender Ortungs-Agent für Firmen-Assets (Fahrzeuge, Anlagen, Geräte).
-100 % lokale Datenhaltung (Room/SQLite), DSGVO-konform. *(Pilot-Projekt: Betriebsvereinbarung ist als Blaupause hinterlegt, aber noch nicht angebunden.)*
+**Version 1.1.0** · **Android 11+** (API 30, minSdk 26) · **JDK 17** · **Android SDK 34**
 
-## 📱 Funktionen
+## Download APK
 
-- 📡 **LoRa / LoRaWAN** – Langstreckenkommunikation (generisch, ohne Meshtastic)
-- 🧠 **Selbstlernender Agent** – rekursive Verbesserung, adaptive Intervalle,
-  Mustererkennung (zeitlich/räumlich/signalbasiert), Erfahrungsspeicher (letzte 1000 Ereignisse)
-- 🗺️ **OpenStreetMap-Karte** mit Echtzeitpositionen
-- 🎮 **Fernsteuerung** (Alarm, Motor, Batterie, Nachricht, Position)
-- 👁️ **Optische Erkennung** (Webcams, YOLO)
-- 🌍 **Apple/Google Crowdsourcing** – nur mit expliziter Einwilligung
-- 🏙️ **Urbane Infrastruktur** (ÖPNV, Laternen, Paketstationen, Wetterstationen)
-- 📡 **GPS / GLONASS / Galileo** (Satellitenortung)
-- 🔒 **DSGVO-konform** (Pilot: Betriebsvereinbarung als Blaupause hinterlegt)
+[![Download APK](https://img.shields.io/github/v/release/dang88bang-pixel/Dinge88?label=Download%20APK&color=blue)](https://github.com/dang88bang-pixel/Dinge88/releases/latest)
 
-## 🛠️ Technologie-Stack
+- Release-APK: `SecureGuard-Enterprise-1.1.0-android11.apk`
+- Debug-APK: `SecureGuard-Enterprise-1.1.0-debug.apk`
 
-- **Sprache:** Kotlin 1.9.20
-- **UI:** Jetpack Compose (Material 3, BOM 2024.02.00)
-- **Architektur:** MVVM + Repository + Hilt DI
-- **Datenbank:** Room (SQLite) – lokal, keine Cloud
-- **Ortung:** BLE (Nordic), WiFi-Probe-Requests, LoRa, GPS, Crowd, Optik, Urban
-- **Background:** WorkManager + Foreground Service
-- **minSdk 26 / targetSdk 34**
+## Funktionen (alle aktiv)
 
-## 📥 Download
+- BLE-Scan und GATT-Fernsteuerung (Alarm, Licht, Motor, Batterie, Nachricht, Position, Restart, Telemetrie)
+- WiFi-BSSID-Erkennung
+- GPS / GLONASS / Galileo
+- LoRa / LoRaWAN, Optik (YOLO), Urban, Crowd (Find My) über konfigurierbare Endpunkte
+- Selbstlernender Agent (adaptive Intervalle, Erfahrungsspeicher, WorkManager)
+- OpenStreetMap-Karte, QR-Scan, Dashboard, Alarme, Asset-Whitelist
 
-[![Download APK](https://img.shields.io/github/v/release/YOUR_USERNAME/secureguard-enterprise?label=Download%20APK&color=blue)](https://github.com/YOUR_USERNAME/secureguard-enterprise/releases/latest)
+## Installation auf Android 11
 
-> Ersetze `YOUR_USERNAME` durch deinen GitHub-Org-/Benutzernamen.
+1. APK aus dem [GitHub Release](https://github.com/dang88bang-pixel/Dinge88/releases/latest) laden
+2. Unbekannte Quellen erlauben und installieren
+3. Beim Start Standort, Bluetooth und Kamera erteilen
+4. Asset hinzufügen → Agent starten
 
-## 🛠️ Installation
+## Toolchain
 
-1. APK aus dem GitHub Release herunterladen (oder mit `./gradlew assembleRelease` selbst bauen)
-2. Auf Android-Gerät installieren (min. Android 8.0 / API 26)
-3. Assets in die Whitelist hinzufügen
-4. Laufzeit-Berechtigungen erteilen (Bluetooth, Standort, Benachrichtigungen)
-5. Agent starten
-
-> **Hinweis zum lokalen Build in dieser Sandbox:** Siehe
-> [`TOOLCHAIN.md`](./TOOLCHAIN.md) – hier ist nur eine JDK-Runtime (ohne `javac`)
-> erreichbar; Maven/Google/Gradle-Server sind gefirewallt, daher ist der **Build über
-> GitHub Actions** der vorgesehene Weg.
-
-## 🔧 Lokaler Build
+| Komponente | Version |
+|---|---|
+| JDK | 17 (Temurin) |
+| Android SDK | compile/target 34, min 26 (Android 11 = API 30) |
+| Gradle | 8.5 |
+| Kotlin | 1.9.22 |
+| AGP | 8.2.2 |
+| Compose BOM | 2024.02.00 |
 
 ```bash
-# JDK 17 vorausgesetzt
-./gradlew assembleDebug     # Debug-APK
-./gradlew assembleRelease   # Release-APK (Signing konfigurieren)
+# Lokal (JDK 17 + Android SDK)
+./gradlew assembleDebug
+./gradlew assembleRelease
 ```
 
-> Hinweis zum Gradle Wrapper: Dieser Wrapper ist **selbstbootstrapierend** und
-> benötigt keine eingecheckte `gradle-wrapper.jar`. Er lädt die Gradle-Distribution
-> (siehe `gradle/wrapper/gradle-wrapper.properties`) bei der ersten Ausführung herunter.
-> Alternativ kann der offizielle Wrapper mit `gradle wrapper` erzeugt werden.
+In dieser Sandbox sind Maven/Google/Gradle gefirewallt – der vorgesehene
+Build-Weg ist **GitHub Actions** (`.github/workflows/build-release.yml`).
+Siehe [`TOOLCHAIN.md`](./TOOLCHAIN.md).
 
-## ⚙️ GitHub Actions (CI/CD)
+## Rechtlicher Rahmen
 
-Der Workflow `.github/workflows/build-release.yml` baut automatisch bei jedem Push
-auf `main`/`develop` und erstellt bei Tags (`v*`) ein GitHub Release mit APK.
+Pilot-Projekt. Die Betriebsvereinbarung ist als Blaupause hinterlegt,
+aber nicht an die App angebunden. Siehe [`BETRIEBSVEREINBARUNG.md`](./BETRIEBSVEREINBARUNG.md).
 
-**Voraussetzungen – Repository Secrets setzen:**
-
-| Secret | Zweck |
-|---|---|
-| `KEYSTORE_BASE64` | Release-Keystore als base64-kodierter String |
-| `KEYSTORE_PASSWORD` | Keystore-Passwort |
-| `KEY_ALIAS` | Alias des Signaturschlüssels |
-| `KEY_PASSWORD` | Schlüssel-Passwort |
-
-> **Hinweis:** Ohne gesetzte Secrets wird das APK **unsigned** gebaut und hochgeladen.
-> Für die Verteilung signierst du das APK bitte mit deinem eigenen Keystore.
-
-## 🧭 Rechtlicher Rahmen (Pilot-Projekt)
-
-> **Hinweis:** Dies ist aktuell ein **Pilot-Projekt**. Die Betriebsvereinbarung ist eine
-> **Blaupause** und wird lediglich hinterlegt, aber **noch nicht an die App angebunden**
-> (keine Anzeige, keine aktive Geltung). Siehe
-> [`BETRIEBSVEREINBARUNG.md`](./BETRIEBSVEREINBARUNG.md).
-
-- **DSGVO-konform**: keine Personenüberwachung, ausschließlich Firmen-Assets
-- **Einwilligungspflicht** für externe Quellen (Apple/Google Find My Crowdsourcing)
-- Daten werden lokal gespeichert und standardmäßig nach 30 Tagen automatisch gelöscht
-
-## 📄 Lizenz
+## Lizenz
 
 [Apache License 2.0](./LICENSE)

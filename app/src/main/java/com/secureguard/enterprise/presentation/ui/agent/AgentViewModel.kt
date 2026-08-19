@@ -133,7 +133,7 @@ class AgentViewModel @Inject constructor(
         dynamicPriority = state.dynamicPriority,
         learningMode = state.learningMode,
         offlineOnly = true,
-        externalSources = false
+        externalSources = settingsRepository.externalSources.value
     )
 }
 

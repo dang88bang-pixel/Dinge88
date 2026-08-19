@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import com.secureguard.enterprise.services.TelemetryService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +19,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ActionsViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
-    private val telemetryService: TelemetryService
+    private val telemetryService: TelemetryService,
+    val settings: SettingsRepository
 ) : ViewModel() {
 
     private val _assets = MutableStateFlow<List<Asset>>(emptyList())
@@ -57,43 +59,40 @@ class ActionsViewModel @Inject constructor(
             val asset = _selectedAsset.value ?: return@launch
             _isExecuting.value = true
 
-            val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-            val logEntry = when (actionType) {
-                ActionType.ALARM -> {
-                    val success = telemetryService.sendCommand(asset.mac, "ALARM")
-                    "$timestamp → ALARM ausgelöst ${if (success) "✓" else "✗"}"
-                }
-                ActionType.LIGHT -> {
-                    val success = telemetryService.sendCommand(asset.mac, "LIGHT")
-                    "$timestamp → Lichter blinken ${if (success) "✓" else "✗"}"
-                }
-                ActionType.MOTOR_OFF -> {
-                    val success = telemetryService.sendCommand(asset.mac, "MOTOR_OFF")
-                    "$timestamp → Motor ausgeschaltet ${if (success) "✓" else "✗"}"
-                }
-                ActionType.BATTERY -> {
-                    val success = telemetryService.sendCommand(asset.mac, "BATTERY")
-                    "$timestamp → Batterie getrennt ${if (success) "✓" else "✗"}"
-                }
-                ActionType.MESSAGE -> {
-                    val success = telemetryService.sendCommand(asset.mac, "MESSAGE")
-                    "$timestamp → Nachricht gesendet ${if (success) "✓" else "✗"}"
-                }
-                ActionType.POSITION -> {
-                    val success = telemetryService.sendCommand(asset.mac, "POSITION")
-                    "$timestamp → Position angefordert ${if (success) "✓" else "✗"}"
-                }
-                ActionType.RESTART -> {
-                    val success = telemetryService.sendCommand(asset.mac, "RESTART")
-                    "$timestamp → Neustart ausgelöst ${if (success) "✓" else "✗"}"
-                }
-                ActionType.TELEMETRY -> {
-                    val success = telemetryService.sendCommand(asset.mac, "TELEMETRY")
-                    "$timestamp → Telemetrie gelesen ${if (success) "✓" else "✗"}"
+            val command = actionType.name
+            var success = if (actionType == ActionType.TELEMETRY) {
+                telemetryService.getLatestTelemetry(asset.mac) != null
+            } else {
+                telemetryService.sendCommand(asset.mac, command)
+            }
+            var retried = false
+            if (!success && settings.recoverResend.value) {
+                retried = true
+                success = if (actionType == ActionType.TELEMETRY) {
+                    telemetryService.getLatestTelemetry(asset.mac) != null
+                } else {
+                    telemetryService.sendCommand(asset.mac, command)
                 }
             }
 
-            _commandLog.value = _commandLog.value + logEntry
+            if (settings.commandLogging.value) {
+                val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+                val description = when (actionType) {
+                    ActionType.ALARM -> "ALARM ausgelöst"
+                    ActionType.LIGHT -> "Lichter blinken"
+                    ActionType.MOTOR_OFF -> "Motor ausgeschaltet"
+                    ActionType.BATTERY -> "Batterie getrennt"
+                    ActionType.MESSAGE -> "Nachricht gesendet"
+                    ActionType.POSITION -> "Position angefordert"
+                    ActionType.RESTART -> "Neustart ausgelöst"
+                    ActionType.TELEMETRY -> "Telemetrie gelesen"
+                }
+                val suffix = buildString {
+                    append(if (success) "✓" else "✗")
+                    if (retried) append(if (success) " (nach Wiederholung)" else " (Wiederholung fehlgeschlagen)")
+                }
+                _commandLog.value = _commandLog.value + "$timestamp → $description $suffix"
+            }
             _isExecuting.value = false
         }
     }

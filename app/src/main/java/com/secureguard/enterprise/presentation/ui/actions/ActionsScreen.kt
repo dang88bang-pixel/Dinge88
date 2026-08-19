@@ -66,6 +66,10 @@ fun ActionsScreen(
     val commandLog by viewModel.commandLog.collectAsState()
     val isExecuting by viewModel.isExecuting.collectAsState()
 
+    val recoverResend by viewModel.settings.recoverResend.collectAsState()
+    val commandLogging by viewModel.settings.commandLogging.collectAsState()
+    val actionNotifications by viewModel.settings.actionNotifications.collectAsState()
+
     var dropdownExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -171,14 +175,14 @@ fun ActionsScreen(
                                     icon = Icons.Filled.Warning,
                                     label = "🔔 Alarm",
                                     onClick = { viewModel.executeAction(ActionType.ALARM) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
+                                    enabled = !isExecuting
                                 )
                                 ActionButton(
                                     modifier = Modifier.weight(1f),
                                     icon = Icons.Filled.Lightbulb,
                                     label = "💡 Blinken",
                                     onClick = { viewModel.executeAction(ActionType.LIGHT) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
+                                    enabled = !isExecuting
                                 )
                             }
                             Row(
@@ -190,14 +194,14 @@ fun ActionsScreen(
                                     icon = Icons.Filled.PowerSettingsNew,
                                     label = "🔇 Motor aus",
                                     onClick = { viewModel.executeAction(ActionType.MOTOR_OFF) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
+                                    enabled = !isExecuting
                                 )
                                 ActionButton(
                                     modifier = Modifier.weight(1f),
                                     icon = Icons.Filled.BatteryAlert,
                                     label = "🔋 Batterie",
                                     onClick = { viewModel.executeAction(ActionType.BATTERY) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
+                                    enabled = !isExecuting
                                 )
                             }
                             Row(
@@ -209,14 +213,14 @@ fun ActionsScreen(
                                     icon = Icons.Filled.Message,
                                     label = "📝 Nachricht",
                                     onClick = { viewModel.executeAction(ActionType.MESSAGE) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
+                                    enabled = !isExecuting
                                 )
                                 ActionButton(
                                     modifier = Modifier.weight(1f),
                                     icon = Icons.Filled.LocationOn,
                                     label = "📍 Position",
                                     onClick = { viewModel.executeAction(ActionType.POSITION) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
+                                    enabled = !isExecuting
                                 )
                             }
 
@@ -231,22 +235,34 @@ fun ActionsScreen(
                                     icon = Icons.Filled.Refresh,
                                     label = "🔄 Neustarten",
                                     onClick = { viewModel.executeAction(ActionType.RESTART) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
+                                    enabled = !isExecuting
                                 )
                                 ActionButton(
                                     modifier = Modifier.weight(1f),
                                     icon = Icons.Filled.Storage,
                                     label = "📊 Telemetrie",
                                     onClick = { viewModel.executeAction(ActionType.TELEMETRY) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
+                                    enabled = !isExecuting
                                 )
                             }
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                             Text("⚙️ Einstellungen", style = MaterialTheme.typography.titleSmall)
-                            SettingCheckboxRow("Recover/Resend aktivieren", true)
-                            SettingCheckboxRow("Steuerlog aufzeichnen", false)
-                            SettingCheckboxRow("Automatische Benachrichtigung", false)
+                            SettingCheckboxRow(
+                                label = "Recover/Resend aktivieren",
+                                checked = recoverResend,
+                                onCheckedChange = viewModel.settings::setRecoverResend
+                            )
+                            SettingCheckboxRow(
+                                label = "Steuerlog aufzeichnen",
+                                checked = commandLogging,
+                                onCheckedChange = viewModel.settings::setCommandLogging
+                            )
+                            SettingCheckboxRow(
+                                label = "Automatische Benachrichtigung",
+                                checked = actionNotifications,
+                                onCheckedChange = viewModel.settings::setActionNotifications
+                            )
 
                             if (isExecuting) {
                                 Row(
@@ -328,10 +344,13 @@ fun ActionsScreen(
 }
 
 @Composable
-private fun SettingCheckboxRow(label: String, initiallyChecked: Boolean) {
-    var checked by remember { mutableStateOf(initiallyChecked) }
+private fun SettingCheckboxRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = checked, onCheckedChange = { checked = it })
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
         Text(label, modifier = Modifier.padding(top = 8.dp))
     }
 }

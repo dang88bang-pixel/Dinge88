@@ -40,9 +40,11 @@ class WifiService @Inject constructor(
         val wifiManager = context.applicationContext
             .getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
 
-        // Bei Bedarf einen neuen Scan anstoßen (Ergebnisse kommen asynchron,
-        // wir nutzen die zuletzt verfügbaren Ergebnisse).
         if (!wifiManager.isWifiEnabled) return null
+
+        // Android 11: Scan anstoßen; Ergebnisse sind asynchron, wir lesen
+        // zusätzlich den letzten bekannten Scan-Cache.
+        runCatching { @Suppress("DEPRECATION") wifiManager.startScan() }
 
         val results = runCatching { wifiManager.scanResults }.getOrNull() ?: return null
 

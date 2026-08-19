@@ -11,7 +11,7 @@ import com.secureguard.enterprise.data.model.Detection
 
 @Database(
     entities = [Asset::class, Detection::class, Alert::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

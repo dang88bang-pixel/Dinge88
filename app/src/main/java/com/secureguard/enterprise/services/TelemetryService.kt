@@ -13,6 +13,7 @@ import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withTimeoutOrNull
@@ -64,10 +65,7 @@ class TelemetryService @Inject constructor(
                 }
             }
             scanner.startScan(callback)
-            // Kurzer Scan-Fenster, danach stoppen.
-            runCatching {
-                Thread.sleep(SCAN_TIMEOUT_MS)
-            }
+            delay(SCAN_TIMEOUT_MS)
             scanner.stopScan(callback)
             return found
         } finally {
@@ -76,12 +74,23 @@ class TelemetryService @Inject constructor(
     }
 
     private fun hasBlePermissions(): Boolean {
-        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Manifest.permission.BLUETOOTH_SCAN
+        val bleOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) ==
+                PackageManager.PERMISSION_GRANTED
         } else {
-            Manifest.permission.BLUETOOTH
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) ==
+                PackageManager.PERMISSION_GRANTED
         }
-        return ContextCompat.checkSelfPermission(context, perm) == PackageManager.PERMISSION_GRANTED
+        // Android 11 (API 30) verlangt Standort für BLE-Scan-Ergebnisse.
+        val locationOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            true
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        }
+        return bleOk && locationOk
     }
 
     /**

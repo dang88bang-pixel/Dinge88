@@ -1,11 +1,8 @@
-name: 🛡️ Build SecureGuard APK
+name: Build SecureGuard APK
 
 on:
   push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
   pull_request:
-    branches: [ main, develop ]
   workflow_dispatch:
     inputs:
       build_type:
@@ -18,182 +15,143 @@ on:
           - debug
           - release
 
-# Nur der neueste Lauf pro Branch/Ref wird ausgeführt; überholte werden abgebrochen.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: apk-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   JAVA_VERSION: '17'
-  COMPILE_SDK: 'android-34'
-  BUILD_TOOLS: '34.0.0'
-  GRADLE_CACHE_FOLDER: ~/.gradle/caches
-  GRADLE_WRAPPER_FOLDER: ~/.gradle/wrapper
 
 jobs:
   build:
+    name: APK (JDK 17 + Android SDK)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - task: assembleDebug
-            artifact: secureguard-pro-debug
-            retention: 14
-          - task: assembleRelease
-            artifact: secureguard-pro
-            retention: 30
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup JDK
+      - name: Setup JDK 17 (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
 
-      # Gradle Wrapper validieren + Dependency-/Wrapper-Cache (großer Speedup).
-      - name: Setup Gradle
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+
+      - name: Setup Gradle 8.5
         uses: gradle/actions/setup-gradle@v4
         with:
+          gradle-version: '8.5'
           cache-read-only: false
 
-      # Install the Android SDK cmdline-tools + required packages (einmalig,
-      # danach über actions/cache wiederverwendet).
-      - name: Install Android SDK
-        run: |
-          ANDROID_ROOT="${ANDROID_HOME:-$HOME/android-sdk}"
-          mkdir -p "$ANDROID_ROOT/cmdline-tools"
-          echo "ANDROID_HOME=$ANDROID_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$ANDROID_ROOT" >> "$GITHUB_ENV"
-          if [ ! -x "$ANDROID_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
-            CMDLINE_VERSION=$(curl -s https://dl.google.com/android/repository/repository2-1.xml | \
-              grep -oP 'commandlinetools-linux-\K[0-9]+' | sort -V | tail -1)
-            if [ -z "$CMDLINE_VERSION" ]; then CMDLINE_VERSION=11076708; fi
-            curl -fSL -o /tmp/cmdline.zip \
-              "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_VERSION}_latest.zip"
-            unzip -q -o /tmp/cmdline.zip -d "$ANDROID_ROOT/cmdline-tools"
-            mv "$ANDROID_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_ROOT/cmdline-tools/latest"
-          fi
-          yes | "$ANDROID_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_ROOT/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;${{ env.COMPILE_SDK }}" "build-tools;${{ env.BUILD_TOOLS }}" "platform-tools"
-
-      # Android-SDK-Komponenten zwischen Läufen cachen (erspart Download/Unzip).
-      - name: Cache Android SDK
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.ANDROID_HOME }}
-          key: android-sdk-${{ env.COMPILE_SDK }}-${{ env.BUILD_TOOLS }}
-
-      # Release-Keystore aus Secret dekodieren (nur für Release-Builds).
-      - name: Decode Keystore
-        if: matrix.task == 'assembleRelease'
+      - name: Decode Release-Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > app/secureguard-keystore.jks
-            echo "Keystore written (size: $(wc -c < app/secureguard-keystore.jks) bytes)."
+            echo "Keystore geschrieben ($(wc -c < app/secureguard-keystore.jks) Bytes)."
           else
-            echo "::warning::KEYSTORE_BASE64 is not set - APK wird UNSIGNIERT gebaut."
+            echo "::notice::Kein KEYSTORE_BASE64 – Release wird mit Debug-Key signiert (installierbar)."
           fi
 
-      # Signing-Konfiguration nur dann anwenden, wenn der Keystore existiert.
-      - name: Prepare signing config
-        if: matrix.task == 'assembleRelease'
-        run: |
-          if [ -f "app/secureguard-keystore.jks" ]; then
-            echo "SG_HAS_KEYSTORE=true" >> "$GITHUB_ENV"
-          else
-            echo "SG_HAS_KEYSTORE=false" >> "$GITHUB_ENV"
-          fi
-
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-
-      - name: Build ${{ matrix.task }}
+      - name: Build Debug + Release APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew ${{ matrix.task }} --no-daemon --stacktrace
+        run: |
+          echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" > local.properties
+          gradle assembleDebug assembleRelease --stacktrace --no-daemon
 
-      # APK benennen + Prüfsumme berechnen.
       - name: Prepare APK artifacts
         run: |
           mkdir -p apk-out
-          cp app/build/outputs/apk/release/*.apk apk-out/ 2>/dev/null || true
-          cp app/build/outputs/apk/debug/*.apk apk-out/ 2>/dev/null || true
+          find app/build/outputs/apk -name '*.apk' -print -exec cp {} apk-out/ \;
           cd apk-out
-          sha256sum *.apk > SHA256SUMS.txt
-          ls -la
+          if ls *.apk >/dev/null 2>&1; then
+            for f in *.apk; do
+              case "$f" in
+                *debug*) mv "$f" SecureGuard-Enterprise-1.1.0-debug.apk ;;
+                *release*) mv "$f" SecureGuard-Enterprise-1.1.0-android11.apk ;;
+              esac
+            done
+            sha256sum *.apk > SHA256SUMS.txt
+            ls -la
+          else
+            echo "Keine APK gefunden" >&2
+            find ../app/build/outputs -type f || true
+            exit 1
+          fi
 
-      - name: Upload APK (${{ matrix.artifact }})
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: apk-out/*.apk
+          name: secureguard-apk
+          path: |
+            apk-out/*.apk
+            apk-out/SHA256SUMS.txt
           if-no-files-found: error
-          retention-days: ${{ matrix.retention }}
-
-      - name: Upload SHA256 checksums
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}-checksums
-          path: apk-out/SHA256SUMS.txt
-          if-no-files-found: error
-          retention-days: ${{ matrix.retention }}
+          retention-days: 30
 
   release:
+    name: GitHub Release
     runs-on: ubuntu-latest
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
     steps:
-      - name: Download release APK
+      - name: Download APKs
         uses: actions/download-artifact@v4
         with:
-          name: secureguard-pro
+          name: secureguard-apk
           path: ./apk
 
-      - name: Download checksums
-        uses: actions/download-artifact@v4
-        with:
-          name: secureguard-pro-checksums
-          path: ./apk
+      - name: Publish / update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="v1.1.0"
+          TITLE="SecureGuard Enterprise 1.1.0 (Android 11)"
+          NOTES=$(cat <<'EOF'
+          ## SecureGuard Enterprise 1.1.0
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "🛡️ SecureGuard Pro ${{ github.ref_name }}"
-          body: |
-            ## 🛡️ SecureGuard Enterprise
+          Installierbare APK für **Android 11 (API 30)** und höher (minSdk 26).
+          Gebaut mit **JDK 17** + **Android SDK 34** + **Gradle 8.5**.
 
-            ### ✅ Funktionen
-            - 📡 LoRa/LoRaWAN
-            - 🧠 Selbstlernender Agent
-            - 🗺️ OpenStreetMap-Karte
-            - 🎮 Fernsteuerung (Alarm, Motor, Batterie)
-            - 👁️ Optische Erkennung
-            - 🌍 Apple/Google Crowdsourcing (nur mit Einwilligung)
-            - 🏙️ Urbane Infrastruktur
-            - 📡 GPS/GLONASS/Galileo
-            - 🔒 DSGVO-konform
+          ### Alle Funktionen aktiv
+          - BLE-Scan & GATT-Fernsteuerung (Alarm, Licht, Motor, Batterie, Nachricht, Position, Restart, Telemetrie)
+          - WiFi-BSSID-Erkennung
+          - GPS / Satellit
+          - LoRa / Optik / Urban / Crowd über konfigurierbare Endpunkte
+          - Selbstlernender Agent + WorkManager
+          - OpenStreetMap, QR-Scan, Alarme, Dashboard
 
-            ### 📦 Download
-            - **APK**: `secureguard-pro.apk`
+          ### Installation
+          1. `SecureGuard-Enterprise-1.1.0-android11.apk` herunterladen
+          2. Unbekannte Quellen erlauben und installieren
+          3. Standort + Bluetooth (+ Kamera für QR) erteilen
+          4. Agent starten
 
-            ### 🔑 Signatur
-            - APK **signiert**, wenn die Keystore-Secrets gesetzt sind.
-            - Sonst wird eine **unsignierte** APK erzeugt (`app-release-unsigned.apk`).
-
-            > 🔐 Prüfsummen siehe `SHA256SUMS.txt` im Release.
-          files: |
-            ./apk/*.apk
-            ./apk/SHA256SUMS.txt
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+          Debug-Variante: `SecureGuard-Enterprise-1.1.0-debug.apk`
+          EOF
+          )
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" ./apk/*.apk ./apk/SHA256SUMS.txt --repo "${{ github.repository }}" --clobber
+            gh release edit "$TAG" --repo "${{ github.repository }}" --title "$TITLE" --notes "$NOTES"
+          else
+            gh release create "$TAG" ./apk/*.apk ./apk/SHA256SUMS.txt \
+              --repo "${{ github.repository }}" \
+              --title "$TITLE" \
+              --notes "$NOTES"
+          fi

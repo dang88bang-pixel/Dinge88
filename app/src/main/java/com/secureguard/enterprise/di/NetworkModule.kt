@@ -1,6 +1,5 @@
 package com.secureguard.enterprise.di
 
-import com.secureguard.enterprise.data.network.WebSocketClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -41,7 +40,5 @@ object NetworkModule {
             .build()
     }
 
-    @Provides
-    @Singleton
-    fun provideWebSocketClient(client: OkHttpClient): WebSocketClient = WebSocketClient(client)
+    // WebSocketClient hat eigenen @Inject-Konstruktor – hier nicht erneut binden.
 }

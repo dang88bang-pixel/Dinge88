@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 (API 30) blockiert Cleartext standardmäßig bei targetSdk 28+.
+     LoRa/Optik/Urban/Crowd-Endpunkte im Pilot dürfen http:// nutzen. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

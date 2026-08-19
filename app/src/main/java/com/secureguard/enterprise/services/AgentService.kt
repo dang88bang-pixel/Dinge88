@@ -112,26 +112,25 @@ class AgentService @Inject constructor(
     private suspend fun comprehensiveSearch(asset: Asset): SearchResult {
         val usePriority = settings.learningMode && settings.dynamicPriority && sourcePriority.isNotEmpty()
 
-        // Aktive Quellen zusammenstellen (respektiert die Einstellungen).
-        val available = buildMap {
-            put(DetectionSource.LORA, loraService.searchAsset(asset))
+        // Alle Quellen aktiv; Schalter steuern nur, ob eine Quelle übersprungen wird.
+        val available = buildMap<DetectionSource, suspend () -> Detection?> {
+            put(DetectionSource.LORA) { loraService.searchAsset(asset) }
             if (settingsRepository.bluetooth.value) {
-                put(DetectionSource.BLE, telemetryService.searchAsset(asset))
+                put(DetectionSource.BLE) { telemetryService.searchAsset(asset) }
             }
             if (settingsRepository.wifi.value) {
-                put(DetectionSource.WIFI, wifiService.searchAsset(asset))
+                put(DetectionSource.WIFI) { wifiService.searchAsset(asset) }
             }
-            put(DetectionSource.OPTICAL, opticalService.searchAsset(asset))
-            put(DetectionSource.URBAN, urbanService.searchAsset(asset))
+            put(DetectionSource.OPTICAL) { opticalService.searchAsset(asset) }
+            put(DetectionSource.URBAN) { urbanService.searchAsset(asset) }
             if (asset.externalAllowed && settings.externalSources) {
-                put(DetectionSource.CROWD, crowdService.searchAsset(asset))
+                put(DetectionSource.CROWD) { crowdService.searchAsset(asset) }
             }
             if (settingsRepository.location.value) {
-                put(DetectionSource.SATELLITE, satelliteService.searchAsset(asset))
+                put(DetectionSource.SATELLITE) { satelliteService.searchAsset(asset) }
             }
         }
 
-        // Abfrage-Reihenfolge: gelernte Priorität, sonst Quell-Reihenfolge.
         val order = if (usePriority) {
             sourcePriority.filter { available.containsKey(it) } +
                 available.keys.filter { !sourcePriority.contains(it) }
@@ -139,10 +138,9 @@ class AgentService @Inject constructor(
             available.keys.toList()
         }
 
-        // Nacheinander abfragen; erster Treffer gewinnt.
         for (source in order) {
-            val search = available.getValue(source)
-            val detection = runCatching { search }.getOrNull()
+            val provider = available[source] ?: continue
+            val detection = runCatching { provider() }.getOrNull()
             if (detection != null) {
                 return SearchResult(found = true, detection = detection, accuracy = detection.rssi)
             }
