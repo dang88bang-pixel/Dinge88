@@ -152,10 +152,10 @@ dependencies {
     implementation 'com.google.android.gms:play-services-location:21.1.0'
 
     // BLE (Nordic)
-    implementation 'no.nordicsemi.android:ble-ktx:2.7.3'
+    implementation 'no.nordicsemi.android:ble-ktx:2.6.1'
 
     // Permissions
-    implementation 'com.google.accompanist:accompanist-permissions:0.34.0'
+    implementation 'com.google.accompanist:accompanist-permissions:0.32.0'
 
     // Coil (Bilder)
     implementation 'io.coil-kt:coil-compose:2.6.0'

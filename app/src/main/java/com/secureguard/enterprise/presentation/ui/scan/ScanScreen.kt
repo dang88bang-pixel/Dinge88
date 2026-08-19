@@ -1,3 +1,5 @@
+@file:OptIn(androidx.camera.core.ExperimentalGetImage::class)
+
 package com.secureguard.enterprise.presentation.ui.scan
 
 import android.Manifest

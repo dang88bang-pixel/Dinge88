@@ -15,5 +15,5 @@ interface DetectionDao {
     suspend fun insert(detection: Detection)
 
     @Query("DELETE FROM detections WHERE timestamp < :cutoff")
-    suspend fun deleteOlderThan(cutoff: Long)
+    suspend fun deleteOlderThan(cutoff: java.util.Date)
 }
