@@ -11,8 +11,17 @@ import com.secureguard.enterprise.data.model.SearchResult
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.presentation.ui.common.ActionResult
 import com.secureguard.enterprise.presentation.ui.common.ActionType
+import com.secureguard.enterprise.data.model.Telemetry
 import com.secureguard.enterprise.services.AgentService
+import com.secureguard.enterprise.services.NotificationService
+import com.secureguard.enterprise.services.CrowdService
+import com.secureguard.enterprise.services.LoraService
+import com.secureguard.enterprise.services.OpticalService
+import com.secureguard.enterprise.services.SatelliteService
 import com.secureguard.enterprise.services.TelemetryService
+import com.secureguard.enterprise.services.UrbanService
+import com.secureguard.enterprise.services.BleService
+import com.secureguard.enterprise.services.WifiService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,11 +29,21 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class SearchChannel { ALL, BLE, LORA, WIFI, OPTICAL, URBAN, CROWD, SATELLITE }
+
 @HiltViewModel
 class AssetDetailViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
     private val telemetryService: TelemetryService,
-    private val agentService: AgentService
+    private val agentService: AgentService,
+    private val bleService: BleService,
+    private val wifiService: WifiService,
+    private val loraService: LoraService,
+    private val opticalService: OpticalService,
+    private val urbanService: UrbanService,
+    private val crowdService: CrowdService,
+    private val satelliteService: SatelliteService,
+    private val notificationService: NotificationService
 ) : ViewModel() {
 
     private val _assetState = MutableStateFlow<Asset?>(null)
@@ -42,6 +61,9 @@ class AssetDetailViewModel @Inject constructor(
     private val _detections = MutableStateFlow<List<Detection>>(emptyList())
     val detections: StateFlow<List<Detection>> = _detections.asStateFlow()
 
+    private val _telemetry = MutableStateFlow<Telemetry?>(null)
+    val telemetry: StateFlow<Telemetry?> = _telemetry.asStateFlow()
+
     private var loadedMac: String? = null
 
     fun loadAsset(assetId: String) {
@@ -50,6 +72,8 @@ class AssetDetailViewModel @Inject constructor(
             _assetState.value = found
             if (found != null && found.mac != loadedMac) {
                 loadedMac = found.mac
+                // Prime the telemetry cache with a fresh read.
+                refreshTelemetry()
                 repository.getDetections(found.mac).collect { list ->
                     _detections.value = list
                 }
@@ -76,10 +100,20 @@ class AssetDetailViewModel @Inject constructor(
                 severity = if (success) AlertSeverity.INFO else AlertSeverity.WARNING,
                 message = "${actionType.label}: ${result.message}"
             )
+            notificationService.sendActionNotification(asset, actionType, success)
         }
     }
 
-    fun startSearch() {
+    /** Full multi-channel search via the self-learning agent. */
+    fun startSearch() = searchOnChannel(SearchChannel.ALL)
+
+    /** Search using only the external (crowd) channel. */
+    fun startExternalSearch() = searchOnChannel(SearchChannel.CROWD)
+
+    /** Search using only the satellite channel. */
+    fun startSatelliteSearch() = searchOnChannel(SearchChannel.SATELLITE)
+
+    private fun searchOnChannel(channel: SearchChannel) {
         viewModelScope.launch {
             _isSearching.value = true
             val asset = _assetState.value
@@ -87,17 +121,32 @@ class AssetDetailViewModel @Inject constructor(
                 _isSearching.value = false
                 return@launch
             }
-            val result = agentService.searchAsset(asset)
-            _searchResult.value = result
-            if (result.found && result.detection != null) {
+
+            val detection = when (channel) {
+                SearchChannel.ALL -> agentService.searchAsset(asset).detection
+                SearchChannel.BLE -> bleService.searchAsset(asset)
+                SearchChannel.WIFI -> wifiService.searchAsset(asset)
+                SearchChannel.LORA -> loraService.searchAsset(asset)
+                SearchChannel.OPTICAL -> opticalService.searchAsset(asset)
+                SearchChannel.URBAN -> urbanService.searchAsset(asset)
+                SearchChannel.CROWD ->
+                    if (asset.externalAllowed) crowdService.searchAsset(asset) else null
+                SearchChannel.SATELLITE -> satelliteService.searchAsset(asset)
+            }
+
+            if (detection != null) {
+                repository.insertDetection(detection)
                 repository.updateAssetStatus(
                     mac = asset.mac,
                     status = AssetStatus.ONLINE,
                     timestamp = System.currentTimeMillis(),
-                    rssi = result.detection.rssi,
-                    lat = result.detection.latitude,
-                    lon = result.detection.longitude
+                    rssi = detection.rssi,
+                    lat = detection.latitude,
+                    lon = detection.longitude
                 )
+                _searchResult.value = SearchResult(found = true, detection = detection)
+            } else {
+                _searchResult.value = SearchResult(found = false)
             }
             _assetState.value = repository.resolveAsset(asset.id)
             _isSearching.value = false
@@ -107,12 +156,20 @@ class AssetDetailViewModel @Inject constructor(
     fun refreshTelemetry() {
         viewModelScope.launch {
             val asset = _assetState.value ?: return@launch
+            // Force a fresh read if nothing cached yet.
             val telemetry = telemetryService.getLatestTelemetry(asset.mac)
+                ?: telemetryService.run {
+                    // Trigger a search which populates the telemetry cache.
+                    searchAsset(asset)
+                    getLatestTelemetry(asset.mac)
+                }
+            _telemetry.value = telemetry
             if (telemetry != null) {
                 repository.updateAssetStatus(
                     mac = asset.mac,
                     status = AssetStatus.ONLINE,
                     timestamp = System.currentTimeMillis(),
+                    rssi = _assetState.value?.rssi,
                     lat = telemetry.latitude,
                     lon = telemetry.longitude
                 )

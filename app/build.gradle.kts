@@ -91,8 +91,9 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
-    // Material
+    // Material / AppCompat (AppCompat theme required by ZXing CaptureActivity)
     implementation(libs.material)
+    implementation(libs.androidx.appcompat)
 
     // OpenStreetMap
     implementation(libs.osmdroid.android)
@@ -103,4 +104,7 @@ dependencies {
 
     // Desugaring
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+
+    // Unit tests
+    testImplementation(libs.junit)
 }

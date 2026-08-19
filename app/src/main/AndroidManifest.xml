@@ -71,6 +71,13 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- ZXing barcode scanner (QR scan) -->
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="fullSensor"
+            android:theme="@style/Theme.AppCompat.NoActionBar"
+            tools:replace="android:screenOrientation,android:theme" />
+
     </application>
 
 </manifest>

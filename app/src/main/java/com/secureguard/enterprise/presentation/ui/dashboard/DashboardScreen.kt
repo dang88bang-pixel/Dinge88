@@ -38,25 +38,41 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.secureguard.enterprise.presentation.components.AssetCard
 import com.secureguard.enterprise.presentation.components.StatCard
 import com.secureguard.enterprise.presentation.navigation.Routes
+import com.secureguard.enterprise.presentation.ui.common.missingPermissions
 
 @Composable
 fun DashboardScreen(
     navController: NavController,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val assets by viewModel.assets.collectAsState()
     val agentRunning by viewModel.agentRunning.collectAsState()
+
+    // Request all runtime permissions once on first launch.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* result intentionally ignored; channels handle missing perms */ }
+    LaunchedEffect(Unit) {
+        val missing = missingPermissions(context)
+        if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
+    }
 
     Scaffold(
         topBar = {

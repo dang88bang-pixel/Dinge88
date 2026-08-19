@@ -1,9 +1,11 @@
 package com.secureguard.enterprise.services
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
@@ -14,16 +16,19 @@ import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.random.Random
 
 /**
- * Passive Bluetooth Low Energy scanning. Looks for whitelisted assets by
- * their MAC address. If the runtime permission is missing (or no BLE hardware
- * is present) the service falls back to a simulated scan so the UI stays alive.
+ * Active + passive Bluetooth Low Energy scanning. For an explicit asset search
+ * a short (2 s) filtered scan is run; a real hit for the asset's MAC is
+ * preferred. If BLE is unavailable or nothing is seen, a simulated result is
+ * returned so the demo / agent pipeline stays functional.
  */
 @Singleton
 class BleService @Inject constructor(
@@ -35,24 +40,7 @@ class BleService @Inject constructor(
         manager?.adapter
     }
 
-    @Volatile private var scanning = false
-
-    private val scanCallback = object : ScanCallback() {
-        override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val mac = result.device?.address ?: return
-            emit(
-                Detection(
-                    assetMac = mac,
-                    sourceType = DetectionSource.BLE,
-                    nodeId = "ble",
-                    rssi = result.rssi,
-                    timestamp = Date()
-                )
-            )
-        }
-    }
-
-    private fun hasPermission(): Boolean {
+    private fun hasScanPermission(): Boolean {
         val needed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Manifest.permission.BLUETOOTH_SCAN
         } else {
@@ -62,14 +50,15 @@ class BleService @Inject constructor(
             PackageManager.PERMISSION_GRANTED
     }
 
-    /** Searches for a single asset. Falls back to a simulated result when BLE is unavailable. */
+    @SuppressLint("MissingPermission")
     suspend fun searchAsset(asset: Asset): Detection? {
-        if (hasPermission()) {
-            startHardwareScan()
-            delay(2_000)
-            stopHardwareScan()
-        }
-        // Simulated nearby hit so the channel always produces a result in demos.
+        val hit = if (hasScanPermission() && bluetoothAdapter != null) {
+            runHardwareScan(asset)
+        } else null
+
+        if (hit != null) return hit
+
+        // Fallback / demo result.
         delay(150)
         val rssi = -35 - Random.nextInt(0, 45)
         return Detection(
@@ -84,24 +73,63 @@ class BleService @Inject constructor(
         ).also { emit(it) }
     }
 
-    private fun startHardwareScan() {
-        val adapter = bluetoothAdapter?.bluetoothLeScanner ?: return
-        if (scanning) return
-        runCatching {
-            adapter.startScan(null, SCAN_SETTINGS, scanCallback)
-            scanning = true
+    @SuppressLint("MissingPermission")
+    private suspend fun runHardwareScan(asset: Asset): Detection? {
+        val scanner = bluetoothAdapter?.bluetoothLeScanner ?: return null
+        val resultDeferred = CompletableDeferred<ScanResult?>()
+
+        val callback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                if (result.device?.address.equals(asset.mac, ignoreCase = true) &&
+                    !resultDeferred.isCompleted
+                ) {
+                    resultDeferred.complete(result)
+                }
+            }
+
+            override fun onBatchScanResults(results: MutableList<ScanResult>) {
+                results.firstOrNull {
+                    it.device?.address.equals(asset.mac, ignoreCase = true)
+                }?.let { if (!resultDeferred.isCompleted) resultDeferred.complete(it) }
+            }
+
+            override fun onScanFailed(errorCode: Int) {
+                if (!resultDeferred.isCompleted) resultDeferred.complete(null)
+            }
+        }
+
+        val filter = ScanFilter.Builder()
+            .setDeviceAddress(asset.mac)
+            .build()
+
+        return try {
+            runCatching {
+                scanner.startScan(listOf(filter), SETTINGS, callback)
+            }.onFailure { return null }
+
+            val scanResult = withTimeoutOrNull(SCAN_DURATION_MS) { resultDeferred.await() }
+            runCatching { scanner.stopScan(callback) }
+
+            scanResult?.let {
+                Detection(
+                    assetMac = asset.mac,
+                    sourceType = DetectionSource.BLE,
+                    nodeId = "ble-${it.device?.address}",
+                    rssi = it.rssi,
+                    latitude = asset.latitude,
+                    longitude = asset.longitude,
+                    accuracyMeters = 5f,
+                    timestamp = Date()
+                ).also { d -> emit(d) }
+            }
+        } finally {
+            runCatching { scanner.stopScan(callback) }
         }
     }
 
-    private fun stopHardwareScan() {
-        if (!scanning) return
-        val adapter = bluetoothAdapter?.bluetoothLeScanner ?: return
-        runCatching { adapter.stopScan(scanCallback) }
-        scanning = false
-    }
-
     companion object {
-        private val SCAN_SETTINGS = ScanSettings.Builder()
+        private const val SCAN_DURATION_MS = 2_000L
+        private val SETTINGS = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
     }

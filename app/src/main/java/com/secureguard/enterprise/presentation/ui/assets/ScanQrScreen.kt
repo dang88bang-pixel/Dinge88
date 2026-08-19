@@ -34,9 +34,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
-import com.journeyapps.barcodescanner.CompoundBarcodeView
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
+import com.journeyapps.barcodescanner.DecoratedBarcodeView
 
 /**
  * QR / barcode scanner screen. Uses ZXing embedded so no external scanner app
@@ -84,37 +84,45 @@ fun ScanQrScreen(navController: NavController) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (hasPermission) {
-                val barcodeView = remember { CompoundBarcodeView(context) }
+                val barcodeView = remember {
+                    DecoratedBarcodeView(context).apply {
+                        decodeContinuous(object : BarcodeCallback {
+                            override fun barcodeResult(result: BarcodeResult?) {
+                                result?.text?.let { value ->
+                                    if (scanned == null) scanned = value
+                                }
+                            }
+                        })
+                        resume()
+                    }
+                }
                 DisposableEffect(Unit) {
                     barcodeView.resume()
                     onDispose { barcodeView.pause() }
-                }
-                LaunchedEffect(Unit) {
-                    barcodeView.decodeContinuous(object : BarcodeCallback {
-                        override fun barcodeResult(result: BarcodeResult?) {
-                            result?.text?.let { scanned = it }
-                        }
-                    })
                 }
                 androidx.compose.ui.viewinterop.AndroidView(
                     factory = { barcodeView },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(260.dp)
+                        .height(280.dp)
                 )
             } else {
                 Text(
                     "Kamera-Berechtigung erforderlich",
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.titleMedium
                 )
+                Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                    Text("Berechtigung erteilen")
+                }
             }
 
-            scanned?.let {
-                Text("Erkannt: $it", style = MaterialTheme.typography.titleMedium)
+            scanned?.let { value ->
+                Text("Erkannt: $value", style = MaterialTheme.typography.titleMedium)
                 Button(
                     onClick = {
                         navController.previousBackStackEntry
-                            ?.savedStateHandle?.set("scanned_mac", it)
+                            ?.savedStateHandle?.set("scanned_mac", value)
                         navController.popBackStack()
                     }
                 ) { Text("Übernehmen") }
@@ -135,7 +143,8 @@ fun ScanQrScreen(navController: NavController) {
                         ?.savedStateHandle?.set("scanned_mac", manual)
                     navController.popBackStack()
                 },
-                enabled = manual.isNotBlank()
+                enabled = manual.isNotBlank(),
+                modifier = Modifier.fillMaxWidth()
             ) { Text("Weiter") }
         }
     }

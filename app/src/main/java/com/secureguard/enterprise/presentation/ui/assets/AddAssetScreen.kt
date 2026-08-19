@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 
+private val MAC_REGEX = Regex("([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}")
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddAssetScreen(
@@ -40,6 +43,22 @@ fun AddAssetScreen(
     viewModel: AddAssetViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    // Consume a MAC address scanned by the QR scanner (if any).
+    LaunchedEffect(Unit) {
+        navController.currentBackStackEntry
+            ?.savedStateHandle
+            ?.getStateFlow<String?>("scanned_mac", null)
+            ?.collect { scanned ->
+                if (!scanned.isNullOrBlank()) {
+                    // Scan may return a MAC directly or a URL; extract a MAC if present.
+                    val mac = MAC_REGEX.find(scanned)?.value ?: scanned.trim()
+                    viewModel.onMacChange(mac.uppercase())
+                    navController.currentBackStackEntry
+                        ?.savedStateHandle?.remove<String>("scanned_mac")
+                }
+            }
+    }
 
     LaunchedEffect(state.saved) {
         if (state.saved) {
@@ -92,7 +111,12 @@ fun AddAssetScreen(
                 onValueChange = viewModel::onMacChange,
                 label = { Text("MAC-Adresse (AA:BB:CC:DD:EE:FF)") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = { navController.navigate("scan_qr") }) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = "QR scannen")
+                    }
+                }
             )
             OutlinedTextField(
                 value = state.vin,

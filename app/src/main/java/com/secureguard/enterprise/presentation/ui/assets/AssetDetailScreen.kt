@@ -61,6 +61,7 @@ fun AssetDetailScreen(
     val isSearching by viewModel.isSearching.collectAsState()
     val searchResult by viewModel.searchResult.collectAsState()
     val actionResult by viewModel.actionResult.collectAsState()
+    val telemetry by viewModel.telemetry.collectAsState()
 
     LaunchedEffect(assetId) { viewModel.loadAsset(assetId) }
 
@@ -196,17 +197,36 @@ fun AssetDetailScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                TelemetryItem("🔋 Batterie", "${current.batteryLevel ?: 78}%")
-                                TelemetryItem("⛽ Kraftstoff", "45%")
-                                TelemetryItem("🔧 Motor", "OK")
-                                TelemetryItem("🛞 Reifen", "OK")
+                                TelemetryItem(
+                                    "🔋 Batterie",
+                                    telemetry?.batteryPercent?.let { "$it%" }
+                                        ?: (current.batteryLevel?.let { "$it%" } ?: "–")
+                                )
+                                TelemetryItem(
+                                    "⛽ Kraftstoff",
+                                    telemetry?.fuelPercent?.let { "$it%" } ?: "–"
+                                )
+                                TelemetryItem(
+                                    "🔧 Motor",
+                                    if (telemetry?.motorOk != false) "OK" else "FEHLER"
+                                )
+                                TelemetryItem(
+                                    "🛞 Reifen",
+                                    if (telemetry?.tiresOk != false) "OK" else "FEHLER"
+                                )
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                TelemetryItem("⏱ Betriebsstd.", "12.456 h")
-                                TelemetryItem("📏 Kilometer", "234.567 km")
+                                TelemetryItem(
+                                    "⏱ Betriebsstd.",
+                                    telemetry?.operatingHours?.let { "%,.1f h".format(it) } ?: "–"
+                                )
+                                TelemetryItem(
+                                    "📏 Kilometer",
+                                    telemetry?.kilometers?.let { "%,.1f km".format(it) } ?: "–"
+                                )
                             }
                         }
                     }
@@ -276,12 +296,12 @@ fun AssetDetailScreen(
                                 }
                                 Button(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { viewModel.startSearch() },
+                                    onClick = { viewModel.startExternalSearch() },
                                     enabled = current.externalAllowed && !isSearching
                                 ) { Text("🌍 Extern") }
                                 Button(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { viewModel.startSearch() },
+                                    onClick = { viewModel.startSatelliteSearch() },
                                     enabled = !isSearching
                                 ) { Text("📡 Satellit") }
                             }

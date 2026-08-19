@@ -31,7 +31,7 @@ class TelemetryService @Inject constructor(
     private val mutex = Mutex()
 
     suspend fun searchAsset(asset: Asset): Detection? {
-        val telemetry = getLatestTelemetry(asset.mac) ?: fetchTelemetry(asset)
+        val telemetry = fetchTelemetry(asset)
         if (telemetry != null) {
             return Detection(
                 assetMac = asset.mac,
