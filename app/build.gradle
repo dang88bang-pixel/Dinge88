@@ -68,6 +68,9 @@ android {
 
     buildFeatures {
         compose true
+        // AGP 8.x generiert BuildConfig standardmaessig nicht mehr;
+        // SecureGuardApplication nutzt BuildConfig.VERSION_NAME.
+        buildConfig true
     }
 
     composeOptions {
