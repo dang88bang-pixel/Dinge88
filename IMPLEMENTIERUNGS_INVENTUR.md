@@ -50,6 +50,11 @@
 | Asset-Detail Suche | `AssetDetailScreen` | ✅ | „Suche starten" (alle Quellen), „Extern", „Satellit", „Bluetooth" – jede Quelle einzeln auslösbar; Ergebnis zeigt Quelle + RSSI. |
 | Asset-Detail Telemetrie | `AssetDetailScreen` | ✅ | Zeigt echte GATT-Telemetrie (Batterie, Kraftstoff, Motor, Betriebsstunden, km) nach „↻ Aktualisieren". |
 | Navigations-Stubs | `DashboardViewModel` / `AssetListViewModel` | ✅ | Entfernt (Navigation läuft direkt über `navController`). |
+| Laufzeit-Berechtigungen | `SettingsScreen` → „Berechtigungen" | ✅ | Anfragen für **Standort**, **Bluetooth**, **Benachrichtigungen** (Android 13+) mit Statusanzeige („Erteilt/Nicht erteilt") + Recomposition nach Systemrückkehr. |
+| Worker-Scheduling | `SecureGuardApplication` | ✅ | Plant `SecureAgentWorker` periodisch (15 Min) per WorkManager (`HiltWorkerFactory`, `ExistingPeriodicWorkPolicy.KEEP`). |
+| Benachrichtigungs-Permission | `NotificationService` | ✅ | Prüft `POST_NOTIFICATIONS` (API 33+) vor dem Senden; Vibration folgt der Asset-/Einstellungs-Flag. |
+| Asset-Liste „Suchen" | `AssetListScreen` | ✅ | Button navigiert zur Detailseite mit den Suchfunktionen. |
+| Adaptive Priorisierung | `AgentService` | ✅ | `learnFromExperience` sortiert Quellen nach Erfolgsquote; `comprehensiveSearch` fragt in gelernter Reihenfolge ab (erster Treffer gewinnt). |
 
 ## 5. Wirklich funktionsfähig (✅)
 

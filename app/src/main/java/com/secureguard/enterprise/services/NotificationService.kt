@@ -3,7 +3,11 @@ package com.secureguard.enterprise.services
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
@@ -32,6 +36,7 @@ class NotificationService @Inject constructor(
     }
 
     fun sendActionNotification(asset: Asset, actionName: String, success: Boolean) {
+        if (!canNotify()) return
         val title = if (success) "✅ ${asset.shortName}" else "❌ ${asset.shortName}"
         val content = "${asset.shortName}: Aktion '$actionName' " +
             (if (success) "erfolgreich ausgeführt." else "fehlgeschlagen.")
@@ -42,9 +47,11 @@ class NotificationService @Inject constructor(
             .setAutoCancel(true)
             .build()
         notificationManager.notify("${asset.id}-$actionName".hashCode(), notification)
+        vibrate(asset.vibration)
     }
 
     fun sendFoundNotification(asset: Asset, detection: Detection) {
+        if (!canNotify()) return
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle("🛡️ ${asset.shortName} gefunden!")
             .setContentText(
@@ -55,6 +62,29 @@ class NotificationService @Inject constructor(
             .setAutoCancel(true)
             .build()
         notificationManager.notify(asset.id.hashCode(), notification)
+        vibrate(asset.vibration)
+    }
+
+    private fun canNotify(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    /** Löst Vibration aus, wenn das Asset es wünscht. */
+    private fun vibrate(enabled: Boolean) {
+        if (!enabled) return
+        val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(200)
+        }
     }
 
     private fun formatLocation(detection: Detection): String {

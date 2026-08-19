@@ -27,4 +27,8 @@ class SecureAgentWorker @AssistedInject constructor(
             Result.retry()
         }
     }
+
+    companion object {
+        const val WORK_NAME = "secureguard_agent_worker"
+    }
 }

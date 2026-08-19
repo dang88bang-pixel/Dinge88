@@ -1,6 +1,5 @@
 package com.secureguard.enterprise.services
 
-import android.content.Context
 import com.secureguard.enterprise.data.model.Alert
 import com.secureguard.enterprise.data.model.AlertSeverity
 import com.secureguard.enterprise.data.model.AlertType
@@ -11,12 +10,9 @@ import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.data.repository.SettingsRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -36,7 +32,6 @@ import javax.inject.Singleton
  */
 @Singleton
 class AgentService @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val repository: SecureGuardRepository,
     private val settingsRepository: SettingsRepository,
     private val loraService: LoraService,
@@ -52,6 +47,7 @@ class AgentService @Inject constructor(
     private var isRunning = false
     private var settings = AgentSettings()
     private val experienceMemory = mutableListOf<Experience>()
+    private val sourcePriority = mutableListOf<DetectionSource>()
     private val _agentStatus = MutableSharedFlow<AgentStatus>(extraBufferCapacity = 1)
     val agentStatus = _agentStatus.asSharedFlow()
 
@@ -106,48 +102,52 @@ class AgentService @Inject constructor(
         }
     }
 
+    /**
+     * Führt eine Gesamtsuche über alle Ortungsquellen durch.
+     *
+     * Wenn der Lernmodus + dynamische Priorisierung aktiv sind, werden die
+     * Quellen in der Reihenfolge ihrer bisherigen Erfolgsquote abgefragt
+     * (zuerst die erfolgreichste; erster Treffer gewinnt).
+     */
     private suspend fun comprehensiveSearch(asset: Asset): SearchResult {
-        val results = coroutineScope {
-            listOf(
-                async { loraService.searchAsset(asset) },
-                async {
-                    if (settingsRepository.bluetooth.value) {
-                        telemetryService.searchAsset(asset)
-                    } else {
-                        null
-                    }
-                },
-                async {
-                    if (settingsRepository.wifi.value) {
-                        wifiService.searchAsset(asset)
-                    } else {
-                        null
-                    }
-                },
-                async { opticalService.searchAsset(asset) },
-                async { urbanService.searchAsset(asset) },
-                async {
-                    if (asset.externalAllowed && settings.externalSources) {
-                        crowdService.searchAsset(asset)
-                    } else {
-                        null
-                    }
-                },
-                async {
-                    if (settingsRepository.location.value) {
-                        satelliteService.searchAsset(asset)
-                    } else {
-                        null
-                    }
-                }
-            ).awaitAll()
+        val usePriority = settings.learningMode && settings.dynamicPriority && sourcePriority.isNotEmpty()
+
+        // Aktive Quellen zusammenstellen (respektiert die Einstellungen).
+        val available = buildMap {
+            put(DetectionSource.LORA, loraService.searchAsset(asset))
+            if (settingsRepository.bluetooth.value) {
+                put(DetectionSource.BLE, telemetryService.searchAsset(asset))
+            }
+            if (settingsRepository.wifi.value) {
+                put(DetectionSource.WIFI, wifiService.searchAsset(asset))
+            }
+            put(DetectionSource.OPTICAL, opticalService.searchAsset(asset))
+            put(DetectionSource.URBAN, urbanService.searchAsset(asset))
+            if (asset.externalAllowed && settings.externalSources) {
+                put(DetectionSource.CROWD, crowdService.searchAsset(asset))
+            }
+            if (settingsRepository.location.value) {
+                put(DetectionSource.SATELLITE, satelliteService.searchAsset(asset))
+            }
         }
-        val best = results.filterNotNull().minByOrNull { it.rssi }
-        return if (best != null) {
-            SearchResult(found = true, detection = best, accuracy = best.rssi)
+
+        // Abfrage-Reihenfolge: gelernte Priorität, sonst Quell-Reihenfolge.
+        val order = if (usePriority) {
+            sourcePriority.filter { available.containsKey(it) } +
+                available.keys.filter { !sourcePriority.contains(it) }
         } else {
-            SearchResult(found = false)
+            available.keys.toList()
         }
+
+        // Nacheinander abfragen; erster Treffer gewinnt.
+        for (source in order) {
+            val search = available.getValue(source)
+            val detection = runCatching { search }.getOrNull()
+            if (detection != null) {
+                return SearchResult(found = true, detection = detection, accuracy = detection.rssi)
+            }
+        }
+        return SearchResult(found = false)
     }
 
     private suspend fun handleSearchResult(asset: Asset, result: SearchResult) {
@@ -198,18 +198,30 @@ class AgentService @Inject constructor(
     }
 
     /**
-     * Lernt aus den letzten 100 Ereignissen: Erfolgsquote je Ortungsquelle
-     * (zeitlich + signalbasiert). Dient als Grundlage für die Kanal-Priorisierung.
+     * Lernt aus den letzten 100 Ereignissen die Erfolgsquote je Ortungsquelle
+     * und sortiert die Kanal-Priorität entsprechend (erfolgreichste zuerst).
+     * Unbekannte Quellen (nie geliefert) wandern nach hinten.
      */
     private suspend fun learnFromExperience() {
         val last100 = experienceMemory.takeLast(100)
-        val successBySource = last100
-            .filter { it.success }
-            .groupBy { it.source }
-            .mapValues { (_, list) -> list.size.toDouble() / last100.size.coerceAtLeast(1) }
-        // TODO: Hier können Strategie und Kanal-Priorisierung optimiert werden.
-        @Suppress("UNUSED_EXPRESSION")
-        successBySource
+        if (last100.isEmpty()) return
+
+        // Erfolgsquote pro Quelle (nur gelieferte Quellen zählen).
+        val delivered = last100.filter { it.source != DetectionSource.UNKNOWN }
+        if (delivered.isEmpty()) return
+
+        val successCount = delivered.groupingBy { it.source }
+            .eachCount()
+            .mapValues { (_, count) -> count.toDouble() / delivered.size }
+
+        val ranked = successCount.entries
+            .sortedByDescending { it.value }
+            .map { it.key }
+
+        val unknownOrder = DetectionSource.entries.filter { !successCount.containsKey(it) }
+        sourcePriority.clear()
+        sourcePriority.addAll(ranked)
+        sourcePriority.addAll(unknownOrder)
     }
 
     /**

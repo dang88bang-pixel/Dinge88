@@ -158,7 +158,8 @@ fun AssetListScreen(
                     items(filteredAssets) { asset ->
                         AssetCard(
                             asset = asset,
-                            onClick = { navController.navigate("asset_detail/${asset.id}") }
+                            onClick = { navController.navigate("asset_detail/${asset.id}") },
+                            onSearch = { navController.navigate("asset_detail/${asset.id}") }
                         )
                     }
                 }
