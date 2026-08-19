@@ -1,5 +1,3 @@
-@file:OptIn(androidx.camera.core.ExperimentalGetImage::class)
-
 package com.secureguard.enterprise.presentation.ui.scan
 
 import android.Manifest
@@ -7,7 +5,6 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
@@ -93,25 +90,21 @@ fun ScanScreen(
     val analyzer = remember(scanner, scanStore) {
         object : ImageAnalysis.Analyzer {
             override fun analyze(imageProxy: ImageProxy) {
-                val mediaImage = imageProxy.image
-                if (mediaImage != null) {
-                    val input = InputImage.fromMediaImage(
-                        mediaImage,
-                        imageProxy.imageInfo.rotationDegrees
-                    )
-                    scanner.process(input)
-                        .addOnSuccessListener { barcodes ->
-                            val raw = barcodes.firstOrNull { it.rawValue != null }?.rawValue
-                            if (raw != null && scannedValue == null) {
-                                scannedValue = raw
-                                // Ergebnis für das "Asset hinzufügen"-Formular bereitstellen.
-                                scanStore.setScannedValue(raw)
-                            }
-                        }
-                        .addOnCompleteListener { imageProxy.close() }
-                } else {
+                val input = try {
+                    InputImage.fromBitmap(imageProxy.toBitmap(), 0)
+                } catch (e: Exception) {
                     imageProxy.close()
+                    return
                 }
+                scanner.process(input)
+                    .addOnSuccessListener { barcodes ->
+                        val raw = barcodes.firstOrNull { it.rawValue != null }?.rawValue
+                        if (raw != null && scannedValue == null) {
+                            scannedValue = raw
+                            scanStore.setScannedValue(raw)
+                        }
+                    }
+                    .addOnCompleteListener { imageProxy.close() }
             }
         }
     }

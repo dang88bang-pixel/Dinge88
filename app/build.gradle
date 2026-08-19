@@ -76,8 +76,8 @@ android {
     }
 
     composeOptions {
-        // Muss zur Kotlin-Version passen (1.9.22 → 1.5.8).
-        kotlinCompilerExtensionVersion '1.5.8'
+        // Muss zur Kotlin-Version passen (1.9.20 → 1.5.4).
+        kotlinCompilerExtensionVersion '1.5.4'
     }
 
     packaging {

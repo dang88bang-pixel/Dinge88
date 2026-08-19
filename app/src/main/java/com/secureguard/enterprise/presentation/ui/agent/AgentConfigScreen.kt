@@ -117,8 +117,9 @@ fun AgentConfigScreen(
                             "📊 Gesamtdauer: ${uiState.progress}%",
                             style = MaterialTheme.typography.bodySmall
                         )
+                        @Suppress("DEPRECATION")
                         LinearProgressIndicator(
-                            progress = { uiState.progress / 100f },
+                            progress = uiState.progress / 100f,
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(12.dp))
