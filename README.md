@@ -30,9 +30,7 @@ Selbstlernender Ortungs-Agent für Firmen-Assets (Fahrzeuge, Anlagen, Geräte).
 
 ## 📥 Download
 
-[![Download APK](https://img.shields.io/github/v/release/YOUR_USERNAME/secureguard-enterprise?label=Download%20APK&color=blue)](https://github.com/YOUR_USERNAME/secureguard-enterprise/releases/latest)
-
-> Ersetze `YOUR_USERNAME` durch deinen GitHub-Org-/Benutzernamen.
+[![Download APK](https://img.shields.io/github/v/release/dang88bang-pixel/Dinge88?label=Download%20APK&color=blue)](https://github.com/dang88bang-pixel/Dinge88/releases/latest)
 
 ## 🛠️ Installation
 

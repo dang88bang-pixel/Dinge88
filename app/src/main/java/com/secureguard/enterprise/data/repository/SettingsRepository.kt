@@ -56,6 +56,14 @@ class SettingsRepository @Inject constructor(
     private val _crowdUrl = MutableStateFlow(prefs.getString(KEY_CROWD_URL, "").orEmpty())
     val crowdUrl: StateFlow<String> = _crowdUrl.asStateFlow()
 
+    // --- Profil ---
+    private val _profileName = MutableStateFlow(prefs.getString(KEY_PROFILE_NAME, "").orEmpty())
+    val profileName: StateFlow<String> = _profileName.asStateFlow()
+
+    private val _profileCompany =
+        MutableStateFlow(prefs.getString(KEY_PROFILE_COMPANY, "").orEmpty())
+    val profileCompany: StateFlow<String> = _profileCompany.asStateFlow()
+
     // --- Agent-Laufzeit ---
     private val _agentStartTime = MutableStateFlow(prefs.getLong(KEY_AGENT_START_TIME, 0L))
     val agentStartTime: StateFlow<Long> = _agentStartTime.asStateFlow()
@@ -108,6 +116,16 @@ class SettingsRepository @Inject constructor(
         _crowdUrl.value = value
     }
 
+    fun setProfileName(value: String) {
+        prefs.edit().putString(KEY_PROFILE_NAME, value).apply()
+        _profileName.value = value
+    }
+
+    fun setProfileCompany(value: String) {
+        prefs.edit().putString(KEY_PROFILE_COMPANY, value).apply()
+        _profileCompany.value = value
+    }
+
     fun setAgentStartTime(value: Long) {
         prefs.edit().putLong(KEY_AGENT_START_TIME, value).apply()
         _agentStartTime.value = value
@@ -129,6 +147,8 @@ class SettingsRepository @Inject constructor(
         private const val KEY_OPTICAL_URL = "optical_url"
         private const val KEY_URBAN_URL = "urban_url"
         private const val KEY_CROWD_URL = "crowd_url"
+        private const val KEY_PROFILE_NAME = "profile_name"
+        private const val KEY_PROFILE_COMPANY = "profile_company"
         private const val KEY_AGENT_START_TIME = "agent_start_time"
         private const val KEY_AGENT_DURATION_SECONDS = "agent_duration_seconds"
     }

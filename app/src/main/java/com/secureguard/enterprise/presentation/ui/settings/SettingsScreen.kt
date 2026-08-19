@@ -61,6 +61,9 @@ fun SettingsScreen(
     val urbanUrl by viewModel.repository.urbanUrl.collectAsState()
     val crowdUrl by viewModel.repository.crowdUrl.collectAsState()
 
+    val profileName by viewModel.repository.profileName.collectAsState()
+    val profileCompany by viewModel.repository.profileCompany.collectAsState()
+
     val context = LocalContext.current
 
     // Laufzeit-Berechtigungs-Launcher.
@@ -236,8 +239,30 @@ fun SettingsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Name: SecureGuard Admin", style = MaterialTheme.typography.bodyMedium)
-                        Text("Firma: Muster GmbH", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Diese Angaben erscheinen in Berichten und Protokollen.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = profileName,
+                            onValueChange = viewModel.repository::setProfileName,
+                            label = { Text("Ihr Name") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        )
+                        OutlinedTextField(
+                            value = profileCompany,
+                            onValueChange = viewModel.repository::setProfileCompany,
+                            label = { Text("Firma") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        )
                     }
                 }
             }

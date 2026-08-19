@@ -29,6 +29,9 @@ android {
         release {
             if (hasReleaseKeystore) {
                 storeFile releaseKeystoreFile
+                // 'PKCS12' laed dank Java-Keystore-Kompatibilitaetsmodus
+                // sowohl PKCS12- als auch JKS-Dateien.
+                storeType 'PKCS12'
                 storePassword System.getenv('KEYSTORE_PASSWORD') ?: ''
                 keyAlias System.getenv('KEY_ALIAS') ?: ''
                 keyPassword System.getenv('KEY_PASSWORD') ?: ''
@@ -42,6 +45,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (hasReleaseKeystore) {
                 signingConfig signingConfigs.release
+            } else {
+                // Fallback: Debug-Signatur. Ein unsigniertes APK waere auf
+                // Geraeten nicht installierbar; so bleibt der Pilot-Build
+                // immer installierbar (Updates dann ueber denselben Debug-Key).
+                signingConfig signingConfigs.debug
             }
         }
         debug {
