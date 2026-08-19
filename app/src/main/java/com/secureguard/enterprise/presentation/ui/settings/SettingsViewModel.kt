@@ -1,0 +1,71 @@
+package com.secureguard.enterprise.presentation.ui.settings
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import javax.inject.Inject
+
+data class SettingsUiState(
+    val notificationsEnabled: Boolean = true,
+    val externalCrowdAllowed: Boolean = false,
+    val offlineOnly: Boolean = true,
+    val learningMode: Boolean = true,
+    val darkMode: Boolean = false,
+    val consentGiven: Boolean = true
+)
+
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context
+) : ViewModel() {
+
+    private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
+
+    private val _uiState = MutableStateFlow(load())
+    val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    private fun load() = SettingsUiState(
+        notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),
+        externalCrowdAllowed = prefs.getBoolean(KEY_CROWD, false),
+        offlineOnly = prefs.getBoolean(KEY_OFFLINE, true),
+        learningMode = prefs.getBoolean(KEY_LEARNING, true),
+        darkMode = prefs.getBoolean(KEY_DARK, false),
+        consentGiven = prefs.getBoolean(KEY_CONSENT, true)
+    )
+
+    private fun save(transform: (SettingsUiState) -> SettingsUiState) {
+        _uiState.update { current ->
+            val next = transform(current)
+            prefs.edit()
+                .putBoolean(KEY_NOTIFICATIONS, next.notificationsEnabled)
+                .putBoolean(KEY_CROWD, next.externalCrowdAllowed)
+                .putBoolean(KEY_OFFLINE, next.offlineOnly)
+                .putBoolean(KEY_LEARNING, next.learningMode)
+                .putBoolean(KEY_DARK, next.darkMode)
+                .putBoolean(KEY_CONSENT, next.consentGiven)
+                .apply()
+            next
+        }
+    }
+
+    fun setNotifications(value: Boolean) = save { it.copy(notificationsEnabled = value) }
+    fun setExternalCrowd(value: Boolean) = save { it.copy(externalCrowdAllowed = value) }
+    fun setOfflineOnly(value: Boolean) = save { it.copy(offlineOnly = value) }
+    fun setLearning(value: Boolean) = save { it.copy(learningMode = value) }
+    fun setDarkMode(value: Boolean) = save { it.copy(darkMode = value) }
+    fun setConsent(value: Boolean) = save { it.copy(consentGiven = value) }
+
+    companion object {
+        private const val KEY_NOTIFICATIONS = "notifications"
+        private const val KEY_CROWD = "external_crowd"
+        private const val KEY_OFFLINE = "offline_only"
+        private const val KEY_LEARNING = "learning_mode"
+        private const val KEY_DARK = "dark_mode"
+        private const val KEY_CONSENT = "gdpr_consent"
+    }
+}
