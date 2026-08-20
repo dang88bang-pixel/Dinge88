@@ -1,7 +1,6 @@
 package com.secureguard.enterprise.presentation.ui.map
 
 import android.graphics.Paint
-import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.OvalShape
@@ -197,12 +196,7 @@ private fun markerDrawable(asset: Asset): Drawable {
         AssetStatus.UNKNOWN -> android.graphics.Color.GRAY
     }
     val sizePx = 36
-    val shape = object : ShapeDrawable(OvalShape()) {
-        override fun getIntrinsicWidth(): Int = sizePx
-        override fun getIntrinsicHeight(): Int = sizePx
-        override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
-    }
-    return shape.apply {
+    return ShapeDrawable(OvalShape()).apply {
         paint.color = color
         paint.style = Paint.Style.FILL
         paint.isAntiAlias = true
