@@ -2,21 +2,22 @@ package com.secureguard.enterprise.services
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
+import com.secureguard.enterprise.MainActivity
 import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.Asset
-import com.secureguard.enterprise.data.model.Detection
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Verwaltet die Benachrichtigungen für den Agenten.
+ * Centralised notification helper. Creates the two channels used by the app
+ * (alerts & agent status) and exposes small, typed methods for the services
+ * and ViewModels.
  */
 @Singleton
 class NotificationService @Inject constructor(
@@ -24,74 +25,81 @@ class NotificationService @Inject constructor(
 ) {
     private val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    private val channelId = "secureguard_channel"
 
     init {
-        val channel = NotificationChannel(
-            channelId,
-            "SecureGuard Benachrichtigungen",
-            NotificationManager.IMPORTANCE_HIGH
-        )
-        notificationManager.createNotificationChannel(channel)
+        createChannels()
     }
 
-    fun sendActionNotification(asset: Asset, actionName: String, success: Boolean) {
-        if (!canNotify()) return
-        val title = if (success) "✅ ${asset.shortName}" else "❌ ${asset.shortName}"
-        val content = "${asset.shortName}: Aktion '$actionName' " +
-            (if (success) "erfolgreich ausgeführt." else "fehlgeschlagen.")
-        val notification = NotificationCompat.Builder(context, channelId)
-            .setContentTitle(title)
-            .setContentText(content)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setAutoCancel(true)
-            .build()
-        notificationManager.notify("${asset.id}-$actionName".hashCode(), notification)
-        vibrate(asset.vibration)
-    }
-
-    fun sendFoundNotification(asset: Asset, detection: Detection) {
-        if (!canNotify()) return
-        val notification = NotificationCompat.Builder(context, channelId)
-            .setContentTitle("🛡️ ${asset.shortName} gefunden!")
-            .setContentText(
-                "📍 Standort: ${formatLocation(detection)} | " +
-                    "📶 RSSI: ${detection.rssi} dBm"
-            )
-            .setSmallIcon(R.drawable.ic_notification)
-            .setAutoCancel(true)
-            .build()
-        notificationManager.notify(asset.id.hashCode(), notification)
-        vibrate(asset.vibration)
-    }
-
-    private fun canNotify(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context, android.Manifest.permission.POST_NOTIFICATIONS
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
-    }
-
-    /** Löst Vibration aus, wenn das Asset es wünscht. */
-    private fun vibrate(enabled: Boolean) {
-        if (!enabled) return
-        val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
+    private fun createChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(200)
+            val alerts = NotificationChannel(
+                CHANNEL_ALERTS,
+                "Sicherheitsalarme",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = "Alarme und sicherheitsrelevante Ereignisse" }
+
+            val agent = NotificationChannel(
+                CHANNEL_AGENT,
+                "Agent-Status",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply { description = "Statusmeldungen des selbstlernenden Agenten" }
+
+            notificationManager.createNotificationChannels(listOf(alerts, agent))
         }
     }
 
-    private fun formatLocation(detection: Detection): String {
-        return if (detection.latitude != null && detection.longitude != null) {
-            "${detection.latitude}, ${detection.longitude}"
-        } else {
-            "Unbekannt"
+    fun sendActionNotification(asset: Asset, actionType: Any, success: Boolean) {
+        val title = if (success) "Aktion ausgeführt" else "Aktion fehlgeschlagen"
+        val body = "${actionType::class.simpleName ?: "Aktion"} · ${asset.shortName}"
+        notify(System.currentTimeMillis().toInt(), title, body, CHANNEL_ALERTS)
+    }
+
+    fun sendAlertNotification(title: String, body: String) {
+        notify(System.currentTimeMillis().toInt(), title, body, CHANNEL_ALERTS)
+    }
+
+    fun buildAgentNotification(content: String): android.app.Notification {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(context, CHANNEL_AGENT)
+            .setContentTitle("🛡️ SecureGuard Agent")
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_shield)
+            .setOngoing(true)
+            .setContentIntent(pendingIntent)
+            .build()
+    }
+
+    private fun notify(id: Int, title: String, body: String, channel: String) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            id,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, channel)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setSmallIcon(R.drawable.ic_shield)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+        notificationManager.notify(id, notification)
+    }
+
+    companion object {
+        const val CHANNEL_ALERTS = "secureguard_alerts"
+        const val CHANNEL_AGENT = "secureguard_agent"
+        const val AGENT_NOTIFICATION_ID = 1001
     }
 }

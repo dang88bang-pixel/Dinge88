@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="secureguard.db" />
+        <exclude domain="sharedpref" path="secureguard_settings.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="secureguard.db" />
+        <exclude domain="sharedpref" path="secureguard_settings.xml" />
+    </device-transfer>
+</data-extraction-rules>

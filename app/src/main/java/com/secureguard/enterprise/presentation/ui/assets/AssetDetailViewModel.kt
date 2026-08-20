@@ -2,34 +2,41 @@ package com.secureguard.enterprise.presentation.ui.assets
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.secureguard.enterprise.data.model.Alert
 import com.secureguard.enterprise.data.model.AlertSeverity
 import com.secureguard.enterprise.data.model.AlertType
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.model.Detection
+import com.secureguard.enterprise.data.model.SearchResult
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
+import com.secureguard.enterprise.presentation.ui.common.ActionResult
+import com.secureguard.enterprise.presentation.ui.common.ActionType
+import com.secureguard.enterprise.data.model.Telemetry
+import com.secureguard.enterprise.services.AgentService
+import com.secureguard.enterprise.services.NotificationService
 import com.secureguard.enterprise.services.CrowdService
 import com.secureguard.enterprise.services.LoraService
-import com.secureguard.enterprise.services.NotificationService
 import com.secureguard.enterprise.services.OpticalService
 import com.secureguard.enterprise.services.SatelliteService
-import com.secureguard.enterprise.services.Telemetry
 import com.secureguard.enterprise.services.TelemetryService
 import com.secureguard.enterprise.services.UrbanService
+import com.secureguard.enterprise.services.BleService
 import com.secureguard.enterprise.services.WifiService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.Date
 import javax.inject.Inject
+
+enum class SearchChannel { ALL, BLE, LORA, WIFI, OPTICAL, URBAN, CROWD, SATELLITE }
 
 @HiltViewModel
 class AssetDetailViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
     private val telemetryService: TelemetryService,
+    private val agentService: AgentService,
+    private val bleService: BleService,
     private val wifiService: WifiService,
     private val loraService: LoraService,
     private val opticalService: OpticalService,
@@ -39,11 +46,8 @@ class AssetDetailViewModel @Inject constructor(
     private val notificationService: NotificationService
 ) : ViewModel() {
 
-    private val _asset = MutableStateFlow<Asset?>(null)
-    val asset: StateFlow<Asset?> = _asset.asStateFlow()
-
-    private val _detections = MutableStateFlow<List<Detection>>(emptyList())
-    val detections: StateFlow<List<Detection>> = _detections.asStateFlow()
+    private val _assetState = MutableStateFlow<Asset?>(null)
+    val assetState: StateFlow<Asset?> = _assetState.asStateFlow()
 
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
@@ -54,243 +58,127 @@ class AssetDetailViewModel @Inject constructor(
     private val _actionResult = MutableStateFlow<ActionResult?>(null)
     val actionResult: StateFlow<ActionResult?> = _actionResult.asStateFlow()
 
+    private val _detections = MutableStateFlow<List<Detection>>(emptyList())
+    val detections: StateFlow<List<Detection>> = _detections.asStateFlow()
+
     private val _telemetry = MutableStateFlow<Telemetry?>(null)
     val telemetry: StateFlow<Telemetry?> = _telemetry.asStateFlow()
 
+    private var loadedMac: String? = null
+
     fun loadAsset(assetId: String) {
         viewModelScope.launch {
-            val found = repository.getAssetById(assetId)
-            if (found != null) {
-                _asset.value = found
-                loadDetections(found.mac)
+            val found = repository.resolveAsset(assetId)
+            _assetState.value = found
+            if (found != null && found.mac != loadedMac) {
+                loadedMac = found.mac
+                // Prime the telemetry cache with a fresh read.
+                refreshTelemetry()
+                repository.getDetections(found.mac).collect { list ->
+                    _detections.value = list
+                }
             }
         }
     }
-
-    private fun loadDetections(mac: String) {
-        viewModelScope.launch {
-            repository.getDetections(mac).collect { detectionList ->
-                _detections.value = detectionList
-            }
-        }
-    }
-
-    // ============ STATUS / ASSET ============
-
-    fun setStatus(status: AssetStatus) {
-        viewModelScope.launch {
-            val asset = _asset.value ?: return@launch
-            val updated = asset.copy(status = status)
-            repository.updateAsset(updated)
-            _asset.value = updated
-            _actionResult.value = ActionResult(true, "Status auf ${status.name} gesetzt")
-        }
-    }
-
-    fun setExternalAllowed(enabled: Boolean) {
-        viewModelScope.launch {
-            val asset = _asset.value ?: return@launch
-            val updated = asset.copy(externalAllowed = enabled)
-            repository.updateAsset(updated)
-            _asset.value = updated
-            _actionResult.value = ActionResult(
-                true,
-                if (enabled) "Externe Quellen erlaubt" else "Externe Quellen gesperrt"
-            )
-        }
-    }
-
-    fun deleteAsset() {
-        viewModelScope.launch {
-            val asset = _asset.value ?: return@launch
-            repository.deleteAsset(asset)
-            _actionResult.value = ActionResult(true, "Asset gelöscht")
-            _asset.value = null
-        }
-    }
-
-    // ============ AKTIONEN ============
 
     fun executeAction(actionType: ActionType) {
         viewModelScope.launch {
             _actionResult.value = ActionResult.Processing
+            val asset = _assetState.value ?: return@launch
 
-            val asset = _asset.value ?: return@launch
-
-            val result = when (actionType) {
-                ActionType.ALARM -> executeAlarm(asset)
-                ActionType.LIGHT -> executeLight(asset)
-                ActionType.MOTOR_OFF -> executeMotorOff(asset)
-                ActionType.BATTERY -> executeBattery(asset)
-                ActionType.MESSAGE -> executeMessage(asset)
-                ActionType.POSITION -> executePosition(asset)
+            val success = telemetryService.sendCommand(asset.mac, actionType.wireCommand)
+            val result = if (success) {
+                ActionResult(true, "${actionType.label} ausgeführt")
+            } else {
+                ActionResult(false, "Keine Verbindung zum Asset")
             }
-
             _actionResult.value = result
 
-            // Alert speichern
-            if (result.success) {
-                repository.insertAlert(
-                    Alert(
-                        assetId = asset.id,
-                        type = AlertType.SECURITY,
-                        severity = AlertSeverity.INFO,
-                        message = "${actionType.name} erfolgreich ausgeführt",
-                        timestamp = Date()
-                    )
-                )
-                notificationService.sendActionNotification(asset, actionType.name, true)
-            } else {
-                repository.insertAlert(
-                    Alert(
-                        assetId = asset.id,
-                        type = AlertType.CRITICAL,
-                        severity = AlertSeverity.WARNING,
-                        message = "${actionType.name} fehlgeschlagen: ${result.message}",
-                        timestamp = Date()
-                    )
-                )
-                notificationService.sendActionNotification(asset, actionType.name, false)
-            }
+            repository.raiseAlert(
+                assetId = asset.id,
+                type = if (success) AlertType.SECURITY else AlertType.CRITICAL,
+                severity = if (success) AlertSeverity.INFO else AlertSeverity.WARNING,
+                message = "${actionType.label}: ${result.message}"
+            )
+            notificationService.sendActionNotification(asset, actionType, success)
         }
     }
 
-    private suspend fun executeAlarm(asset: Asset): ActionResult =
-        runCommand(asset.mac, "ALARM", "Alarm ausgelöst")
+    /** Full multi-channel search via the self-learning agent. */
+    fun startSearch() = searchOnChannel(SearchChannel.ALL)
 
-    private suspend fun executeLight(asset: Asset): ActionResult =
-        runCommand(asset.mac, "LIGHT", "Lichter blinken")
+    /** Search using only the external (crowd) channel. */
+    fun startExternalSearch() = searchOnChannel(SearchChannel.CROWD)
 
-    private suspend fun executeMotorOff(asset: Asset): ActionResult =
-        runCommand(asset.mac, "MOTOR_OFF", "Motor ausgeschaltet")
+    /** Search using only the satellite channel. */
+    fun startSatelliteSearch() = searchOnChannel(SearchChannel.SATELLITE)
 
-    private suspend fun executeBattery(asset: Asset): ActionResult =
-        runCommand(asset.mac, "BATTERY", "Batterie getrennt")
-
-    private suspend fun executeMessage(asset: Asset): ActionResult =
-        runCommand(asset.mac, "MESSAGE", "Nachricht gesendet")
-
-    private suspend fun executePosition(asset: Asset): ActionResult =
-        runCommand(asset.mac, "POSITION", "Position angefordert")
-
-    private suspend fun runCommand(mac: String, command: String, successMessage: String): ActionResult {
-        if (mac.isNotEmpty()) {
-            val success = telemetryService.sendCommand(mac, command)
-            return if (success) {
-                ActionResult(true, successMessage)
-            } else {
-                ActionResult(false, "Keine Verbindung zum Gerät")
-            }
-        }
-        return ActionResult(false, "Keine MAC-Adresse hinterlegt")
-    }
-
-    // ============ SUCHE ============
-
-    fun startSearch() {
-        val asset = _asset.value ?: return
-        runSearch(
-            asset,
-            listOf(
-                { telemetryService.searchAsset(asset) },
-                { wifiService.searchAsset(asset) },
-                { loraService.searchAsset(asset) },
-                { opticalService.searchAsset(asset) },
-                { urbanService.searchAsset(asset) },
-                { if (asset.externalAllowed) crowdService.searchAsset(asset) else null },
-                { satelliteService.searchAsset(asset) }
-            )
-        )
-    }
-
-    fun searchExternal() {
-        val asset = _asset.value ?: return
-        runSearch(
-            asset,
-            listOf(
-                { if (asset.externalAllowed) crowdService.searchAsset(asset) else null }
-            )
-        )
-    }
-
-    fun searchSatellite() {
-        val asset = _asset.value ?: return
-        runSearch(asset, listOf({ satelliteService.searchAsset(asset) }))
-    }
-
-    fun searchBluetooth() {
-        val asset = _asset.value ?: return
-        runSearch(asset, listOf({ telemetryService.searchAsset(asset) }))
-    }
-
-    private fun runSearch(asset: Asset, searches: List<suspend () -> Detection?>) {
+    private fun searchOnChannel(channel: SearchChannel) {
         viewModelScope.launch {
             _isSearching.value = true
-            _searchResult.value = null
-
-            val results = searches.map { runCatching { it() }.getOrNull() }
-            val best = results.filterNotNull().minByOrNull { it.rssi }
-            _searchResult.value = if (best != null) {
-                repository.insertDetection(best)
-                // Asset sofort als online markieren.
-                val updated = asset.copy(
-                    status = AssetStatus.ONLINE,
-                    lastSeen = Date(),
-                    latitude = best.latitude ?: asset.latitude,
-                    longitude = best.longitude ?: asset.longitude,
-                    rssi = best.rssi
-                )
-                repository.updateAsset(updated)
-                _asset.value = updated
-                loadDetections(asset.mac)
-                SearchResult(true, best)
-            } else {
-                SearchResult(false)
+            val asset = _assetState.value
+            if (asset == null) {
+                _isSearching.value = false
+                return@launch
             }
+
+            val detection = when (channel) {
+                SearchChannel.ALL -> agentService.searchAsset(asset).detection
+                SearchChannel.BLE -> bleService.searchAsset(asset)
+                SearchChannel.WIFI -> wifiService.searchAsset(asset)
+                SearchChannel.LORA -> loraService.searchAsset(asset)
+                SearchChannel.OPTICAL -> opticalService.searchAsset(asset)
+                SearchChannel.URBAN -> urbanService.searchAsset(asset)
+                SearchChannel.CROWD ->
+                    if (asset.externalAllowed) crowdService.searchAsset(asset) else null
+                SearchChannel.SATELLITE -> satelliteService.searchAsset(asset)
+            }
+
+            if (detection != null) {
+                repository.insertDetection(detection)
+                repository.updateAssetStatus(
+                    mac = asset.mac,
+                    status = AssetStatus.ONLINE,
+                    timestamp = System.currentTimeMillis(),
+                    rssi = detection.rssi,
+                    lat = detection.latitude,
+                    lon = detection.longitude
+                )
+                _searchResult.value = SearchResult(found = true, detection = detection)
+            } else {
+                _searchResult.value = SearchResult(found = false)
+            }
+            _assetState.value = repository.resolveAsset(asset.id)
             _isSearching.value = false
         }
     }
 
-    // ============ TELEMETRIE ============
-
     fun refreshTelemetry() {
         viewModelScope.launch {
-            val asset = _asset.value ?: return@launch
+            val asset = _assetState.value ?: return@launch
+            // Force a fresh read if nothing cached yet.
             val telemetry = telemetryService.getLatestTelemetry(asset.mac)
+                ?: telemetryService.run {
+                    // Trigger a search which populates the telemetry cache.
+                    searchAsset(asset)
+                    getLatestTelemetry(asset.mac)
+                }
             _telemetry.value = telemetry
             if (telemetry != null) {
                 repository.updateAssetStatus(
                     mac = asset.mac,
                     status = AssetStatus.ONLINE,
                     timestamp = System.currentTimeMillis(),
+                    rssi = _assetState.value?.rssi,
                     lat = telemetry.latitude,
                     lon = telemetry.longitude
                 )
-                _actionResult.value = ActionResult(true, "Telemetrie aktualisiert")
-                loadAsset(asset.id)
-            } else {
-                _actionResult.value = ActionResult(false, "Keine Telemetrie verfügbar (kein Gerät erreichbar)")
+                _assetState.value = repository.resolveAsset(asset.id)
             }
         }
     }
 
-    override fun onCleared() {
-        super.onCleared()
+    fun clearActionResult() {
+        _actionResult.value = null
     }
 }
-
-enum class ActionType { ALARM, LIGHT, MOTOR_OFF, BATTERY, MESSAGE, POSITION }
-
-data class ActionResult(
-    val success: Boolean,
-    val message: String
-) {
-    companion object {
-        val Processing = ActionResult(false, "Wird ausgeführt...")
-    }
-}
-
-data class SearchResult(
-    val found: Boolean,
-    val detection: Detection? = null
-)

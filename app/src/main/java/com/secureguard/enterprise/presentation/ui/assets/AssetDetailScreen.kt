@@ -11,11 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LocationOn
@@ -28,9 +27,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,95 +37,55 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.components.ActionButton
+import com.secureguard.enterprise.presentation.ui.common.ActionType
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssetDetailScreen(
     navController: NavController,
     assetId: String,
     viewModel: AssetDetailViewModel = hiltViewModel()
 ) {
-    val asset by viewModel.asset.collectAsState()
+    val asset by viewModel.assetState.collectAsState()
     val detections by viewModel.detections.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
     val searchResult by viewModel.searchResult.collectAsState()
     val actionResult by viewModel.actionResult.collectAsState()
     val telemetry by viewModel.telemetry.collectAsState()
 
-    LaunchedEffect(assetId) {
-        viewModel.loadAsset(assetId)
-    }
-
-    var menuOpen by remember { mutableStateOf(false) }
-    val a = asset
+    LaunchedEffect(assetId) { viewModel.loadAsset(assetId) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(a?.shortName ?: "Asset Detail") },
+                title = { Text(asset?.shortName ?: "Asset Detail") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refreshTelemetry() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Aktualisieren")
+                        Icon(Icons.Default.Refresh, contentDescription = "Aktualisieren")
                     }
-                    Box {
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "Menü")
-                        }
-                        DropdownMenu(
-                            expanded = menuOpen,
-                            onDismissRequest = { menuOpen = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Als Online markieren") },
-                                onClick = { menuOpen = false; viewModel.setStatus(AssetStatus.ONLINE) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Als Wartung markieren") },
-                                onClick = { menuOpen = false; viewModel.setStatus(AssetStatus.MAINTENANCE) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Als Offline markieren") },
-                                onClick = { menuOpen = false; viewModel.setStatus(AssetStatus.OFFLINE) }
-                            )
-                            if (a != null) {
-                                DropdownMenuItem(
-                                    text = { Text(if (a.externalAllowed) "Externe Quellen sperren" else "Externe Quellen erlauben") },
-                                    onClick = { menuOpen = false; viewModel.setExternalAllowed(!a.externalAllowed) }
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text("Asset löschen") },
-                                onClick = {
-                                    menuOpen = false
-                                    viewModel.deleteAsset()
-                                    navController.navigateUp()
-                                }
-                            )
-                        }
+                    IconButton(onClick = { /* Menü */ }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menü")
                     }
                 }
             )
         }
     ) { paddingValues ->
-        if (a == null) {
+        if (asset == null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -139,6 +95,15 @@ fun AssetDetailScreen(
                 CircularProgressIndicator()
             }
         } else {
+            val current = asset!!
+            val statusColor = when (current.status) {
+                AssetStatus.ONLINE -> Color(0xFF2E7D32)
+                AssetStatus.MAINTENANCE -> Color(0xFFF9A825)
+                AssetStatus.OFFLINE -> Color(0xFFC62828)
+                AssetStatus.SEARCHING -> Color(0xFF1565C0)
+                AssetStatus.UNKNOWN -> Color.Gray
+            }
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -146,17 +111,11 @@ fun AssetDetailScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Status-Header
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = when (a.status) {
-                                AssetStatus.ONLINE -> Color.Green.copy(alpha = 0.1f)
-                                AssetStatus.MAINTENANCE -> Color(0xFFFFA000).copy(alpha = 0.1f)
-                                AssetStatus.OFFLINE -> Color.Red.copy(alpha = 0.1f)
-                                else -> Color.Gray.copy(alpha = 0.1f)
-                            }
+                            containerColor = statusColor.copy(alpha = 0.1f)
                         )
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -169,31 +128,27 @@ fun AssetDetailScreen(
                                     Box(
                                         modifier = Modifier
                                             .size(12.dp)
-                                            .background(
-                                                color = statusColor(a.status),
-                                                shape = CircleShape
-                                            )
+                                            .background(statusColor, CircleShape)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Spacer(Modifier.size(8.dp))
                                     Text(
-                                        a.status.name,
+                                        current.status.name,
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = statusColor(a.status)
+                                        color = statusColor,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                                 Text(
-                                    "📶 ${a.rssi} dBm",
+                                    "📍 ${current.latitude?.let { "%.4f".format(it) } ?: "?"}, " +
+                                        "${current.longitude?.let { "%.4f".format(it) } ?: "?"}",
                                     style = MaterialTheme.typography.bodySmall
                                 )
+                                Text("📶 ${current.rssi} dBm", style = MaterialTheme.typography.bodySmall)
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "📍 ${a.latitude ?: "Unbekannt"}, ${a.longitude ?: "Unbekannt"}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            Spacer(Modifier.height(4.dp))
                             Text(
                                 "⏱ Letzte Aktualisierung: ${
-                                    a.lastSeen?.let {
+                                    current.lastSeen?.let {
                                         SimpleDateFormat("HH:mm", Locale.getDefault()).format(it)
                                     } ?: "Nie"
                                 }",
@@ -204,7 +159,6 @@ fun AssetDetailScreen(
                     }
                 }
 
-                // Kartenvorschau
                 item {
                     Card(
                         modifier = Modifier
@@ -217,12 +171,12 @@ fun AssetDetailScreen(
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    "🗺️ Karte mit Position",
+                                    "🗺️ Karten-Position",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                if (a.latitude != null && a.longitude != null) {
+                                if (current.latitude != null && current.longitude != null) {
                                     Text(
-                                        "📍 ${a.latitude}, ${a.longitude}",
+                                        "📍 ${"%.4f".format(current.latitude)}, ${"%.4f".format(current.longitude)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -232,31 +186,34 @@ fun AssetDetailScreen(
                     }
                 }
 
-                // Telemetrie
                 item {
                     Text("📊 Telemetrie", style = MaterialTheme.typography.titleMedium)
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(
-                                text = if (telemetry == null) {
-                                    "Noch keine Telemetrie gelesen. Tippe oben auf Aktualisieren (↻)."
-                                } else {
-                                    "Telemetrie zuletzt über BLE-GATT gelesen."
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                TelemetryItem("🔋 Batterie", telemetry?.battery?.let { "$it%" } ?: "–")
-                                TelemetryItem("⛽ Kraftstoff", telemetry?.fuel?.let { "$it%" } ?: "–")
-                                TelemetryItem("🔧 Motor", telemetry?.engineOk?.let { if (it) "OK" else "FEHLER" } ?: "–")
-                                TelemetryItem("🛞 Reifen", "–")
+                                TelemetryItem(
+                                    "🔋 Batterie",
+                                    telemetry?.batteryPercent?.let { "$it%" }
+                                        ?: (current.batteryLevel?.let { "$it%" } ?: "–")
+                                )
+                                TelemetryItem(
+                                    "⛽ Kraftstoff",
+                                    telemetry?.fuelPercent?.let { "$it%" } ?: "–"
+                                )
+                                TelemetryItem(
+                                    "🔧 Motor",
+                                    if (telemetry?.motorOk != false) "OK" else "FEHLER"
+                                )
+                                TelemetryItem(
+                                    "🛞 Reifen",
+                                    if (telemetry?.tiresOk != false) "OK" else "FEHLER"
+                                )
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -264,18 +221,17 @@ fun AssetDetailScreen(
                             ) {
                                 TelemetryItem(
                                     "⏱ Betriebsstd.",
-                                    telemetry?.operatingHours?.let { "%.1f h".format(it) } ?: "–"
+                                    telemetry?.operatingHours?.let { "%,.1f h".format(it) } ?: "–"
                                 )
                                 TelemetryItem(
                                     "📏 Kilometer",
-                                    telemetry?.distanceKm?.let { "%.0f km".format(it) } ?: "–"
+                                    telemetry?.kilometers?.let { "%,.1f km".format(it) } ?: "–"
                                 )
                             }
                         }
                     }
                 }
 
-                // Aktionen
                 item {
                     Text("🎯 Aktionen", style = MaterialTheme.typography.titleMedium)
                     Card(modifier = Modifier.fillMaxWidth()) {
@@ -283,72 +239,41 @@ fun AssetDetailScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            val online = current.status == AssetStatus.ONLINE
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.Warning,
-                                    label = "🔔 Alarm",
-                                    onClick = { viewModel.executeAction(ActionType.ALARM) },
-                                    enabled = a.status == AssetStatus.ONLINE
-                                )
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.Lightbulb,
-                                    label = "💡 Blinken",
-                                    onClick = { viewModel.executeAction(ActionType.LIGHT) },
-                                    enabled = a.status == AssetStatus.ONLINE
-                                )
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.PowerSettingsNew,
-                                    label = "🔇 Motor",
-                                    onClick = { viewModel.executeAction(ActionType.MOTOR_OFF) },
-                                    enabled = a.status == AssetStatus.ONLINE
-                                )
+                                ActionButton(Modifier.weight(1f), Icons.Default.Warning, "🔔 Alarm",
+                                    { viewModel.executeAction(ActionType.ALARM) }, online)
+                                ActionButton(Modifier.weight(1f), Icons.Default.Lightbulb, "💡 Blinken",
+                                    { viewModel.executeAction(ActionType.LIGHT) }, online)
+                                ActionButton(Modifier.weight(1f), Icons.Default.PowerSettingsNew, "🔇 Motor",
+                                    { viewModel.executeAction(ActionType.MOTOR_OFF) }, online)
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.BatteryAlert,
-                                    label = "🔋 Batterie",
-                                    onClick = { viewModel.executeAction(ActionType.BATTERY) },
-                                    enabled = a.status == AssetStatus.ONLINE
-                                )
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.Message,
-                                    label = "📝 Nachricht",
-                                    onClick = { viewModel.executeAction(ActionType.MESSAGE) },
-                                    enabled = a.status == AssetStatus.ONLINE
-                                )
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.LocationOn,
-                                    label = "📍 Position",
-                                    onClick = { viewModel.executeAction(ActionType.POSITION) },
-                                    enabled = a.status == AssetStatus.ONLINE
-                                )
+                                ActionButton(Modifier.weight(1f), Icons.Default.BatteryAlert, "🔋 Batterie",
+                                    { viewModel.executeAction(ActionType.BATTERY) }, online)
+                                ActionButton(Modifier.weight(1f), Icons.Default.Message, "📝 Nachricht",
+                                    { viewModel.executeAction(ActionType.MESSAGE) }, online)
+                                ActionButton(Modifier.weight(1f), Icons.Default.LocationOn, "📍 Position",
+                                    { viewModel.executeAction(ActionType.POSITION) }, online)
                             }
-                            val res = actionResult
-                            if (res != null && res != ActionResult.Processing) {
+                            if (actionResult != null && actionResult != com.secureguard.enterprise.presentation.ui.common.ActionResult.Processing) {
                                 Text(
-                                    text = if (res.success) "✅ ${res.message}" else "❌ ${res.message}",
+                                    text = if (actionResult!!.success) "✅ ${actionResult!!.message}"
+                                    else "❌ ${actionResult!!.message}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (res.success) Color.Green else Color.Red,
-                                    modifier = Modifier.padding(top = 8.dp)
+                                    color = if (actionResult!!.success) Color(0xFF2E7D32) else Color(0xFFC62828)
                                 )
                             }
                         }
                     }
                 }
 
-                // Weitere Suchoptionen
                 item {
                     Text("🔍 Weitere Suchoptionen", style = MaterialTheme.typography.titleMedium)
                     Card(modifier = Modifier.fillMaxWidth()) {
@@ -367,65 +292,34 @@ fun AssetDetailScreen(
                                             modifier = Modifier.size(16.dp),
                                             strokeWidth = 2.dp
                                         )
-                                    } else {
-                                        Text("🔄 Suche starten")
-                                    }
+                                    } else Text("🔄 Suche")
                                 }
                                 Button(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { viewModel.searchExternal() },
-                                    enabled = a.externalAllowed && !isSearching
-                                ) {
-                                    Text("🌍 Extern")
-                                }
+                                    onClick = { viewModel.startExternalSearch() },
+                                    enabled = current.externalAllowed && !isSearching
+                                ) { Text("🌍 Extern") }
                                 Button(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { viewModel.searchSatellite() },
+                                    onClick = { viewModel.startSatelliteSearch() },
                                     enabled = !isSearching
-                                ) {
-                                    Text("📡 Satellit")
-                                }
+                                ) { Text("📡 Satellit") }
                             }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { viewModel.searchBluetooth() },
-                                    enabled = !isSearching
-                                ) {
-                                    Text("📶 Bluetooth")
-                                }
+                            searchResult?.let { result ->
+                                Spacer(Modifier.height(8.dp))
                                 Text(
-                                    text = "Einzelne Quelle antippen, um gezielt zu suchen.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier
-                                        .weight(1.4f)
-                                        .align(Alignment.CenterVertically)
-                                )
-                            }
-                            val sres = searchResult
-                            if (sres != null) {
-                                Text(
-                                    text = if (sres.found) {
-                                        "✅ Gefunden via ${sres.detection?.sourceType?.name} | " +
-                                            "RSSI: ${sres.detection?.rssi} dBm"
-                                    } else {
-                                        "❌ Nicht gefunden"
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+                                    text = if (result.found)
+                                        "✅ Gefunden! RSSI: ${result.detection?.rssi} dBm"
+                                    else "❌ Nicht gefunden",
+                                    style = MaterialTheme.typography.bodySmall
                                 )
                             }
                         }
                     }
                 }
 
-                // Historie
                 item {
-                    Text("📋 Historien (${detections.size})", style = MaterialTheme.typography.titleMedium)
+                    Text("📋 Historie (${detections.size})", style = MaterialTheme.typography.titleMedium)
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier.padding(16.dp),
@@ -454,9 +348,8 @@ fun AssetDetailScreen(
                                         )
                                         if (detection.latitude != null) {
                                             Text(
-                                                "📍 ${"%.4f".format(detection.latitude)}, ${
-                                                    "%.4f".format(detection.longitude)
-                                                }",
+                                                "📍 ${"%.4f".format(detection.latitude)}, " +
+                                                    "${"%.4f".format(detection.longitude)}",
                                                 style = MaterialTheme.typography.bodySmall
                                             )
                                         }
@@ -474,18 +367,8 @@ fun AssetDetailScreen(
 @Composable
 private fun TelemetryItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+        Text(label, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
     }
-}
-
-private fun statusColor(status: AssetStatus): Color = when (status) {
-    AssetStatus.ONLINE -> Color.Green
-    AssetStatus.MAINTENANCE -> Color(0xFFFFA000)
-    AssetStatus.OFFLINE -> Color.Red
-    else -> Color.Gray
 }

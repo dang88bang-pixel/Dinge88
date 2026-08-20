@@ -10,10 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Lightbulb
@@ -31,7 +30,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,11 +47,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.components.ActionButton
+import com.secureguard.enterprise.presentation.ui.common.ActionType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,8 +65,11 @@ fun ActionsScreen(
     val selectedAsset by viewModel.selectedAsset.collectAsState()
     val commandLog by viewModel.commandLog.collectAsState()
     val isExecuting by viewModel.isExecuting.collectAsState()
+    val menuExpanded by viewModel.menuExpanded.collectAsState()
 
-    var dropdownExpanded by remember { mutableStateOf(false) }
+    var recoverResend by remember { mutableStateOf(true) }
+    var logCommands by remember { mutableStateOf(false) }
+    var autoNotify by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -74,12 +77,12 @@ fun ActionsScreen(
                 title = { Text("⚡ Aktionen") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.clearLog() }) {
-                        Icon(Icons.Filled.Clear, contentDescription = "Log löschen")
+                        Icon(Icons.Default.Clear, contentDescription = "Log löschen")
                     }
                 }
             )
@@ -92,38 +95,34 @@ fun ActionsScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Asset-Auswahl
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("🎯 Asset auswählen", style = MaterialTheme.typography.titleSmall)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(Modifier.height(8.dp))
                         ExposedDropdownMenuBox(
-                            expanded = dropdownExpanded,
-                            onExpandedChange = { dropdownExpanded = it }
+                            expanded = menuExpanded,
+                            onExpandedChange = { viewModel.setMenuExpanded(it) }
                         ) {
                             OutlinedTextField(
                                 value = selectedAsset?.shortName ?: "Asset auswählen",
                                 onValueChange = {},
                                 readOnly = true,
                                 trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded)
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuExpanded)
                                 },
                                 modifier = Modifier
-                                    .menuAnchor()
                                     .fillMaxWidth()
+                                    .menuAnchor()
                             )
                             ExposedDropdownMenu(
-                                expanded = dropdownExpanded,
-                                onDismissRequest = { dropdownExpanded = false }
+                                expanded = menuExpanded,
+                                onDismissRequest = { viewModel.setMenuExpanded(false) }
                             ) {
                                 assets.forEach { asset ->
                                     DropdownMenuItem(
                                         text = { Text(asset.shortName) },
-                                        onClick = {
-                                            viewModel.selectAsset(asset)
-                                            dropdownExpanded = false
-                                        }
+                                        onClick = { viewModel.selectAsset(asset) }
                                     )
                                 }
                             }
@@ -132,18 +131,15 @@ fun ActionsScreen(
                 }
             }
 
-            val sel = selectedAsset
-            if (sel != null) {
-                // Aktionen
+            val asset = selectedAsset
+            if (asset != null) {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (sel.status == AssetStatus.ONLINE) {
-                                Color.Green.copy(alpha = 0.05f)
-                            } else {
-                                Color.Red.copy(alpha = 0.05f)
-                            }
+                            containerColor = if (asset.status == AssetStatus.ONLINE)
+                                Color(0xFF2E7D32).copy(alpha = 0.05f)
+                            else Color(0xFFC62828).copy(alpha = 0.05f)
                         )
                     ) {
                         Column(
@@ -151,132 +147,91 @@ fun ActionsScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = "🚀 Aktionen für ${sel.shortName}",
-                                style = MaterialTheme.typography.titleSmall
+                                "🚀 Aktionen für ${asset.shortName}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "STATUS: ${sel.status.name}  |  " +
-                                    "📶 ${sel.rssi} dBm  |  ⏱ ${sel.lastSeen}",
+                                "STATUS: ${asset.status}  |  📶 ${asset.rssi} dBm",
                                 style = MaterialTheme.typography.bodySmall
                             )
 
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                            val online = asset.status == AssetStatus.ONLINE && !isExecuting
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.Warning,
-                                    label = "🔔 Alarm",
-                                    onClick = { viewModel.executeAction(ActionType.ALARM) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
-                                )
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.Lightbulb,
-                                    label = "💡 Blinken",
-                                    onClick = { viewModel.executeAction(ActionType.LIGHT) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
-                                )
+                                ActionButton(Modifier.weight(1f), Icons.Default.Warning, "🔔 Alarm",
+                                    { viewModel.executeAction(ActionType.ALARM) }, online)
+                                ActionButton(Modifier.weight(1f), Icons.Default.Lightbulb, "💡 Blinken",
+                                    { viewModel.executeAction(ActionType.LIGHT) }, online)
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.PowerSettingsNew,
-                                    label = "🔇 Motor aus",
-                                    onClick = { viewModel.executeAction(ActionType.MOTOR_OFF) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
-                                )
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.BatteryAlert,
-                                    label = "🔋 Batterie",
-                                    onClick = { viewModel.executeAction(ActionType.BATTERY) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
-                                )
+                                ActionButton(Modifier.weight(1f), Icons.Default.PowerSettingsNew, "🔇 Motor",
+                                    { viewModel.executeAction(ActionType.MOTOR_OFF) }, online)
+                                ActionButton(Modifier.weight(1f), Icons.Default.BatteryAlert, "🔋 Batterie",
+                                    { viewModel.executeAction(ActionType.BATTERY) }, online)
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.Message,
-                                    label = "📝 Nachricht",
-                                    onClick = { viewModel.executeAction(ActionType.MESSAGE) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
-                                )
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.LocationOn,
-                                    label = "📍 Position",
-                                    onClick = { viewModel.executeAction(ActionType.POSITION) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
-                                )
+                                ActionButton(Modifier.weight(1f), Icons.Default.Message, "📝 Nachricht",
+                                    { viewModel.executeAction(ActionType.MESSAGE) }, online)
+                                ActionButton(Modifier.weight(1f), Icons.Default.LocationOn, "📍 Position",
+                                    { viewModel.executeAction(ActionType.POSITION) }, online)
                             }
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.Refresh,
-                                    label = "🔄 Neustarten",
-                                    onClick = { viewModel.executeAction(ActionType.RESTART) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
-                                )
-                                ActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    icon = Icons.Filled.Storage,
-                                    label = "📊 Telemetrie",
-                                    onClick = { viewModel.executeAction(ActionType.TELEMETRY) },
-                                    enabled = sel.status == AssetStatus.ONLINE && !isExecuting
-                                )
+                                ActionButton(Modifier.weight(1f), Icons.Default.Refresh, "🔄 Neustart",
+                                    { viewModel.executeAction(ActionType.RESTART) }, online)
+                                ActionButton(Modifier.weight(1f), Icons.Default.Storage, "📊 Telemetrie",
+                                    { viewModel.executeAction(ActionType.TELEMETRY) }, online)
                             }
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                            Text("⚙️ Einstellungen", style = MaterialTheme.typography.titleSmall)
-                            SettingCheckboxRow("Recover/Resend aktivieren", true)
-                            SettingCheckboxRow("Steuerlog aufzeichnen", false)
-                            SettingCheckboxRow("Automatische Benachrichtigung", false)
 
                             if (isExecuting) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp),
+                                    modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Aktion wird ausgeführt...", style = MaterialTheme.typography.bodySmall)
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.size(8.dp))
+                                    Text("Aktion wird ausgeführt...",
+                                        style = MaterialTheme.typography.bodySmall)
                                 }
                             }
                         }
                     }
                 }
 
-                // Command Log
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("⚙️ Einstellungen", style = MaterialTheme.typography.titleSmall)
+                            CheckRow(recoverResend, "Recover/Resend aktivieren") { recoverResend = it }
+                            CheckRow(logCommands, "Steuerlog aufzeichnen") { logCommands = it }
+                            CheckRow(autoNotify, "Automatische Benachrichtigung") { autoNotify = it }
+                        }
+                    }
+                }
+
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("📋 Command Log", style = MaterialTheme.typography.titleSmall)
-                                TextButton(onClick = { viewModel.clearLog() }) {
-                                    Text("Log löschen")
-                                }
+                                TextButton(onClick = { viewModel.clearLog() }) { Text("Leeren") }
                             }
                             if (commandLog.isEmpty()) {
                                 Text(
@@ -286,11 +241,8 @@ fun ActionsScreen(
                                 )
                             } else {
                                 commandLog.takeLast(10).forEach { entry ->
-                                    Text(
-                                        text = entry,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(vertical = 2.dp)
-                                    )
+                                    Text(entry, style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(vertical = 2.dp))
                                 }
                             }
                         }
@@ -305,20 +257,8 @@ fun ActionsScreen(
                                 .padding(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Filled.Warning,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(
-                                    "Bitte wähle ein Asset aus",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Text("Bitte wähle ein Asset aus",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -328,10 +268,9 @@ fun ActionsScreen(
 }
 
 @Composable
-private fun SettingCheckboxRow(label: String, initiallyChecked: Boolean) {
-    var checked by remember { mutableStateOf(initiallyChecked) }
+private fun CheckRow(checked: Boolean, label: String, onCheckedChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = checked, onCheckedChange = { checked = it })
-        Text(label, modifier = Modifier.padding(top = 8.dp))
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Text(label)
     }
 }

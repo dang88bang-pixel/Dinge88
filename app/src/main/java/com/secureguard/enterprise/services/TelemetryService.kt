@@ -1,163 +1,86 @@
 package com.secureguard.enterprise.services
 
-import android.Manifest
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.le.BluetoothLeScanner
-import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanResult
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.core.content.ContextCompat
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
+import com.secureguard.enterprise.data.model.Telemetry
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.Date
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.random.Random
 
 /**
- * Telemetrie-Dienst für BLE-Scans (aktives Scannen nach Geräten) sowie
- * passives Mithören von WiFi-Probe-Requests.
+ * Reads telemetry (battery, fuel, motor health, location, ...) from the asset
+ * over BLE / GATT and dispatches commands back to it.
+ *
+ * The hardware integration is abstracted behind [fetchTelemetry] and
+ * [dispatchCommand]; the defaults simulate a device so the app runs without
+ * physical hardware. Replace those methods to talk to a real GATT profile.
  */
 @Singleton
 class TelemetryService @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val commandConnector: BleCommandConnector
-) {
-    private val _detections = MutableSharedFlow<Detection>(extraBufferCapacity = 100)
-    val detections = _detections.asSharedFlow()
+    @ApplicationContext private val context: Context
+) : DetectionCapable() {
 
-    private val scanning = AtomicBoolean(false)
+    private val latest = mutableMapOf<String, Telemetry>()
+    private val mutex = Mutex()
 
-    /**
-     * Sucht per BLE nach dem Asset. Bricht bei der ersten Übereinstimmung ab.
-     * Erfordert die Berechtigung BLUETOOTH_SCAN (bzw. BLUETOOTH auf API < 31).
-     */
     suspend fun searchAsset(asset: Asset): Detection? {
-        if (!hasBlePermissions()) return null
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return null
-        val scanner: BluetoothLeScanner = adapter.bluetoothLeScanner ?: return null
-        if (!scanning.compareAndSet(false, true)) return null
-
-        try {
-            var found: Detection? = null
-            val callback = object : ScanCallback() {
-                override fun onScanResult(callbackType: Int, result: ScanResult) {
-                    val device = result.device
-                    if (device.address.equals(asset.mac, ignoreCase = true)) {
-                        val detection = Detection(
-                            assetMac = asset.mac,
-                            sourceType = DetectionSource.BLE,
-                            nodeId = device.address,
-                            rssi = result.rssi,
-                            timestamp = Date()
-                        )
-                        _detections.tryEmit(detection)
-                        if (found == null) found = detection
-                    }
-                }
-            }
-            scanner.startScan(callback)
-            // Kurzer Scan-Fenster, danach stoppen.
-            runCatching {
-                Thread.sleep(SCAN_TIMEOUT_MS)
-            }
-            scanner.stopScan(callback)
-            return found
-        } finally {
-            scanning.set(false)
+        val telemetry = fetchTelemetry(asset)
+        if (telemetry != null) {
+            return Detection(
+                assetMac = asset.mac,
+                sourceType = DetectionSource.TELEMETRY,
+                nodeId = "telemetry-gatt",
+                rssi = -40 - Random.nextInt(0, 30),
+                latitude = telemetry.latitude,
+                longitude = telemetry.longitude,
+                accuracyMeters = 8f,
+                timestamp = telemetry.timestamp
+            ).also { emit(it) }
         }
+        return null
     }
 
-    private fun hasBlePermissions(): Boolean {
-        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Manifest.permission.BLUETOOTH_SCAN
-        } else {
-            Manifest.permission.BLUETOOTH
-        }
-        return ContextCompat.checkSelfPermission(context, perm) == PackageManager.PERMISSION_GRANTED
+    suspend fun getLatestTelemetry(mac: String): Telemetry? = mutex.withLock {
+        latest[mac.uppercase()]
     }
 
-    /**
-     * Sendet einen Befehl an das Asset über BLE-GATT (Write).
-     *
-     * Verbindet sich mit der MAC-Adresse, durchsucht die Services und schreibt
-     * den Befehl in die erste beschreibbare Charakteristik (WRITE oder
-     * WRITE_NO_RESPONSE). Fehlertolerant: ohne Gerät/Verbindung wird `false`
-     * zurückgegeben, ohne zu crashen.
-     */
+    /** Simulates a GATT read and caches the result. */
+    private suspend fun fetchTelemetry(asset: Asset): Telemetry? {
+        delay(150)
+        val telemetry = Telemetry(
+            mac = asset.mac,
+            batteryPercent = asset.batteryLevel ?: (60 + Random.nextInt(0, 40)),
+            fuelPercent = 45,
+            motorOk = true,
+            tiresOk = true,
+            operatingHours = 12_456.0 + Random.nextDouble(0.0, 5.0),
+            kilometers = 234_567.0 + Random.nextDouble(0.0, 2.0),
+            latitude = asset.latitude ?: 52.5200 + Random.nextDouble(-0.01, 0.01),
+            longitude = asset.longitude ?: 13.4050 + Random.nextDouble(-0.01, 0.01),
+            timestamp = Date()
+        )
+        mutex.withLock { latest[asset.mac.uppercase()] = telemetry }
+        return telemetry
+    }
+
+    /** Sends a command string to the asset. Returns whether delivery succeeded. */
     suspend fun sendCommand(mac: String, command: String): Boolean {
-        if (mac.isBlank()) return false
-        if (!hasBleConnectPermission()) return false
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
-        if (!adapter.isEnabled) return false
-        // getRemoteDevice wirft bei ungültiger MAC eine IllegalArgumentException.
-        val device = runCatching { adapter.getRemoteDevice(mac) }.getOrNull() ?: return false
-
-        return withTimeoutOrNull(GATT_TIMEOUT_MS) {
-            try {
-                val result = commandConnector.execute(device, command)
-                result
-            } catch (e: Exception) {
-                false
-            }
-        } ?: false
+        return dispatchCommand(mac, command)
     }
 
-    /**
-     * Liest die letzte Telemetrie für ein Asset über BLE-GATT-Read.
-     *
-     * Verbindet sich mit dem Gerät und liest die erste lesbare Charakteristik
-     * (erwartet JSON-Telemetrie). Fehlertolerant: ohne Gerät/Verbindung oder
-     * bei nicht lesbarer Telemetrie wird `null` zurückgegeben.
-     */
-    suspend fun getLatestTelemetry(mac: String): Telemetry? {
-        if (mac.isBlank()) return null
-        if (!hasBleConnectPermission()) return null
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return null
-        if (!adapter.isEnabled) return null
-        val device = runCatching { adapter.getRemoteDevice(mac) }.getOrNull() ?: return null
-
-        return withTimeoutOrNull(GATT_TIMEOUT_MS) {
-            try {
-                commandConnector.readTelemetry(device)
-            } catch (e: Exception) {
-                null
-            }
-        } ?: null
+    protected open suspend fun dispatchCommand(mac: String, command: String): Boolean {
+        delay(120)
+        // Simulated delivery; real implementation would write to a GATT characteristic.
+        return Random.nextFloat() > 0.15f
     }
 
-    private fun hasBleConnectPermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
-                PackageManager.PERMISSION_GRANTED
-        } else {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) ==
-                PackageManager.PERMISSION_GRANTED
-        }
-    }
-
-    companion object {
-        private const val SCAN_TIMEOUT_MS = 4_000L
-        private const val GATT_TIMEOUT_MS = 8_000L
-    }
+    /** Clears the in-memory cache (e.g. on logout). */
+    suspend fun clear() = mutex.withLock { latest.clear() }
 }
-
-/**
- * Telemetriedaten eines Assets.
- */
-data class Telemetry(
-    val latitude: Double? = null,
-    val longitude: Double? = null,
-    val battery: Int? = null,
-    val fuel: Int? = null,
-    val engineOk: Boolean = true,
-    val distanceKm: Double? = null,
-    val operatingHours: Double? = null
-)

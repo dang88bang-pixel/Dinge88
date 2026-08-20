@@ -5,9 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.Alert
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -16,19 +16,14 @@ class AlertsViewModel @Inject constructor(
     private val repository: SecureGuardRepository
 ) : ViewModel() {
 
-    private val _alerts = MutableStateFlow<List<Alert>>(emptyList())
-    val alerts: StateFlow<List<Alert>> = _alerts.asStateFlow()
+    val alerts: StateFlow<List<Alert>> = repository.getAlerts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    init {
-        viewModelScope.launch {
-            repository.getUnresolvedAlerts().collect { _alerts.value = it }
-        }
+    fun acknowledge(id: Long) {
+        viewModelScope.launch { repository.acknowledgeAlert(id) }
     }
 
-    fun acknowledge(alert: Alert) {
-        viewModelScope.launch {
-            val resolved = alert.copy(resolved = true, resolvedAt = java.util.Date())
-            repository.updateAlert(resolved)
-        }
+    fun acknowledgeAll() {
+        viewModelScope.launch { repository.acknowledgeAllAlerts() }
     }
 }

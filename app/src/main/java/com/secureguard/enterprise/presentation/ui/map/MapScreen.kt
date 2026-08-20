@@ -1,5 +1,10 @@
 package com.secureguard.enterprise.presentation.ui.map
 
+import android.graphics.Paint
+import android.graphics.PixelFormat
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.ShapeDrawable
+import android.graphics.drawable.shapes.OvalShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,14 +17,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,26 +31,26 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.secureguard.enterprise.R
+import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
+import com.secureguard.enterprise.presentation.navigation.Routes
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     navController: NavController,
@@ -56,10 +59,9 @@ fun MapScreen(
     val assets by viewModel.assets.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val lastUpdate by viewModel.lastUpdate.collectAsState()
-    val context = LocalContext.current
+    val zoom by viewModel.zoom.collectAsState()
 
-    // Referenz auf die MapView für Zoom-/Zentrier-Steuerung.
-    var mapViewRef by remember { mutableStateOf<MapView?>(null) }
+    Configuration.getInstance().userAgentValue = "SecureGuardEnterprise"
 
     Scaffold(
         topBar = {
@@ -67,35 +69,18 @@ fun MapScreen(
                 title = { Text("🗺️ Kartenansicht") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Aktualisieren")
+                        Icon(Icons.Default.Refresh, contentDescription = "Aktualisieren")
                     }
-                    IconButton(onClick = {
-                        mapViewRef?.let { it.controller.setZoom(it.zoomLevelDouble + 1) }
-                    }) {
-                        Icon(Icons.Filled.ZoomIn, contentDescription = "Vergrößern")
+                    IconButton(onClick = { viewModel.zoomIn() }) {
+                        Icon(Icons.Default.ZoomIn, contentDescription = "Vergrößern")
                     }
-                    IconButton(onClick = {
-                        mapViewRef?.let { it.controller.setZoom(it.zoomLevelDouble - 1) }
-                    }) {
-                        Icon(Icons.Filled.ZoomOut, contentDescription = "Verkleinern")
-                    }
-                    IconButton(onClick = {
-                        val mapView = mapViewRef ?: return@IconButton
-                        val first = assets.firstOrNull {
-                            it.latitude != null && it.longitude != null
-                        }
-                        if (first != null && first.latitude != null && first.longitude != null) {
-                            mapView.controller.animateTo(
-                                GeoPoint(first.latitude, first.longitude)
-                            )
-                        }
-                    }) {
-                        Icon(Icons.Filled.CenterFocusStrong, contentDescription = "Zentrieren")
+                    IconButton(onClick = { viewModel.zoomOut() }) {
+                        Icon(Icons.Default.ZoomOut, contentDescription = "Verkleinern")
                     }
                 }
             )
@@ -106,61 +91,59 @@ fun MapScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Karte
-            AndroidView(
-                factory = { factoryContext ->
-                    MapView(factoryContext).apply {
-                        setBuiltInZoomControls(false)
-                        setMultiTouchControls(true)
-                        controller.setZoom(15.0)
-                        controller.setCenter(GeoPoint(52.52, 13.40))
-                        mapViewRef = this
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-                update = { mapView ->
-                    mapViewRef = mapView
-                    mapView.overlays.clear()
-
-                    assets.forEach { asset ->
-                        if (asset.latitude != null && asset.longitude != null) {
-                            val drawableRes = when (asset.status) {
-                                AssetStatus.ONLINE -> R.drawable.marker_green
-                                AssetStatus.OFFLINE -> R.drawable.marker_red
-                                AssetStatus.MAINTENANCE -> R.drawable.marker_yellow
-                                else -> R.drawable.marker_gray
-                            }
-                            val icon = ContextCompat.getDrawable(context, drawableRes)
-                            val marker = Marker(mapView).apply {
-                                position = GeoPoint(asset.latitude!!, asset.longitude!!)
-                                icon?.let { setIcon(it) }
-                                title = asset.shortName
-                                subDescription = "📶 ${asset.rssi} dBm | ⏱ ${asset.lastSeen}"
-                                setOnMarkerClickListener { _, _ ->
-                                    navController.navigate("asset_detail/${asset.id}")
-                                    true
-                                }
-                            }
-                            mapView.overlays.add(marker)
-                        }
-                    }
-                    mapView.invalidate()
-                }
-            )
-
-            // Loading-Indikator
-            if (isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
+            val context = LocalContext.current
+            val mapView = remember {
+                MapView(context).apply {
+                    setTileSource(TileSourceFactory.MAPNIK)
+                    setBuiltInZoomControls(false)
+                    setMultiTouchControls(true)
+                    controller.setZoom(15.0)
+                    controller.setCenter(GeoPoint(52.52, 13.40))
                 }
             }
 
-            // Legende unten
+            DisposableEffect(Unit) {
+                mapView.onResume()
+                onDispose { mapView.onPause() }
+            }
+
+            AndroidView(
+                factory = { mapView },
+                update = { view ->
+                    view.controller.setZoom(zoom)
+                    view.overlays.clear()
+                    val located = assets.filter { it.latitude != null && it.longitude != null }
+                    located.forEach { asset ->
+                        val marker = Marker(view).apply {
+                            position = GeoPoint(asset.latitude!!, asset.longitude!!)
+                            icon = markerDrawable(asset)
+                            title = asset.shortName
+                            snippet = "📶 ${asset.rssi} dBm"
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            setOnMarkerClickListener { _, _ ->
+                                navController.navigate(Routes.assetDetail(asset.id))
+                                true
+                            }
+                        }
+                        view.overlays.add(marker)
+                    }
+                    if (located.isNotEmpty()) {
+                        view.controller.animateTo(
+                            GeoPoint(
+                                located.map { it.latitude!! }.average(),
+                                located.map { it.longitude!! }.average()
+                            )
+                        )
+                    }
+                    view.invalidate()
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -172,25 +155,20 @@ fun MapScreen(
                 ) {
                     Text("Legende:", style = MaterialTheme.typography.bodySmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        LegendDot(Color.Green)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        LegendDot(Color(0xFF2E7D32)); Spacer(Modifier.width(6.dp))
                         Text("Online", style = MaterialTheme.typography.bodySmall)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        LegendDot(Color.Red)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(Modifier.width(12.dp))
+                        LegendDot(Color(0xFFC62828)); Spacer(Modifier.width(6.dp))
                         Text("Offline", style = MaterialTheme.typography.bodySmall)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        LegendDot(Color(0xFFFFA000))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(Modifier.width(12.dp))
+                        LegendDot(Color(0xFFF9A825)); Spacer(Modifier.width(6.dp))
                         Text("Wartung", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
 
-            // Footer
             Text(
-                text = "⏱ Letzte Aktualisierung: $lastUpdate | " +
-                    "📍 ${assets.count { it.latitude != null }} Assets sichtbar",
+                text = "⏱ $lastUpdate | 📍 ${assets.count { it.latitude != null }} sichtbar",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
@@ -208,4 +186,26 @@ private fun LegendDot(color: Color) {
             .size(12.dp)
             .background(color, CircleShape)
     )
+}
+
+private fun markerDrawable(asset: Asset): Drawable {
+    val color = when (asset.status) {
+        AssetStatus.ONLINE -> android.graphics.Color.rgb(46, 125, 50)
+        AssetStatus.MAINTENANCE -> android.graphics.Color.rgb(249, 168, 37)
+        AssetStatus.OFFLINE -> android.graphics.Color.rgb(198, 40, 40)
+        AssetStatus.SEARCHING -> android.graphics.Color.rgb(21, 101, 192)
+        AssetStatus.UNKNOWN -> android.graphics.Color.GRAY
+    }
+    val sizePx = 36
+    val shape = object : ShapeDrawable(OvalShape()) {
+        override fun getIntrinsicWidth(): Int = sizePx
+        override fun getIntrinsicHeight(): Int = sizePx
+        override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
+    }
+    return shape.apply {
+        paint.color = color
+        paint.style = Paint.Style.FILL
+        paint.isAntiAlias = true
+        setBounds(0, 0, sizePx, sizePx)
+    }
 }

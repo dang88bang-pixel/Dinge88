@@ -3,6 +3,7 @@ package com.secureguard.enterprise.presentation.ui.assets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,13 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,17 +38,25 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.components.AssetCard
+import com.secureguard.enterprise.presentation.navigation.Routes
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssetListScreen(
     navController: NavController,
     viewModel: AssetListViewModel = hiltViewModel()
 ) {
     val filteredAssets by viewModel.filteredAssets.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val selectedStatus by viewModel.selectedStatus.collectAsState()
+    val searchQuery by viewModel.currentQuery.collectAsState()
+    val selectedStatus by viewModel.currentStatus.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
+
+    val tabs = listOf("Alle", "Online", "Offline", "Wartung")
+    val selectedTabIndex = when (selectedStatus) {
+        AssetStatus.ONLINE -> 1
+        AssetStatus.OFFLINE -> 2
+        AssetStatus.MAINTENANCE -> 3
+        else -> 0
+    }
 
     Scaffold(
         topBar = {
@@ -56,15 +64,15 @@ fun AssetListScreen(
                 title = { Text("📦 Assets (${uiState.total})") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { navController.navigate("scan") }) {
-                        Icon(Icons.Filled.QrCodeScanner, contentDescription = "Scan")
+                    IconButton(onClick = { navController.navigate(Routes.SCAN_QR) }) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                     }
-                    IconButton(onClick = { navController.navigate("add_asset") }) {
-                        Icon(Icons.Filled.Add, contentDescription = "Hinzufügen")
+                    IconButton(onClick = { navController.navigate(Routes.ADD_ASSET) }) {
+                        Icon(Icons.Default.Add, contentDescription = "Hinzufügen")
                     }
                 }
             )
@@ -76,36 +84,28 @@ fun AssetListScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
-            // Suchleiste
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("🔍 Asset suchen...") },
                 singleLine = true,
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clearFilters() }) {
-                            Icon(Icons.Filled.Clear, contentDescription = "Löschen")
+                            Icon(Icons.Default.Clear, contentDescription = "Löschen")
                         }
                     }
                 }
             )
 
-            // Filter-Tabs
             ScrollableTabRow(
-                selectedTabIndex = when (selectedStatus) {
-                    null -> 0
-                    AssetStatus.ONLINE -> 1
-                    AssetStatus.OFFLINE -> 2
-                    AssetStatus.MAINTENANCE -> 3
-                    else -> 0
-                },
+                selectedTabIndex = selectedTabIndex,
                 modifier = Modifier.padding(vertical = 8.dp),
                 edgePadding = 0.dp
             ) {
-                listOf("Alle", "Online", "Offline", "Wartung").forEachIndexed { index, label ->
+                tabs.forEachIndexed { index, label ->
                     val status = when (index) {
                         1 -> AssetStatus.ONLINE
                         2 -> AssetStatus.OFFLINE
@@ -113,29 +113,28 @@ fun AssetListScreen(
                         else -> null
                     }
                     Tab(
-                        selected = selectedStatus == status,
+                        selected = selectedTabIndex == index,
                         onClick = { viewModel.setStatusFilter(status) },
                         text = { Text(label) }
                     )
                 }
             }
 
-            // Asset-Liste
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.weight(1f)
             ) {
                 if (filteredAssets.isEmpty()) {
                     item {
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
                                 .padding(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(
-                                    Icons.Filled.Search,
+                                    Icons.Default.Search,
                                     contentDescription = null,
                                     modifier = Modifier.size(64.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -155,28 +154,26 @@ fun AssetListScreen(
                         }
                     }
                 } else {
-                    items(filteredAssets) { asset ->
+                    items(filteredAssets, key = { it.id }) { asset ->
                         AssetCard(
                             asset = asset,
-                            onClick = { navController.navigate("asset_detail/${asset.id}") },
-                            onSearch = { navController.navigate("asset_detail/${asset.id}") }
+                            onClick = { navController.navigate(Routes.assetDetail(asset.id)) }
                         )
                     }
                 }
             }
 
-            // Footer-Statistik
-            HorizontalDivider()
+            Divider()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Text("📊 ${uiState.total} Assets", style = MaterialTheme.typography.bodySmall)
-                Text("🟢 ${uiState.online} Online", style = MaterialTheme.typography.bodySmall)
-                Text("🔴 ${uiState.offline} Offline", style = MaterialTheme.typography.bodySmall)
-                Text("🟡 ${uiState.maintenance} Wartung", style = MaterialTheme.typography.bodySmall)
+                Text("📊 ${uiState.total}", style = MaterialTheme.typography.bodySmall)
+                Text("🟢 ${uiState.online}", style = MaterialTheme.typography.bodySmall)
+                Text("🔴 ${uiState.offline}", style = MaterialTheme.typography.bodySmall)
+                Text("🟡 ${uiState.maintenance}", style = MaterialTheme.typography.bodySmall)
             }
         }
     }

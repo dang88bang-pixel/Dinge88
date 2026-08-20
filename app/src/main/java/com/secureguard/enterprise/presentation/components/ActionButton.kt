@@ -13,10 +13,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-/**
- * Großer Aktions-Button mit Icon + Label für die Fernsteuerung
- * (Alarm, Motor, Batterie, Nachricht, Position, ...).
- */
 @Composable
 fun ActionButton(
     modifier: Modifier = Modifier,
