@@ -9,7 +9,7 @@ plugins {
 // Keystore from environment (CI) or local.properties; falls back to the debug
 // keystore so `assembleRelease` always produces an installable signed APK.
 val keystoreFile = rootProject.file("secureguard-keystore.jks")
-val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
 val keyAlias = System.getenv("KEY_ALIAS") ?: "secureguard"
 val keyPassword = System.getenv("KEY_PASSWORD") ?: keystorePassword
 
