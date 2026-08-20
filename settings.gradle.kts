@@ -6,6 +6,10 @@ pluginManagement {
     }
 }
 
+// DIAGNOSE-EXPERIMENT: Wenn dieser Throw ausgeführt wird, kompiliert das
+// Settings-Skript und die Evaluierung beginnt. (Wird wieder entfernt.)
+throw GradleException("DIAG-SETTINGS-TOP")
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
