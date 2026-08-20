@@ -104,7 +104,7 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 rxjava = { group = "io.reactivex.rxjava3", name = "rxjava", version.ref = "rxjava" }
 rxandroid = { group = "io.reactivex.rxjava3", name = "rxandroid", version.ref = "rxandroid" }
 
-usb-serial = { group = "com.github.kai-morich", name = "usb-serial-for-android", version.ref = "usbSerial" }
+usb-serial = { group = "com.github.mik3y", name = "usb-serial-for-android", version.ref = "usbSerial" }
 
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
