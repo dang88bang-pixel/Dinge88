@@ -76,6 +76,14 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- WorkManager wird on-demand über HiltWorkerFactory initialisiert
+             (SecureGuardApplication implements Configuration.Provider) –
+             daher den automatischen androidx.startup-Initializer entfernen. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:node="remove" />
+
         <!-- ZXing barcode scanner (QR scan) -->
         <activity
             android:name="com.journeyapps.barcodescanner.CaptureActivity"
