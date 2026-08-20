@@ -1,10 +1,13 @@
 package com.secureguard.enterprise.presentation.ui.map
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
+import com.secureguard.enterprise.services.OfflineMapService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,8 +21,16 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MapViewModel @Inject constructor(
-    private val repository: SecureGuardRepository
+    @ApplicationContext private val context: Context,
+    private val repository: SecureGuardRepository,
+    offlineMapService: OfflineMapService
 ) : ViewModel() {
+
+    init {
+        // Offline-Karten-Konfiguration (osmdroid-Cache-Pfad) vor dem ersten
+        // MapView-Aufruf setzen.
+        offlineMapService.configure(context)
+    }
 
     val assets: StateFlow<List<Asset>> = repository.getWhitelistedAssets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

@@ -1,0 +1,34 @@
+# SecureGuard Enterprise – API-Keys & lokale Build-Einstellungen
+# ----------------------------------------------------------------
+# Diese Datei ist eine VORLAGE. Kopiere sie nach `local.properties`
+# (wird von Git ignoriert) und trage deine echten Keys ein.
+# Alternativ können die Werte auch in `gradle.properties` stehen.
+#
+# Leere Werte sind erlaubt: Die zugehörigen API-Aufrufe liefern dann
+# sauber null/leere Listen, der Build funktioniert trotzdem.
+
+# WiGle.net (BSSID -> GPS) – https://wigle.net/account
+WIGLE_API_KEY=
+
+# Open Charge Map (Ladesäulen) – https://openchargemap.org/site/account
+OPEN_CHARGE_MAP_KEY=
+
+# Netatmo Weather (Wetterstationen) – OAuth2-Access-Token
+NETATMO_TOKEN=
+
+# Google Geolocation (WLAN-Triangulation) – https://console.cloud.google.com
+GOOGLE_API_KEY=
+
+# Helium Network (LoRaWAN-Hotspots)
+HELIUM_API_KEY=
+
+# MQTT-Broker (optional; Standard: tcp://10.0.2.2:1883 für Emulator)
+MQTT_BROKER_URL=
+
+# WebSocket-Fleet-Endpunkt (optional; leer = keine Verbindung)
+WEBSOCKET_URL=
+
+# MCP-Server für temporäre E-Mail-Dienste (OTP-Empfang für Registrierungen).
+# Nur für legitime Zwecke (Testumgebungen, autorisierte API-Key-Generierung).
+# Leer = Feature deaktiviert.
+MCP_SERVER_URL=

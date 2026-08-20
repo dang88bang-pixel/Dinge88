@@ -97,3 +97,147 @@ Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs
 > Open-Data-API, Find-My-Proxy) und unter „Backend-Endpunkte" konfiguriert werden.
 > **Vor Ort ohne Backend** sind **BLE, GPS, WiFi, Befehlsübertragung und Telemetrie** vollständig
 > ausführbar.
+
+---
+
+# 🔌 Ergänzung: Externe APIs, Echtzeit-Kanäle & fehlende Komponenten
+
+**Stand:** ergänzt im Rahmen der API-Integrations-Überprüfung. Legende: ✅ implementiert · 🟡 von Backend/Keys abhängig · ⚠ Abweichung dokumentiert
+
+## 6. Externe API-Knotenpunkte (REST)
+
+| API | Datei | Status | Kommentar |
+|---|---|---|---|
+| WiGle.net (BSSID→GPS) | `services/apis/WiGleApi.kt` | 🟡 | Key über `WIGLE_API_KEY`; ohne Key → null |
+| MacLookup.app (OUI) | `services/apis/MacLookupApi.kt` | ✅ | kostenlos, ohne Key |
+| Open Charge Map | `services/apis/OpenChargeMapApi.kt` | 🟡 | Key `OPEN_CHARGE_MAP_KEY`; reale verschachtelte Antwortstruktur abgebildet |
+| DHL Packstation | `services/apis/DhlPackstationApi.kt` | 🟡 | Endpunkt benötigt DHL-Zugang (Vertrag); Vertrag hinterlegt |
+| CKAN Open Data | `services/apis/CkanOpenDataApi.kt` | ✅ | demo.ckan.org, ohne Key |
+| Google Geolocation | `services/apis/GoogleGeolocationApi.kt` | 🟡 | Key `GOOGLE_API_KEY`; WLAN-APs als Body |
+| Netatmo Weather | `services/apis/NetatmoWeatherApi.kt` | 🟡 | Bearer-Token `NETATMO_TOKEN` |
+| Helium Network | `services/apis/HeliumNetworkApi.kt` | 🟡 | Hotspots um Position, Beacons |
+| Zentraler Manager | `services/ApiServiceManager.kt` | ✅ | Retrofit/OkHttp (Gson+Moshi), Logging, Fehlertoleranz, Detection-Flow, RxJava-Variante |
+
+## 7. Echtzeit-Kanäle
+
+| Komponente | Datei | Status | Kommentar |
+|---|---|---|---|
+| MQTT (Paho) | `services/MqttService.kt` + `MqttConfig.kt` | ✅ | `MqttAsyncClient`, Auto-Reconnect, Events-Flow, Topics/Konfiguration |
+| WebSocket (OkHttp) | `services/WebSocketService.kt` | ✅ | Gson-Nachrichten, Events-Flow; URL via `WEBSOCKET_URL` |
+| Agent-Integration | `services/AgentService.kt` | ✅ | API-Kanal (nur mit Einwilligung), MQTT-/WS-Collectoren, `sendAction` über alle Kanäle, Offline-Queue-Fallback |
+
+## 8. Ergänzte Komponenten (vorher „fehlt")
+
+| Komponente | Datei | Status |
+|---|---|---|
+| Audit-Log (Entity+DAO+Service) | `data/model/AuditLog.kt`, `AuditLogDao.kt`, `AuditLogService.kt` | ✅ |
+| Offline-Queue (Entity+DAO+Service) | `data/model/PendingAction.kt`, `PendingActionDao.kt`, `OfflineQueue.kt` | ✅ |
+| Room-Migration v2 | `SecureGuardDatabase.kt` (`MIGRATION_1_2`) | ✅ |
+| Datenbereinigung (Retention) | `DatabaseCleanup.kt` | ✅ |
+| Backup/Restore | `BackupManager.kt` | ✅ |
+| E2E-Verschlüsselung (AES/GCM, KeyStore) | `EncryptionService.kt` | ✅ |
+| Authentifizierung (PIN, PBKDF2) | `AuthManager.kt` + `LockScreen.kt` (MainActivity-Gate) | ✅ |
+| RBAC | `security/RoleManager.kt` | ✅ |
+| Alarm-Töne pro Stufe | `AlertSoundManager.kt` | ✅ |
+| Offline-Karte (OSM) | `OfflineMapService.kt` | ✅ |
+| CSV/PDF-Export (+verschlüsselt) | `ExportService.kt` | ✅ |
+| Retry-Logik | `util/RetryManager.kt` | ✅ |
+| Globaler Error-Handler | `util/ErrorHandler.kt` | ✅ |
+| Cache (TTL/Size) | `util/CacheManager.kt` | ✅ |
+| Lazy Loading (Paging 3) | `util/AssetPagingSource.kt` + `AssetDao.getPage` | ✅ |
+| Barrierefreiheit (TalkBack) | `util/AccessibilityHelper.kt` | ✅ |
+| Lern-Engine (Muster/Prädiktion) | `services/LearningEngine.kt` | ✅ |
+| WorkManager-Worker (15 Min) | `worker/SecureAgentWorker.kt` + Application-Scheduling | ✅ |
+| NFC-Integration | `services/NfcService.kt` + Manifest | ✅ |
+| USB/Serial | `services/UsbSerialService.kt` (usb-serial-for-android) | ✅ |
+| Benachrichtigungskanäle (4) | `NotificationService.kt` | ✅ |
+| Mehrsprachigkeit | `res/values-en/strings.xml` | ✅ |
+| Dunkelmodus | `presentation/theme/Theme.kt` (Dark/Dynamic) | ✅ (bereits vorhanden) |
+| Foreground Service | `AgentForegroundService.kt` | ✅ (bereits vorhanden) |
+| Backend (FastAPI) | `backend/main.py` + Docker-Compose + Mosquitto | ✅ (neben dem Android-Projekt) |
+| ESP32-Firmware | `firmware/secureguard_esp32/` | ✅ |
+| OpenAPI-Doku | `docs/api-docs.yaml` | ✅ |
+
+## 9. ⚠ Abweichungen von der Vorgabe (bewusst)
+
+| Vorgabe | Umsetzung | Begründung |
+|---|---|---|
+| `org.eclipse.paho.android.service` (MqttAndroidClient) | `org.eclipse.paho.client.mqttv3` + `MqttAsyncClient` | Die Android-Service-Variante ist seit 2018 ungepflegt, benötigt die alte Support-Library und verursacht auf modernen Android-Versionen Laufzeitprobleme. `MqttAsyncClient` ist funktional äquivalent (Pub/Sub, Callbacks, Auto-Reconnect) und stabil. |
+| `no.nordicsemi.android:ble-common:2.6.1` | nur `ble-ktx:2.6.0` | `ble-common`-Artefakt für 2.6.x nicht verifizierbar; `ble-ktx` (auf Maven Central bestätigt) genügt als Nordic-Anbindung. Der aktive Scan läuft über die Plattform-API (`BleService`). |
+| `androidx.startup:startup-runtime` / `androidx.multidex` | nicht ergänzt | Nicht benötigt: minSdk 26 hat natives Multidex, und kein Initializer wird verwendet. |
+| API-Keys `Bearer`-Schema WiGle | `Authorization: Bearer <Key>` | WiGle nutzt regulär HTTP-Basic; über den Key kann beides hinterlegt werden (siehe Doku im Client). |
+| DHL/Helium-Endpunkte | Vertrag hinterlegt | Die realen APIs benötigen Zugangsdaten bzw. haben sich geändert; die Interfaces sind über `ApiServiceManager` austauschbar. |
+
+---
+
+# 🔌 Ergänzung: TempMail/MCP-Integration & ApiNodeManager
+
+**Stand:** ergänzt nach Vorgabe „Temporäre E-Mail-Dienste für Agenten" + „API-Node-Manager Agent".
+
+## 10. Temporäre E-Mail (MCP)
+
+| Komponente | Datei | Status | Kommentar |
+|---|---|---|---|
+| MCP-Client (WebSocket/JSON-RPC) | `mcp/MCPClient.kt` | ✅ | Tools `create_inbox`, `wait_for_otp`, `extract_magic_link`; URL via `MCP_SERVER_URL`; ohne Konfiguration → `null` |
+| TempMail-Service (Fassade) | `services/TempMailService.kt` | ✅ | Inbox/OTP/Magic-Link-Workflow, State-Flows, Auto-Logout |
+| Agent-Erweiterung | `services/AgentService.kt` | ✅ | `autoRegisterExternalService()` + `RegistrationResult`; `performRegistration` bewusst skizziert (keine unautorisierten Aufrufe) |
+| UI | `presentation/ui/tempmail/TempMailScreen.kt` + `ViewModel` | ✅ | Inbox anzeigen, OTP abrufen, Log; Route `temp_mail` + Einstieg in Einstellungen |
+| BuildConfig | `MCP_SERVER_URL` | ✅ | |
+
+## 11. ApiNodeManager (autonome Knoten-Verwaltung)
+
+| Komponente | Datei | Status |
+|---|---|---|
+| Kern (11 Node-Handler, Health-Monitor, Circuit Breaker, Learning Layer, Rate-Limiter) | `agent/ApiNodeManager.kt` | ✅ |
+| Standard-Konfigurationen | `agent/NodeConfig.kt` | ✅ |
+| UI (Status, Toggle, Test-Suche) | `presentation/ui/nodes/NodeStatusScreen.kt` + `ViewModel` | ✅ |
+| Navigation | `Routes.NODE_STATUS` + Einstellungen-Einstieg | ✅ |
+
+## 12. ⚠ Anpassungen gegenüber der Vorgabe (bewusst)
+
+| Vorgabe | Umsetzung | Begründung |
+|---|---|---|
+| Direkte API-Injection in `ApiNodeManager` (WiGleApi etc.) | nutzt `ApiServiceManager` | Clients sind dort zentral gekapselt (Retrofit-Instanzen, Keys) |
+| `Detection.isVerified` / `metadata` / `triangulationPoints` | existieren im Datenmodell nicht → in `message` kodiert | Modell bleibt schlank; `message` zeigt Hersteller/OTP/Status |
+| `AuditService` / `AuditActionType` | `AuditLogService.log(action, details)` | bestehende Audit-Implementierung |
+| TempMail REST-Variante (freecustom.email) | nur MCP-Variante | einheitlicher Kanal; REST-Endpunkt wäre fiktiv |
+| `searchViaTempMail` im NodeManager | nutzt `TempMailService` (MCP) | konsistente Fassade |
+| `performRegistration` | Rückgabe `false` (Skizze) | keine unautorisierten Registrierungen aus dem Repo heraus |
+
+---
+
+# 🛠️ Ergänzung: Finalisierung & Honeywell CT45P XON (Android 11)
+
+**Stand:** Projekt fertiggestellt; Build grün (Debug + Release).
+
+## 13. Abhängigkeiten aktualisiert (2024-12-Stand)
+
+| Komponente | vorher | nachher |
+|---|---|---|
+| AGP | 8.5.2 | 8.7.3 |
+| Kotlin | 2.0.20 | 2.0.21 |
+| compileSdk / targetSdk | 34 | 35 |
+| core-ktx | 1.13.1 | 1.15.0 |
+| lifecycle | 2.8.6 | 2.8.7 |
+| activity-compose | 1.9.2 | 1.9.3 |
+| Compose BOM | 2024.09.02 | 2024.12.01 |
+| navigation | 2.8.1 | 2.8.5 |
+| coroutines | 1.8.1 | 1.9.0 |
+
+## 14. Honeywell CT45P XON (Android 11, API 30)
+
+| Maßnahme | Datei | Status |
+|---|---|---|
+| Klartext-Netzwerk für MQTT tcp:// (Android 9+ blockiert sonst) | `AndroidManifest.xml` (`usesCleartextTraffic`) | ✅ |
+| Geräte-Erkennung + Android-11-Kompatibilitäts-Helfer | `config/CT45PConfig.kt` | ✅ |
+| Geräte-Log beim App-Start (Hersteller/Modell/API) | `SecureGuardApplication.kt` | ✅ |
+| BLE: Standort-Permission auf API ≤ 30 | `BleService` (bereits vorhanden) | ✅ |
+| WiFi: Standort-Permission auf Android 11 | `WifiService` (bereits vorhanden) | ✅ |
+| POST_NOTIFICATIONS nur ab API 33 | `NotificationService` + `CT45PConfig.needsNotificationPermission` | ✅ |
+| Foreground-Service auf API 30 (2-arg startForeground) | `AgentForegroundService` | ✅ |
+| USB-Host (FTDI/CP210x) | `UsbSerialService` | ✅ |
+
+**Hinweis:** Mit `targetSdk 35` läuft die App auf Android 11 uneingeschränkt;
+Android-11-spezifische Regeln (Klartext, Scoped Storage, Hintergrund) sind
+berücksichtigt. Der 2D-Imager des CT45P arbeitet als HID-Keyboard; der
+ZXing-Kamera-Scan bleibt zusätzlich nutzbar.

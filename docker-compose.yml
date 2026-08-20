@@ -1,0 +1,54 @@
+# SecureGuard Enterprise – Backend-Stack
+#   docker compose up --build
+#
+# Enthält: MQTT-Broker (Mosquitto), FastAPI-Backend, Node-RED-Dashboard.
+
+services:
+  # ============ MQTT-BROKER ============
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    container_name: secureguard-mqtt
+    ports:
+      - "1883:1883"   # MQTT (App/Gateways)
+      - "9001:9001"   # MQTT over WebSocket (optional)
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - secureguard-network
+
+  # ============ BACKEND-API ============
+  backend:
+    build: ./backend
+    container_name: secureguard-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_PATH=/data/secureguard.db
+      - MQTT_BROKER=mqtt:1883
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    depends_on:
+      - mqtt
+    networks:
+      - secureguard-network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ============ NODE-RED (DASHBOARD) ============
+  nodered:
+    image: nodered/node-red:latest
+    container_name: secureguard-nodered
+    ports:
+      - "1880:1880"
+    environment:
+      - TZ=Europe/Berlin
+    volumes:
+      - ./nodered:/data
+    networks:
+      - secureguard-network
+
+networks:
+  secureguard-network:
+    driver: bridge

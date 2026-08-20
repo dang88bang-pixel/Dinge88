@@ -27,6 +27,9 @@
     <!-- Camera for optical detection / QR scan -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- NFC (Asset-Tags, PN532-Leser) -->
+    <uses-permission android:name="android.permission.NFC" />
+
     <!-- Notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -41,6 +44,8 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
     <application
         android:name=".SecureGuardApplication"
@@ -52,6 +57,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.SecureGuardEnterprise"
+        android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
         <activity
@@ -70,6 +76,14 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- WorkManager wird on-demand über HiltWorkerFactory initialisiert
+             (SecureGuardApplication implements Configuration.Provider) –
+             daher den automatischen androidx.startup-Initializer entfernen. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:node="remove" />
 
         <!-- ZXing barcode scanner (QR scan) -->
         <activity

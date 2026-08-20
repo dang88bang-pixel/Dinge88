@@ -19,6 +19,14 @@ enum class DetectionSource {
     URBAN,
     CROWD,
     SATELLITE,
+    /** Externe REST-APIs (WiGle.net, Google Geolocation, ...). */
+    API,
+    /** Echtzeit-Kommunikation über MQTT (Paho). */
+    MQTT,
+    /** Echtzeit-Updates über WebSocket (OkHttp). */
+    WEBSOCKET,
+    /** NFC-Tag / kontaktlose Anbindung. */
+    NFC,
     UNKNOWN
 }
 

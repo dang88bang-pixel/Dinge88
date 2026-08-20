@@ -34,5 +34,7 @@ object Routes {
     const val ADD_ASSET = "add_asset"
     const val SCAN_QR = "scan_qr"
     const val ASSET_DETAIL = "asset_detail/{assetId}"
+    const val NODE_STATUS = "node_status"
+    const val TEMP_MAIL = "temp_mail"
     fun assetDetail(id: String) = "asset_detail/$id"
 }

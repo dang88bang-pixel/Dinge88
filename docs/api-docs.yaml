@@ -1,0 +1,168 @@
+openapi: 3.0.0
+info:
+  title: SecureGuard Enterprise API
+  description: REST + WebSocket API des SecureGuard-Backends (FastAPI).
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: Lokale Entwicklung
+
+paths:
+  /api/health:
+    get:
+      summary: Gesundheitsstatus
+      responses:
+        '200':
+          description: Status OK
+          content:
+            application/json:
+              example:
+                status: ok
+                timestamp: '2026-08-20T10:00:00'
+
+  /api/assets:
+    get:
+      summary: Alle Assets abrufen
+      responses:
+        '200':
+          description: Liste der Assets
+    post:
+      summary: Neues Asset anlegen/aktualisieren
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Asset'
+      responses:
+        '200':
+          description: Asset gespeichert
+
+  /api/detections:
+    get:
+      summary: Detektionen auflisten
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Liste der Detektionen
+    post:
+      summary: Neue Detektion hinzufügen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Detection'
+      responses:
+        '200':
+          description: Detektion gespeichert
+
+  /api/alerts:
+    get:
+      summary: Alerts auflisten
+      parameters:
+        - name: unresolved_only
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Liste der Alerts
+    post:
+      summary: Neuen Alert anlegen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Alert'
+      responses:
+        '200':
+          description: Alert gespeichert
+
+  /api/actions/execute:
+    post:
+      summary: Aktion ausführen (wird asynchron über MQTT zugestellt)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Action'
+      responses:
+        '200':
+          description: Aktion in Queue
+
+  /api/commands:
+    get:
+      summary: Befehls-Historie
+      responses:
+        '200':
+          description: Liste der Befehle
+
+  /api/stats:
+    get:
+      summary: Statistiken (Assets, Detektionen, Alerts)
+      responses:
+        '200':
+          description: Zähler
+
+  /ws:
+    get:
+      summary: WebSocket-Endpunkt für Echtzeit-Updates
+      description: Nachrichten vom Typ {"type":"command","assetId":"...","action":"..."}
+
+components:
+  schemas:
+    Asset:
+      type: object
+      required: [id, name, mac, short_name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        mac: { type: string, example: 'AA:BB:CC:DD:EE:01' }
+        short_name: { type: string }
+        status: { type: string, enum: [ONLINE, OFFLINE, MAINTENANCE, SEARCHING, UNKNOWN] }
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        rssi: { type: integer }
+        last_seen: { type: string, format: date-time }
+    Detection:
+      type: object
+      required: [asset_mac, source_type]
+      properties:
+        asset_mac: { type: string }
+        source_type:
+          type: string
+          enum: [BLE, WIFI, LORA, TELEMETRY, OPTICAL, URBAN, CROWD, SATELLITE, API, MQTT, WEBSOCKET, NFC, UNKNOWN]
+        node_id: { type: string }
+        rssi: { type: integer }
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        timestamp: { type: string, format: date-time }
+    Alert:
+      type: object
+      required: [asset_id, message]
+      properties:
+        asset_id: { type: string }
+        type: { type: string, enum: [SECURITY, CRITICAL, WARNING, INFO, GEOFENCE, LOW_BATTERY, MAINTENANCE] }
+        severity: { type: string, enum: [INFO, WARNING, CRITICAL] }
+        message: { type: string }
+        timestamp: { type: string, format: date-time }
+    Action:
+      type: object
+      required: [asset_id, action_type]
+      properties:
+        asset_id: { type: string }
+        action_type:
+          type: string
+          enum: [ALARM, LIGHT, MOTOR_OFF, BATTERY, MESSAGE, POSITION, RESTART, TELEMETRY]
+        parameters:
+          type: object
+          additionalProperties: true

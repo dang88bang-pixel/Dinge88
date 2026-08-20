@@ -39,7 +39,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import androidx.compose.material3.ExperimentalMaterial3Api
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgentConfigScreen(
     navController: NavController,
@@ -87,6 +89,7 @@ fun AgentConfigScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StatusCard(uiState: AgentUiState) {
     val running = uiState.agentRunning
@@ -122,6 +125,7 @@ private fun StatusCard(uiState: AgentUiState) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DurationCard(uiState: AgentUiState, viewModel: AgentViewModel) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -160,6 +164,7 @@ private fun DurationCard(uiState: AgentUiState, viewModel: AgentViewModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun IntervalCard(uiState: AgentUiState, viewModel: AgentViewModel) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -198,6 +203,7 @@ private fun IntervalCard(uiState: AgentUiState, viewModel: AgentViewModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PriorityCard(uiState: AgentUiState, viewModel: AgentViewModel) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -238,6 +244,7 @@ private fun PriorityCard(uiState: AgentUiState, viewModel: AgentViewModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CheckRow(checked: Boolean, label: String, onCheckedChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {

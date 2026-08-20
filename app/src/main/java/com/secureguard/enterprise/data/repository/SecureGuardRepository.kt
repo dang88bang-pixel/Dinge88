@@ -38,8 +38,16 @@ interface SecureGuardRepository {
 
     // ---- Detections ----
     fun getDetections(mac: String): Flow<List<Detection>>
+    fun getAllDetections(): Flow<List<Detection>>
     suspend fun getLatestDetection(mac: String): Detection?
     suspend fun insertDetection(detection: Detection): Long
+
+    /** Paginierte Asset-Liste für Lazy Loading (Paging 3). */
+    suspend fun getAssetsPaginated(offset: Int, limit: Int, filter: String?): List<Asset>
+
+    /** Datenbereinigung: alte Detektionen/Alarme entfernen (Retention). */
+    suspend fun deleteDetectionsOlderThan(cutoff: Long): Int
+    suspend fun deleteAlertsOlderThan(cutoff: Long): Int
 
     // ---- Alerts ----
     fun getAlerts(): Flow<List<Alert>>
@@ -101,11 +109,25 @@ class SecureGuardRepositoryImpl(
     override fun getDetections(mac: String): Flow<List<Detection>> =
         detectionDao.observeForAsset(mac)
 
+    override fun getAllDetections(): Flow<List<Detection>> = detectionDao.observeAll()
+
     override suspend fun getLatestDetection(mac: String): Detection? =
         detectionDao.latestForAsset(mac)
 
     override suspend fun insertDetection(detection: Detection): Long =
         detectionDao.insert(detection)
+
+    override suspend fun getAssetsPaginated(
+        offset: Int,
+        limit: Int,
+        filter: String?
+    ): List<Asset> = assetDao.getPage(offset, limit, filter)
+
+    override suspend fun deleteDetectionsOlderThan(cutoff: Long): Int =
+        detectionDao.deleteOlderThan(cutoff)
+
+    override suspend fun deleteAlertsOlderThan(cutoff: Long): Int =
+        alertDao.deleteOlderThan(cutoff)
 
     override fun getAlerts(): Flow<List<Alert>> = alertDao.observeAll()
     override fun getUnacknowledgedAlerts(): Flow<List<Alert>> = alertDao.observeUnacknowledged()

@@ -44,8 +44,46 @@ class NotificationService @Inject constructor(
                 NotificationManager.IMPORTANCE_LOW
             ).apply { description = "Statusmeldungen des selbstlernenden Agenten" }
 
-            notificationManager.createNotificationChannels(listOf(alerts, agent))
+            val telemetry = NotificationChannel(
+                CHANNEL_TELEMETRY,
+                "Telemetriedaten",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply { description = "Fahrzeug-/Asset-Telemetrie" }
+
+            val system = NotificationChannel(
+                CHANNEL_SYSTEM,
+                "Systemmeldungen",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply { description = "Systembenachrichtigungen (Backup, Sync, Fehler)" }
+
+            notificationManager.createNotificationChannels(
+                listOf(alerts, agent, telemetry, system)
+            )
         }
+    }
+
+    /** Benachrichtigung nach einem abgeschlossenen Worker-Zyklus. */
+    fun sendAgentCycleNotification(content: String) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            System.currentTimeMillis().toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_AGENT)
+            .setContentTitle("🛡️ SecureGuard Agent")
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_shield)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+        notificationManager.notify(
+            System.currentTimeMillis().toInt(),
+            notification
+        )
     }
 
     fun sendActionNotification(asset: Asset, actionType: Any, success: Boolean) {
@@ -100,6 +138,8 @@ class NotificationService @Inject constructor(
     companion object {
         const val CHANNEL_ALERTS = "secureguard_alerts"
         const val CHANNEL_AGENT = "secureguard_agent"
+        const val CHANNEL_TELEMETRY = "secureguard_telemetry"
+        const val CHANNEL_SYSTEM = "secureguard_system"
         const val AGENT_NOTIFICATION_ID = 1001
     }
 }

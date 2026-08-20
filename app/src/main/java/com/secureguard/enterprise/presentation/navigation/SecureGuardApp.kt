@@ -28,7 +28,9 @@ import com.secureguard.enterprise.presentation.ui.assets.AssetListScreen
 import com.secureguard.enterprise.presentation.ui.assets.ScanQrScreen
 import com.secureguard.enterprise.presentation.ui.dashboard.DashboardScreen
 import com.secureguard.enterprise.presentation.ui.map.MapScreen
+import com.secureguard.enterprise.presentation.ui.nodes.NodeStatusScreen
 import com.secureguard.enterprise.presentation.ui.settings.SettingsScreen
+import com.secureguard.enterprise.presentation.ui.tempmail.TempMailScreen
 
 private const val ANIM_MS = 250
 
@@ -99,6 +101,12 @@ fun SecureGuardApp() {
             }
             composable(Routes.SCAN_QR) {
                 ScanQrScreen(navController = navController)
+            }
+            composable(Routes.NODE_STATUS) {
+                NodeStatusScreen(navController = navController)
+            }
+            composable(Routes.TEMP_MAIL) {
+                TempMailScreen(navController = navController)
             }
             composable(
                 route = Routes.ASSET_DETAIL,

@@ -37,12 +37,14 @@ import androidx.navigation.NavController
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
+import androidx.compose.material3.ExperimentalMaterial3Api
 
 /**
  * QR / barcode scanner screen. Uses ZXing embedded so no external scanner app
  * is required. If the camera permission is denied the user can fall back to
  * typing the MAC address manually.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScanQrScreen(navController: NavController) {
     val context = LocalContext.current

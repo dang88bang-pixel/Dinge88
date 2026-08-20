@@ -167,3 +167,125 @@ Alle beschrieben; erwartete Ergebnisse dokumentiert. Manuell auf Gerät zu prüf
 | 8 Aktionen | ☑ |
 | Build | 🔶 via GitHub Actions |
 | APK | 🔶 via GitHub Actions |
+
+---
+
+# 🔄 ERGÄNZUNG: API-INTEGRATION & FEHLENDE KOMPONENTEN (überprüft & ergänzt)
+
+**Stand:** Verifikation der Vorgaben „Komplette Abhängigkeiten & API-Integration", „Was noch nicht erläutert wurde" und „Komplette Restauration".
+
+## Gradle-Abhängigkeiten (app/build.gradle.kts + gradle/libs.versions.toml)
+
+| Dependency | Status |
+|---|---|
+| core-ktx, lifecycle-runtime/viewmodel/activity, appcompat, material | ☑ vorhanden |
+| Compose BOM, ui, graphics, tooling, material3, icons-extended, **window-size-class** | ☑ (window-size-class ergänzt) |
+| Navigation Compose | ☑ |
+| **WorkManager** work-runtime-ktx | ☑ ergänzt |
+| **Paging** runtime-ktx + compose | ☑ ergänzt |
+| Hilt + hilt-navigation-compose + **hilt-work** | ☑ ergänzt |
+| Room 2.6.1 (runtime/ktx/compiler) | ☑ |
+| **Retrofit 2.9.0** (gson/moshi/rxjava3-Adapter) | ☑ ergänzt |
+| **OkHttp 4.12.0** (logging, sse) | ☑ ergänzt |
+| **Moshi 1.15.1** (kotlin, codegen) | ☑ ergänzt |
+| **Gson 2.10.1** | ☑ ergänzt |
+| **Paho MQTT** (client 1.2.5; android.service ⚠ bewusst nicht – siehe Inventur „Abweichungen") | ☑ ergänzt |
+| **play-services-location 21.0.1** (echtes GPS) | ☑ ergänzt |
+| **Nordic ble-ktx 2.6.0** (ble-common ⚠ nicht verifizierbar) | ☑ ergänzt |
+| **Accompanist Permissions 0.32.0**, **Coil 2.6.0**, **kotlinx-serialization 1.6.0** | ☑ ergänzt (aktuell ungenutzt/optional) |
+| **RxJava3 + RxAndroid** | ☑ ergänzt (Rx-Variante OCM) |
+| **USB-Serial** (kai-morich 3.5.1 via JitPack) | ☑ ergänzt |
+| Kotlinx-Coroutines, OSMDroid 6.1.20, ZXing, Desugaring | ☑ vorhanden |
+| JUnit + **Espresso/ui-test-junit4/ui-test-manifest** | ☑ ergänzt |
+| multidex / startup-runtime | ⚠ bewusst nicht (minSdk 26 = natives Multidex, keine Initializer) |
+
+## API-Knotenpunkte (services/apis/*.kt + ApiServiceManager)
+
+WiGle ☑ · MacLookup ☑ · Open Charge Map ☑ · DHL ☑ · CKAN ☑ · Google Geolocation ☑ · Netatmo ☑ · Helium ☑ · ApiServiceManager ☑ · BuildConfig-API-Keys ☑ · local.properties.example ☑
+
+## Echtzeit & Agent
+
+MQTT (MqttConfig + MqttService) ☑ · WebSocket (WebSocketService) ☑ · AgentService-Erweiterung (API-Kanal, MQTT/WS-Collectoren, sendAction, Offline-Queue) ☑ · Lern-Engine ☑ · Audit-Log-Anbindung ☑
+
+## Fehlende Komponenten (Teil 2 & 3 der Vorgabe)
+
+| Komponente | Status |
+|---|---|
+| MQTT-Broker-Konfiguration | ☑ MqttConfig.kt + mosquitto.conf + docker-compose |
+| Offline-Karte (OSM-Download) | ☑ OfflineMapService.kt |
+| Ende-zu-Ende-Verschlüsselung | ☑ EncryptionService.kt (AndroidKeyStore) |
+| Datenbereinigung & Migration | ☑ DatabaseCleanup.kt + MIGRATION_1_2 |
+| Audit-Log | ☑ AuditLog.kt/-Dao/-Service |
+| Foreground Service | ☑ (AgentForegroundService vorhanden) |
+| RBAC | ☑ security/RoleManager.kt |
+| Notification-Channels (4) | ☑ NotificationService.kt |
+| Alarm-Töne pro Asset | ☑ AlertSoundManager.kt |
+| CSV/PDF-Export | ☑ ExportService.kt |
+| Dunkelmodus | ☑ (Theme.kt) |
+| Mehrsprachigkeit | ☑ values-de + values-en |
+| Offline-Queue | ☑ OfflineQueue.kt + PendingAction |
+| Retry-Logik | ☑ util/RetryManager.kt |
+| Lazy Loading (Paging) | ☑ util/AssetPagingSource.kt |
+| Backup/Restore | ☑ BackupManager.kt |
+| PDF-Berichte | ☑ ExportService.kt (PdfDocument) |
+| Barrierefreiheit | ☑ util/AccessibilityHelper.kt |
+| Authentifizierung (PIN) | ☑ AuthManager.kt + LockScreen |
+| USB/Serial, NFC | ☑ UsbSerialService.kt, NfcService.kt |
+| Backend (FastAPI), Docker, ESP32, OpenAPI | ☑ backend/, docker-compose.yml, firmware/, docs/ |
+| Learning Engine (KI/Muster) | ☑ services/LearningEngine.kt |
+| Globaler Error Handler, Cache, Paging | ☑ util/ |
+| Worker (WorkManager 15 Min) | ☑ worker/SecureAgentWorker.kt |
+
+## Build
+
+Der lokale Sandbox-Build ist weiterhin nicht möglich (Firewall, siehe TOOLCHAIN.md) –
+die APK wird über GitHub Actions gebaut. ⚠ Nach dem nächsten Push im CI verifizieren,
+dass alle neuen Dependencies auflösen (insb. JitPack- und Nordic-Artefakte).
+
+---
+
+# 🔄 ERGÄNZUNG: TEMP-MAIL/MCP & API-NODE-MANAGER (Vorgabe 4+5)
+
+## Temporäre E-Mail-Dienste
+
+| Komponente | Status |
+|---|---|
+| MCP-Client (create_inbox / wait_for_otp / extract_magic_link) | ☑ `mcp/MCPClient.kt` |
+| TempMailService (Fassade + State-Flows) | ☑ `services/TempMailService.kt` |
+| AgentService.autoRegisterExternalService + RegistrationResult | ☑ |
+| TempMailScreen + TempMailViewModel + Route `temp_mail` | ☑ |
+| MCP_SERVER_URL BuildConfig + local.properties.example | ☑ |
+
+## API-Node-Manager
+
+| Komponente | Status |
+|---|---|
+| ApiNodeManager.kt (11 Node-Handler, Health-Monitor, Circuit Breaker, Learning Layer, Rate-Limiter, autonomousSearch) | ☑ `agent/ApiNodeManager.kt` |
+| NodeConfig.kt + DefaultNodeConfigs | ☑ |
+| NodeStatusScreen.kt + NodeStatusViewModel.kt + Route `node_status` | ☑ |
+| Einstieg in Einstellungen („Erweiterte Werkzeuge") | ☑ |
+| Audit-Log-Anbindung (NODE_SEARCH / NODE_ERROR) | ☑ |
+
+## Build-Status
+Debug + Release bauen in GitHub Actions **grün** (Stand Commit ca129b9). Nach diesem
+Update erneut im CI verifiziert (Diagnose-Hook ist noch aktiv).
+
+---
+
+# 🏁 ABSCHLUSS: FINALISIERUNG & CT45P XON (ANDROID 11)
+
+## Updates (verifiziert grün in GitHub Actions)
+- AGP 8.7.3 · Kotlin 2.0.21 · compileSdk/targetSdk 35 · Compose BOM 2024.12.01
+- core-ktx 1.15.0, lifecycle 2.8.7, activity 1.9.3, navigation 2.8.5, coroutines 1.9.0
+
+## Honeywell CT45P XON – Android-11-Kompatibilität
+- ☑ `usesCleartextTraffic="true"` (MQTT tcp:// funktioniert auf Android 9+ / 11)
+- ☑ `config/CT45PConfig.kt` (Erkennung, Scan/GPS-Profile, API-30-Helfer)
+- ☑ Geräte-Log beim Start; BLE/WiFi-Standort-Permission auf API ≤ 30
+- ☑ POST_NOTIFICATIONS nur API 33+; FGS 2-arg auf API 30
+- ☑ Installationsanleitung im README (Debug-APK aus Actions-Artefakt)
+
+## Build-Status
+- **Debug + Release: GRÜN** (GitHub Actions, Branch `arena/01a01ce8-dinge88`)
+- Release-Signing: aktiv sobald Keystore-Secrets gesetzt; sonst unsignierte
+  Release-APK + installierbare Debug-APK

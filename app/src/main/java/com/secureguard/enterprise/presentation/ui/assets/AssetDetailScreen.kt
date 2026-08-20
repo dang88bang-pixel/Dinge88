@@ -49,7 +49,9 @@ import com.secureguard.enterprise.presentation.components.ActionButton
 import com.secureguard.enterprise.presentation.ui.common.ActionType
 import java.text.SimpleDateFormat
 import java.util.Locale
+import androidx.compose.material3.ExperimentalMaterial3Api
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssetDetailScreen(
     navController: NavController,
@@ -364,6 +366,7 @@ fun AssetDetailScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TelemetryItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
