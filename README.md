@@ -92,10 +92,11 @@ Die APK wird über **GitHub Actions** gebaut (kein lokal eingerichteter
 Wrapper nötig):
 
 1. Code pushen oder Pull Request öffnen.
-2. Der Workflow `.github/workflows/build.yml` lädt JDK 17, das Android-SDK und
-   Gradle 8.9 und führt `gradle :app:assembleDebug` aus.
-3. Die Debug-APK `app-debug.apk` steht als Artefakt
-   **SecureGuardEnterprise-debug** zur Verfügung.
+2. Der Workflow `.github/workflows/build-release.yml` lädt JDK 17, das
+   Android-SDK (API 35) und Gradle 8.9 und führt `assembleDebug` plus
+   `assembleRelease` aus.
+3. Die Debug-APK steht als Artefakt **secureguard-pro-debug**, die
+   Release-APK als **secureguard-pro** zur Verfügung.
 
 Lokal bauen (sofern Android SDK + JDK 17 vorhanden):
 
