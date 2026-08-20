@@ -203,3 +203,41 @@ Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs
 | TempMail REST-Variante (freecustom.email) | nur MCP-Variante | einheitlicher Kanal; REST-Endpunkt wäre fiktiv |
 | `searchViaTempMail` im NodeManager | nutzt `TempMailService` (MCP) | konsistente Fassade |
 | `performRegistration` | Rückgabe `false` (Skizze) | keine unautorisierten Registrierungen aus dem Repo heraus |
+
+---
+
+# 🛠️ Ergänzung: Finalisierung & Honeywell CT45P XON (Android 11)
+
+**Stand:** Projekt fertiggestellt; Build grün (Debug + Release).
+
+## 13. Abhängigkeiten aktualisiert (2024-12-Stand)
+
+| Komponente | vorher | nachher |
+|---|---|---|
+| AGP | 8.5.2 | 8.7.3 |
+| Kotlin | 2.0.20 | 2.0.21 |
+| compileSdk / targetSdk | 34 | 35 |
+| core-ktx | 1.13.1 | 1.15.0 |
+| lifecycle | 2.8.6 | 2.8.7 |
+| activity-compose | 1.9.2 | 1.9.3 |
+| Compose BOM | 2024.09.02 | 2024.12.01 |
+| navigation | 2.8.1 | 2.8.5 |
+| coroutines | 1.8.1 | 1.9.0 |
+
+## 14. Honeywell CT45P XON (Android 11, API 30)
+
+| Maßnahme | Datei | Status |
+|---|---|---|
+| Klartext-Netzwerk für MQTT tcp:// (Android 9+ blockiert sonst) | `AndroidManifest.xml` (`usesCleartextTraffic`) | ✅ |
+| Geräte-Erkennung + Android-11-Kompatibilitäts-Helfer | `config/CT45PConfig.kt` | ✅ |
+| Geräte-Log beim App-Start (Hersteller/Modell/API) | `SecureGuardApplication.kt` | ✅ |
+| BLE: Standort-Permission auf API ≤ 30 | `BleService` (bereits vorhanden) | ✅ |
+| WiFi: Standort-Permission auf Android 11 | `WifiService` (bereits vorhanden) | ✅ |
+| POST_NOTIFICATIONS nur ab API 33 | `NotificationService` + `CT45PConfig.needsNotificationPermission` | ✅ |
+| Foreground-Service auf API 30 (2-arg startForeground) | `AgentForegroundService` | ✅ |
+| USB-Host (FTDI/CP210x) | `UsbSerialService` | ✅ |
+
+**Hinweis:** Mit `targetSdk 35` läuft die App auf Android 11 uneingeschränkt;
+Android-11-spezifische Regeln (Klartext, Scoped Storage, Hintergrund) sind
+berücksichtigt. Der 2D-Imager des CT45P arbeitet als HID-Keyboard; der
+ZXing-Kamera-Scan bleibt zusätzlich nutzbar.

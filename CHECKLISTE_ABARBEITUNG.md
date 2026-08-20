@@ -269,3 +269,23 @@ dass alle neuen Dependencies auflösen (insb. JitPack- und Nordic-Artefakte).
 ## Build-Status
 Debug + Release bauen in GitHub Actions **grün** (Stand Commit ca129b9). Nach diesem
 Update erneut im CI verifiziert (Diagnose-Hook ist noch aktiv).
+
+---
+
+# 🏁 ABSCHLUSS: FINALISIERUNG & CT45P XON (ANDROID 11)
+
+## Updates (verifiziert grün in GitHub Actions)
+- AGP 8.7.3 · Kotlin 2.0.21 · compileSdk/targetSdk 35 · Compose BOM 2024.12.01
+- core-ktx 1.15.0, lifecycle 2.8.7, activity 1.9.3, navigation 2.8.5, coroutines 1.9.0
+
+## Honeywell CT45P XON – Android-11-Kompatibilität
+- ☑ `usesCleartextTraffic="true"` (MQTT tcp:// funktioniert auf Android 9+ / 11)
+- ☑ `config/CT45PConfig.kt` (Erkennung, Scan/GPS-Profile, API-30-Helfer)
+- ☑ Geräte-Log beim Start; BLE/WiFi-Standort-Permission auf API ≤ 30
+- ☑ POST_NOTIFICATIONS nur API 33+; FGS 2-arg auf API 30
+- ☑ Installationsanleitung im README (Debug-APK aus Actions-Artefakt)
+
+## Build-Status
+- **Debug + Release: GRÜN** (GitHub Actions, Branch `arena/01a01ce8-dinge88`)
+- Release-Signing: aktiv sobald Keystore-Secrets gesetzt; sonst unsignierte
+  Release-APK + installierbare Debug-APK

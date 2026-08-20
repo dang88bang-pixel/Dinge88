@@ -72,7 +72,7 @@ app/src/main/java/com/secureguard/enterprise/
 API-Keys werden über `local.properties` (Vorlage: `local.properties.example`) bzw.
 `gradle.properties` gesetzt und landen als `BuildConfig`-Felder
 (`WIGLE_API_KEY`, `OPEN_CHARGE_MAP_KEY`, `NETATMO_TOKEN`, `GOOGLE_API_KEY`,
-`HELIUM_API_KEY`, `MQTT_BROKER_URL`, `WEBSOCKET_URL`).
+`HELIUM_API_KEY`, `MQTT_BROKER_URL`, `WEBSOCKET_URL`, `MCP_SERVER_URL`).
 
 ## 🖥️ Backend & Firmware
 
@@ -107,10 +107,47 @@ gradle wrapper --gradle-version 8.9
 
 ## ⚙️ Konfiguration
 
-- **minSdk:** 26 · **targetSdk/compileSdk:** 34
-- **Sprache:** Kotlin 2.0, Jetpack Compose (BOM 2024.09)
+- **minSdk:** 26 (Android 8) · **targetSdk/compileSdk:** 35
+- **Sprache:** Kotlin 2.0.21, Jetpack Compose (BOM 2024.12)
+- **Build:** AGP 8.7.3 · Gradle 8.9 · JDK 17
 - **DI:** Hilt 2.52 · **DB:** Room 2.6.1
 - **Karte:** OSMDroid 6.1.20 · **Scanner:** ZXing 4.3.0
+- **Netz:** Retrofit 2.9 / OkHttp 4.12 / Moshi 1.15 / MQTT Paho 1.2.5
+
+## 📟 Honeywell CT45P XON (Android 11)
+
+Das Projekt ist für das **Honeywell CT45P XON** ausgelegt, das werkseitig mit
+**Android 11 (API 30)** läuft. Die App berücksichtigt dessen Besonderheiten:
+
+| Bereich | Umsetzung |
+|---------|-----------|
+| **MQTT (tcp://)** | `android:usesCleartextTraffic="true"` im Manifest – Android 9+ blockiert Klartext sonst (auch auf Android 11) |
+| **BLE-Scan** | Auf API ≤ 30 wird `ACCESS_FINE_LOCATION` statt `BLUETOOTH_SCAN` verlangt (`CT45PConfig.needsLocationForBle`, `BleService`) |
+| **WiFi-Scan** | Benötigt Standortberechtigung auf Android 11 (in `WifiService` berücksichtigt) |
+| **Geräte-Erkennung** | `config/CT45PConfig.kt` erkennt das CT45P (`Build.MODEL`/`MANUFACTURER`) und loggt Gerät + Android-Version beim Start |
+| **Barcode-Scanner** | Integrierter 2D-Imager (HID-Keyboard) + ZXing-Kamera-Scan als Alternative |
+| **USB-Host** | Serielle Anbindung (FTDI/CP210x) via `UsbSerialService` |
+| **Benachrichtigungen** | `POST_NOTIFICATIONS` nur ab API 33 angefordert – auf Android 11 ohne Einschränkung |
+
+Das Gerät läuft mit `targetSdk 35`, ohne dass Android-11-spezifische
+Einschränkungen greifen (Klartext-Netzwerk, Scoped Storage, Hintergrund-
+Dienste sind berücksichtigt).
+
+## 📲 Installation auf dem CT45P
+
+1. **Debug-APK** aus GitHub Actions laden: Workflow „🛡️ Build SecureGuard APK" →
+   Artefakt **secureguard-pro-debug** (debug-signiert, direkt installierbar).
+2. APK per USB/ADB oder Dateimanager auf das Gerät übertragen:
+   `adb install secureguard-pro-debug.apk`
+3. Beim ersten Start Berechtigungen erteilen: **Standort**, **Bluetooth**,
+   **Kamera** (für QR), **Benachrichtigungen** (nur Android 13+).
+4. Für den Pilotbetrieb: unter **Einstellungen → Backend-Endpunkte** die
+   URLs für LoRa/Optik/Urban/Crowd setzen und ggf. `MQTT_BROKER_URL` bzw.
+   `MCP_SERVER_URL` in `local.properties` konfigurieren.
+
+> Die **Release-APK** wird nur signiert, wenn die Keystore-Secrets
+> (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`) im
+> GitHub-Repo gesetzt sind – siehe `.github/workflows/build-release.yml`.
 
 ## 🛡️ Datenschutz
 
