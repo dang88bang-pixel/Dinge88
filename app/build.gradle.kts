@@ -126,7 +126,6 @@ dependencies {
     implementation(libs.osmdroid.android)
 
     // ZXing (QR code scanning)
-    implementation(libs.zxing.core)
     implementation(libs.zxing.embedded)
 
     // Desugaring
