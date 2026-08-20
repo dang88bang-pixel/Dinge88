@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -22,7 +24,7 @@ fun apiKey(name: String): String {
     (project.findProperty(name) as? String)?.takeIf { it.isNotBlank() }?.let { return it }
     val localProps = rootProject.file("local.properties")
     if (localProps.exists()) {
-        val props = java.util.Properties().apply {
+        val props = Properties().apply {
             localProps.inputStream().use { load(it) }
         }
         return props.getProperty(name) ?: ""
