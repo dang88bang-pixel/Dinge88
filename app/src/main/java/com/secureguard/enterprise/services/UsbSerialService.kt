@@ -46,7 +46,13 @@ class UsbSerialService @Inject constructor(
         var connection: android.hardware.usb.UsbDeviceConnection? = null
         try {
             connection = usbManager.openDevice(driver.device) ?: return@withContext null
-            if (!port.open(connection)) return@withContext null
+            // open() wirft in usb-serial-for-android 3.5.x eine Exception bei Fehlern
+            // (Rückgabetyp Unit statt Boolean).
+            try {
+                port.open(connection)
+            } catch (e: Exception) {
+                return@withContext null
+            }
             port.setParameters(
                 115200,
                 8,
