@@ -14,7 +14,7 @@ import android.os.Build
  *   [needsLocationForBle] und `BleService`.
  * - **WiFi-Scan:** `WifiManager.getScanResults()` benötigt auf Android 11
  *   die Standortberechtigung (in `WifiService` berücksichtigt).
- * - **MQTT tcp://**: Lokale Broker (Mosquitto) sprechen Klartext –
+ * - **MQTT (tcp):** Lokale Broker (Mosquitto) sprechen Klartext –
  *   `android:usesCleartextTraffic="true"` ist im Manifest gesetzt
  *   (Android 9+ blockiert Klartext sonst).
  * - **Barcode-Scanner:** Der integrierte 2D-Imager arbeitet als
