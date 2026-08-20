@@ -22,7 +22,7 @@ include(":app")
 if (System.getenv("GITHUB_EVENT_NAME") == "pull_request") {
     println("::error::SECUREGUARD-M1")
     val listener = object : org.gradle.api.invocation.BuildListener {
-        override fun buildStarted() {}
+        override fun buildStarted(gradle: org.gradle.api.invocation.Gradle) {}
         override fun settingsEvaluated(settings: org.gradle.api.initialization.Settings) {}
         override fun projectsLoaded(gradle: org.gradle.api.invocation.Gradle) {}
         override fun projectsEvaluated(gradle: org.gradle.api.invocation.Gradle) {}
