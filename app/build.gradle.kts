@@ -79,10 +79,19 @@ android {
         }
     }
 
+    // Nur signieren, wenn wirklich eine Keystore-Datei existiert (auf
+    // GitHub-Runnern gibt es z. B. keinen ~/.android/debug.keystore).
+    // Ohne Keystore wird die Release-APK unsigniert gebaut
+    // (app-release-unsigned.apk) – so schlägt packageRelease nicht fehl.
+    val debugKeystorePath = file("${System.getProperty("user.home")}/.android/debug.keystore")
+    val hasAnyKeystore = keystoreFile.exists() || debugKeystorePath.exists()
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = releaseSigning
+            if (hasAnyKeystore) {
+                signingConfig = releaseSigning
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

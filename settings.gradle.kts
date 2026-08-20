@@ -30,36 +30,50 @@ if (System.getenv("GITHUB_EVENT_NAME") == "pull_request") {
             val failure = result.failure
             if (failure != null) {
                 try {
-                    val sw = java.io.StringWriter()
-                    failure.printStackTrace(java.io.PrintWriter(sw))
-                    val raw = (failure.message ?: failure.toString()) + "\n" + sw.toString().take(2000)
-                    val escaped = raw.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-                    println("::error::SECUREGUARD-BUILD-FAILURE: $escaped")
-
                     // Rekursions-Guard: Der Sub-Gradle-Lauf erbt die Umgebung.
                     if (System.getenv("SECUREGUARD_DIAG") == "1") return
                     val repoDir = rootProject.projectDir
+
+                    // Gescheiterte Aufgabe aus der Fehlermeldung extrahieren.
+                    val msg = failure.message ?: ""
+                    val taskMatch = Regex("task '([^']+)'").find(msg)
+                    val task = taskMatch?.groupValues?.get(1) ?: ":app:assembleDebug"
+                    val target = if (task.startsWith(":")) task else ":app:$task"
+
                     val pb = ProcessBuilder(
-                        "./gradlew", ":app:compileDebugKotlin",
-                        "--offline", "--no-daemon", "--console=plain", "-q"
+                        "./gradlew", target,
+                        "--offline", "--no-daemon", "--console=plain", "--stacktrace"
                     )
                     pb.directory(repoDir)
                     pb.redirectErrorStream(true)
                     pb.environment()["SECUREGUARD_DIAG"] = "1"
                     val proc = pb.start()
-                    val finished = proc.waitFor(180, java.util.concurrent.TimeUnit.SECONDS)
+                    val finished = proc.waitFor(240, java.util.concurrent.TimeUnit.SECONDS)
                     if (!finished) proc.destroyForcibly()
                     val output = proc.inputStream.bufferedReader().readText()
-                    val errs = output.lineSequence()
-                        .filter { it.startsWith("e:") || it.contains("error:") }
-                        .take(60)
+
+                    // Kernmeldung ("What went wrong"-Block) extrahieren.
+                    val core = output.lineSequence()
+                        .filter {
+                            it.contains("What went wrong") || it.startsWith("> ") ||
+                                it.contains("minCompileSdk") || it.contains("compileSdk") ||
+                                it.contains("requires") || it.contains("FAILED") ||
+                                it.startsWith("e:") || it.contains("SigningConfig") ||
+                                it.contains("missing required")
+                        }
+                        .take(80)
                         .joinToString("\n")
-                    if (errs.isNotBlank()) {
-                        val e2 = errs.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-                        println("::error::SECUREGUARD-KOTLIN-ERRORS: $e2")
-                    } else {
-                        println("::error::SECUREGUARD-KOTLIN-ERRORS: (keine e:-Zeilen) " +
-                            output.take(1500).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))
+                    val body = if (core.isNotBlank()) core else output.take(3000)
+                    val e2 = body.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                    println("::error::SECUREGUARD-DETAIL ($target): $e2")
+
+                    // Fehlerursache (tiefste Exception) zusätzlich ausgeben.
+                    var cause: Throwable? = failure
+                    while (cause?.cause != null) cause = cause.cause
+                    if (cause != null && cause !== failure) {
+                        val cm = cause.message ?: ""
+                        val e3 = cm.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                        println("::error::SECUREGUARD-CAUSE: $e3")
                     }
                 } catch (e: Exception) {
                     println("::error::SECUREGUARD-HOOK-FEHLER: ${e.message}")
