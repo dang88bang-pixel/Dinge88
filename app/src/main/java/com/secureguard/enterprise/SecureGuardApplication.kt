@@ -1,11 +1,13 @@
 package com.secureguard.enterprise
 
 import android.app.Application
+import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.secureguard.enterprise.config.CT45PConfig
 import com.secureguard.enterprise.data.local.SecureGuardDatabase
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
@@ -22,6 +24,10 @@ import javax.inject.Inject
 @HiltAndroidApp
 class SecureGuardApplication : Application(), Configuration.Provider {
 
+    private companion object {
+        const val TAG = "SecureGuard"
+    }
+
     @Inject lateinit var database: SecureGuardDatabase
     @Inject lateinit var workerFactory: HiltWorkerFactory
 
@@ -34,6 +40,11 @@ class SecureGuardApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        Log.i(
+            TAG,
+            "Gerät: ${CT45PConfig.deviceSummary()} · CT45P: ${CT45PConfig.isCT45P()} · " +
+                "BLE braucht Standort (Android 11): ${CT45PConfig.needsLocationForBle}"
+        )
         seedDemoDataIfEmpty()
         scheduleAgentWorker()
     }
