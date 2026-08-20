@@ -18,16 +18,16 @@ dependencyResolutionManagement {
 rootProject.name = "SecureGuardEnterprise"
 include(":app")
 
-// DIAGNOSE-HOOK (wird entfernt): Bei Build-Fehlern wird die Fehlermeldung
-// als GitHub-Actions-Workflow-Command (::error::) ausgegeben – der Runner
-// erfasst das automatisch als Check-Run-Annotation (read-only-tauglich).
+// DIAGNOSE-HOOK (wird entfernt)
 if (System.getenv("GITHUB_EVENT_NAME") == "pull_request") {
-    gradle.addBuildListener(object : org.gradle.api.invocation.BuildListener {
+    println("::error::SECUREGUARD-M1")
+    val listener = object : org.gradle.api.invocation.BuildListener {
         override fun buildStarted() {}
         override fun settingsEvaluated(settings: org.gradle.api.initialization.Settings) {}
         override fun projectsLoaded(gradle: org.gradle.api.invocation.Gradle) {}
         override fun projectsEvaluated(gradle: org.gradle.api.invocation.Gradle) {}
         override fun buildFinished(result: org.gradle.api.invocation.BuildResult) {
+            println("::error::SECUREGUARD-M3-BUILDFINISHED result.failure=${result.failure != null}")
             val failure = result.failure
             if (failure != null) {
                 try {
@@ -41,6 +41,10 @@ if (System.getenv("GITHUB_EVENT_NAME") == "pull_request") {
                 }
             }
         }
-    })
+    }
+    println("::error::SECUREGUARD-M2-LISTENER-OK")
+    gradle.addBuildListener(listener)
+    println("::error::SECUREGUARD-M4-REGISTERED")
 }
+println("::error::SECUREGUARD-M5-SETTINGS-END")
 
