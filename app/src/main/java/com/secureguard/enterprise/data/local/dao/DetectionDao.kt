@@ -13,6 +13,9 @@ interface DetectionDao {
     @Query("SELECT * FROM detections WHERE assetMac = :mac ORDER BY timestamp DESC")
     fun observeForAsset(mac: String): Flow<List<Detection>>
 
+    @Query("SELECT * FROM detections ORDER BY timestamp DESC")
+    fun observeAll(): Flow<List<Detection>>
+
     @Query("SELECT * FROM detections WHERE assetMac = :mac ORDER BY timestamp DESC LIMIT 1")
     suspend fun latestForAsset(mac: String): Detection?
 
@@ -21,4 +24,7 @@ interface DetectionDao {
 
     @Query("DELETE FROM detections WHERE assetMac = :mac")
     suspend fun deleteForAsset(mac: String)
+
+    @Query("DELETE FROM detections WHERE timestamp < :cutoff")
+    suspend fun deleteOlderThan(cutoff: Long): Int
 }

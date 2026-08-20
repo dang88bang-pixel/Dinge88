@@ -97,3 +97,73 @@ Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs
 > Open-Data-API, Find-My-Proxy) und unter „Backend-Endpunkte" konfiguriert werden.
 > **Vor Ort ohne Backend** sind **BLE, GPS, WiFi, Befehlsübertragung und Telemetrie** vollständig
 > ausführbar.
+
+---
+
+# 🔌 Ergänzung: Externe APIs, Echtzeit-Kanäle & fehlende Komponenten
+
+**Stand:** ergänzt im Rahmen der API-Integrations-Überprüfung. Legende: ✅ implementiert · 🟡 von Backend/Keys abhängig · ⚠ Abweichung dokumentiert
+
+## 6. Externe API-Knotenpunkte (REST)
+
+| API | Datei | Status | Kommentar |
+|---|---|---|---|
+| WiGle.net (BSSID→GPS) | `services/apis/WiGleApi.kt` | 🟡 | Key über `WIGLE_API_KEY`; ohne Key → null |
+| MacLookup.app (OUI) | `services/apis/MacLookupApi.kt` | ✅ | kostenlos, ohne Key |
+| Open Charge Map | `services/apis/OpenChargeMapApi.kt` | 🟡 | Key `OPEN_CHARGE_MAP_KEY`; reale verschachtelte Antwortstruktur abgebildet |
+| DHL Packstation | `services/apis/DhlPackstationApi.kt` | 🟡 | Endpunkt benötigt DHL-Zugang (Vertrag); Vertrag hinterlegt |
+| CKAN Open Data | `services/apis/CkanOpenDataApi.kt` | ✅ | demo.ckan.org, ohne Key |
+| Google Geolocation | `services/apis/GoogleGeolocationApi.kt` | 🟡 | Key `GOOGLE_API_KEY`; WLAN-APs als Body |
+| Netatmo Weather | `services/apis/NetatmoWeatherApi.kt` | 🟡 | Bearer-Token `NETATMO_TOKEN` |
+| Helium Network | `services/apis/HeliumNetworkApi.kt` | 🟡 | Hotspots um Position, Beacons |
+| Zentraler Manager | `services/ApiServiceManager.kt` | ✅ | Retrofit/OkHttp (Gson+Moshi), Logging, Fehlertoleranz, Detection-Flow, RxJava-Variante |
+
+## 7. Echtzeit-Kanäle
+
+| Komponente | Datei | Status | Kommentar |
+|---|---|---|---|
+| MQTT (Paho) | `services/MqttService.kt` + `MqttConfig.kt` | ✅ | `MqttAsyncClient`, Auto-Reconnect, Events-Flow, Topics/Konfiguration |
+| WebSocket (OkHttp) | `services/WebSocketService.kt` | ✅ | Gson-Nachrichten, Events-Flow; URL via `WEBSOCKET_URL` |
+| Agent-Integration | `services/AgentService.kt` | ✅ | API-Kanal (nur mit Einwilligung), MQTT-/WS-Collectoren, `sendAction` über alle Kanäle, Offline-Queue-Fallback |
+
+## 8. Ergänzte Komponenten (vorher „fehlt")
+
+| Komponente | Datei | Status |
+|---|---|---|
+| Audit-Log (Entity+DAO+Service) | `data/model/AuditLog.kt`, `AuditLogDao.kt`, `AuditLogService.kt` | ✅ |
+| Offline-Queue (Entity+DAO+Service) | `data/model/PendingAction.kt`, `PendingActionDao.kt`, `OfflineQueue.kt` | ✅ |
+| Room-Migration v2 | `SecureGuardDatabase.kt` (`MIGRATION_1_2`) | ✅ |
+| Datenbereinigung (Retention) | `DatabaseCleanup.kt` | ✅ |
+| Backup/Restore | `BackupManager.kt` | ✅ |
+| E2E-Verschlüsselung (AES/GCM, KeyStore) | `EncryptionService.kt` | ✅ |
+| Authentifizierung (PIN, PBKDF2) | `AuthManager.kt` + `LockScreen.kt` (MainActivity-Gate) | ✅ |
+| RBAC | `security/RoleManager.kt` | ✅ |
+| Alarm-Töne pro Stufe | `AlertSoundManager.kt` | ✅ |
+| Offline-Karte (OSM) | `OfflineMapService.kt` | ✅ |
+| CSV/PDF-Export (+verschlüsselt) | `ExportService.kt` | ✅ |
+| Retry-Logik | `util/RetryManager.kt` | ✅ |
+| Globaler Error-Handler | `util/ErrorHandler.kt` | ✅ |
+| Cache (TTL/Size) | `util/CacheManager.kt` | ✅ |
+| Lazy Loading (Paging 3) | `util/AssetPagingSource.kt` + `AssetDao.getPage` | ✅ |
+| Barrierefreiheit (TalkBack) | `util/AccessibilityHelper.kt` | ✅ |
+| Lern-Engine (Muster/Prädiktion) | `services/LearningEngine.kt` | ✅ |
+| WorkManager-Worker (15 Min) | `worker/SecureAgentWorker.kt` + Application-Scheduling | ✅ |
+| NFC-Integration | `services/NfcService.kt` + Manifest | ✅ |
+| USB/Serial | `services/UsbSerialService.kt` (usb-serial-for-android) | ✅ |
+| Benachrichtigungskanäle (4) | `NotificationService.kt` | ✅ |
+| Mehrsprachigkeit | `res/values-en/strings.xml` | ✅ |
+| Dunkelmodus | `presentation/theme/Theme.kt` (Dark/Dynamic) | ✅ (bereits vorhanden) |
+| Foreground Service | `AgentForegroundService.kt` | ✅ (bereits vorhanden) |
+| Backend (FastAPI) | `backend/main.py` + Docker-Compose + Mosquitto | ✅ (neben dem Android-Projekt) |
+| ESP32-Firmware | `firmware/secureguard_esp32/` | ✅ |
+| OpenAPI-Doku | `docs/api-docs.yaml` | ✅ |
+
+## 9. ⚠ Abweichungen von der Vorgabe (bewusst)
+
+| Vorgabe | Umsetzung | Begründung |
+|---|---|---|
+| `org.eclipse.paho.android.service` (MqttAndroidClient) | `org.eclipse.paho.client.mqttv3` + `MqttAsyncClient` | Die Android-Service-Variante ist seit 2018 ungepflegt, benötigt die alte Support-Library und verursacht auf modernen Android-Versionen Laufzeitprobleme. `MqttAsyncClient` ist funktional äquivalent (Pub/Sub, Callbacks, Auto-Reconnect) und stabil. |
+| `no.nordicsemi.android:ble-common:2.6.1` | nur `ble-ktx:2.6.0` | `ble-common`-Artefakt für 2.6.x nicht verifizierbar; `ble-ktx` (auf Maven Central bestätigt) genügt als Nordic-Anbindung. Der aktive Scan läuft über die Plattform-API (`BleService`). |
+| `androidx.startup:startup-runtime` / `androidx.multidex` | nicht ergänzt | Nicht benötigt: minSdk 26 hat natives Multidex, und kein Initializer wird verwendet. |
+| API-Keys `Bearer`-Schema WiGle | `Authorization: Bearer <Key>` | WiGle nutzt regulär HTTP-Basic; über den Key kann beides hinterlegt werden (siehe Doku im Client). |
+| DHL/Helium-Endpunkte | Vertrag hinterlegt | Die realen APIs benötigen Zugangsdaten bzw. haben sich geändert; die Interfaces sind über `ApiServiceManager` austauschbar. |

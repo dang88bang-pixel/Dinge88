@@ -15,9 +15,9 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Date
@@ -34,6 +34,12 @@ import javax.inject.Singleton
  * most recently produced a hit for an asset is queried first on the next cycle
  * ("rekursive Verbesserung"). The agent is fully decoupled from Meshtastic:
  * LoRa is just one of several channels via [LoraService].
+ *
+ * Zusätzlich integriert:
+ * - externe REST-APIs über [ApiServiceManager] (nur mit Einwilligung)
+ * - Echtzeit-Kanäle MQTT ([MqttService]) und WebSocket ([WebSocketService])
+ * - Lern-Engine ([LearningEngine]) für adaptives Intervall/Quellenwahl
+ * - Audit-Log ([AuditLogService]) und Offline-Queue ([OfflineQueue])
  */
 @Singleton
 class AgentService @Inject constructor(
@@ -46,11 +52,19 @@ class AgentService @Inject constructor(
     private val urbanService: UrbanService,
     private val crowdService: CrowdService,
     private val satelliteService: SatelliteService,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val apiServiceManager: ApiServiceManager,
+    private val mqttService: MqttService,
+    private val webSocketService: WebSocketService,
+    private val learningEngine: LearningEngine,
+    private val auditLogService: AuditLogService,
+    private val offlineQueue: OfflineQueue
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var loopJob: Job? = null
+    private var mqttCollectorJob: Job? = null
+    private var webSocketCollectorJob: Job? = null
 
     private val _agentStatus = MutableStateFlow(AgentStatus())
     val agentStatus: StateFlow<AgentStatus> = _agentStatus.asStateFlow()
@@ -71,13 +85,38 @@ class AgentService @Inject constructor(
             settings = settings
         )
         loopJob = scope.launch { runLoop(settings) }
+        startRealtimeChannels()
+        scope.launch {
+            auditLogService.log(action = "AGENT_START", details = "Agent gestartet (Intervall ${settings.interval}s)")
+        }
     }
 
     @Synchronized
     fun stop() {
         loopJob?.cancel()
         loopJob = null
+        mqttCollectorJob?.cancel()
+        mqttCollectorJob = null
+        webSocketCollectorJob?.cancel()
+        webSocketCollectorJob = null
+        mqttService.disconnect()
+        webSocketService.disconnect()
         _agentStatus.value = _agentStatus.value.copy(running = false)
+        scope.launch {
+            auditLogService.log(action = "AGENT_STOP", details = "Agent gestoppt")
+        }
+    }
+
+    /** Verbindet MQTT/WebSocket und sammelt Echtzeit-Ereignisse. */
+    private fun startRealtimeChannels() {
+        mqttCollectorJob = scope.launch {
+            mqttService.events.collect { event -> handleMqttEvent(event) }
+        }
+        webSocketCollectorJob = scope.launch {
+            webSocketService.events.collect { event -> handleWebSocketEvent(event) }
+        }
+        mqttService.connect()
+        if (webSocketService.isConfigured) webSocketService.connect()
     }
 
     private suspend fun runLoop(settings: AgentSettings) {
@@ -87,7 +126,13 @@ class AgentService @Inject constructor(
                 .getOrDefault(AgentCycleResult())
 
             val now = System.currentTimeMillis()
-            val intervalMs = (settings.interval.coerceAtLeast(5)) * 1000L
+            // Adaptives Intervall: die Lern-Engine optimiert die Taktung.
+            val baseIntervalMs = settings.interval.coerceAtLeast(5) * 1000L
+            val intervalMs = if (settings.learningMode) {
+                learningEngine.getOptimalInterval() * 1000L
+            } else {
+                baseIntervalMs
+            }
             _agentStatus.value = _agentStatus.value.copy(
                 lastRunAt = now,
                 nextRunAt = now + intervalMs,
@@ -123,6 +168,17 @@ class AgentService @Inject constructor(
                     learningMemory[asset.mac.uppercase()] = result.detection.sourceType
                 }
             }
+            // Lern-Engine füttert jede Suche als Erfahrung.
+            learningEngine.learn(
+                Experience(
+                    assetId = asset.id,
+                    success = result.found,
+                    rssi = result.detection?.rssi ?: 0,
+                    latitude = result.detection?.latitude,
+                    longitude = result.detection?.longitude,
+                    sourceType = result.detection?.sourceType?.name ?: "UNKNOWN"
+                )
+            )
         }
         return AgentCycleResult(
             assetsChecked = snapshot.size,
@@ -182,6 +238,8 @@ class AgentService @Inject constructor(
         if (!settings.offlineOnly || settings.externalSources) {
             if (asset.externalAllowed || settings.externalSources) {
                 all[DetectionSource.CROWD] = { crowdService.searchAsset(asset) }
+                // Externe REST-APIs (WiGle.net etc.) – nur mit Einwilligung.
+                all[DetectionSource.API] = { apiServiceManager.searchViaWiGle(asset.mac) }
             }
             all[DetectionSource.SATELLITE] = { satelliteService.searchAsset(asset) }
         }
@@ -222,6 +280,138 @@ class AgentService @Inject constructor(
 
     /** Manually trigger a single-asset search (used by the detail screen). */
     suspend fun searchAsset(asset: Asset): SearchResult = comprehensiveSearch(asset)
+
+    // ============ ECHTZEIT-KANÄLE (MQTT / WEBSOCKET) ============
+
+    private suspend fun handleMqttEvent(event: MqttEvent) {
+        when (event) {
+            is MqttEvent.Telemetry -> {
+                val detection = Detection(
+                    assetMac = event.assetMac,
+                    sourceType = DetectionSource.MQTT,
+                    nodeId = "mqtt-broker",
+                    rssi = event.rssi,
+                    latitude = event.latitude,
+                    longitude = event.longitude,
+                    accuracyMeters = 30f,
+                    message = event.payload.take(120),
+                    timestamp = Date()
+                )
+                persist(detection)
+                updateAssetIfKnown(detection)
+            }
+
+            is MqttEvent.Alert -> {
+                database.alertDao().insert(
+                    com.secureguard.enterprise.data.model.Alert(
+                        assetId = event.assetMac,
+                        type = com.secureguard.enterprise.data.model.AlertType.SECURITY,
+                        severity = com.secureguard.enterprise.data.model.AlertSeverity.WARNING,
+                        message = event.message,
+                        timestamp = Date()
+                    )
+                )
+                notificationService.sendAlertNotification(
+                    "MQTT-Alert",
+                    event.message
+                )
+            }
+
+            else -> Unit
+        }
+    }
+
+    private suspend fun handleWebSocketEvent(event: WebSocketEvent) {
+        when (event) {
+            is WebSocketEvent.Telemetry -> {
+                val mac = event.data["mac"] as? String ?: event.data["assetMac"] as? String
+                if (mac != null) {
+                    val detection = Detection(
+                        assetMac = mac.uppercase(),
+                        sourceType = DetectionSource.WEBSOCKET,
+                        nodeId = "fleet-ws",
+                        rssi = (event.data["rssi"] as? Number)?.toInt() ?: 0,
+                        latitude = (event.data["lat"] as? Number)?.toDouble(),
+                        longitude = (event.data["lng"] as? Number)?.toDouble(),
+                        accuracyMeters = 50f,
+                        timestamp = Date()
+                    )
+                    persist(detection)
+                    updateAssetIfKnown(detection)
+                }
+            }
+
+            is WebSocketEvent.Alert -> {
+                val mac = event.data["mac"] as? String ?: event.data["assetMac"] as? String
+                if (mac != null) {
+                    database.alertDao().insert(
+                        com.secureguard.enterprise.data.model.Alert(
+                            assetId = mac.uppercase(),
+                            type = com.secureguard.enterprise.data.model.AlertType.SECURITY,
+                            severity = com.secureguard.enterprise.data.model.AlertSeverity.CRITICAL,
+                            message = event.data["message"] as? String ?: "WebSocket-Alert",
+                            timestamp = Date()
+                        )
+                    )
+                }
+            }
+
+            else -> Unit
+        }
+    }
+
+    /** Aktualisiert den Asset-Status, falls das Asset bekannt (whitelisted) ist. */
+    private suspend fun updateAssetIfKnown(detection: Detection) {
+        val asset = database.assetDao().getByMac(detection.assetMac) ?: return
+        applyDetectionToAsset(asset, detection)
+    }
+
+    // ============ AKTIONEN ============
+
+    /**
+     * Führt eine Aktion über alle verfügbaren Kanäle aus (MQTT, WebSocket,
+     * BLE-GATT). Bei fehlender Verbindung wird die Aktion in die
+     * Offline-Queue eingereiht.
+     */
+    suspend fun sendAction(asset: Asset, action: String): Boolean {
+        auditLogService.log(
+            action = "ACTION",
+            details = "${action} → ${asset.shortName} (${asset.mac})"
+        )
+
+        var delivered = false
+
+        // 1. MQTT
+        mqttService.sendCommand(asset.mac, action)
+        if (mqttService.isConnected) delivered = true
+
+        // 2. WebSocket
+        if (webSocketService.isConfigured) {
+            webSocketService.sendCommand(asset.id, action)
+            delivered = true
+        }
+
+        // 3. BLE/GATT (Telemetrie-Kanal)
+        if (telemetryService.sendCommand(asset.mac, action)) delivered = true
+
+        // 4. Offline-Fallback: Aktion persistieren, wenn nichts zugestellt wurde.
+        if (!delivered) {
+            offlineQueue.enqueue(
+                actionType = action,
+                assetMac = asset.mac,
+                payload = mapOf("assetId" to asset.id, "action" to action)
+            )
+        }
+        return delivered
+    }
+
+    /** Zustellung der Offline-Queue über alle Kanäle. */
+    suspend fun flushOfflineQueue(): Int {
+        return offlineQueue.retryPending { action ->
+            mqttService.sendCommand(action.assetMac, action.actionType)
+            true
+        }
+    }
 
     companion object {
         private const val STALE_MS = 5 * 60 * 1000L // 5 minutes

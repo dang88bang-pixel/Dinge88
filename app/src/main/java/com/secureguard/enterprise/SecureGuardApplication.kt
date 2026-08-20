@@ -1,27 +1,56 @@
 package com.secureguard.enterprise
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.secureguard.enterprise.data.local.SecureGuardDatabase
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
+import com.secureguard.enterprise.worker.SecureAgentWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.Date
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltAndroidApp
-class SecureGuardApplication : Application() {
+class SecureGuardApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var database: SecureGuardDatabase
+    @Inject lateinit var workerFactory: HiltWorkerFactory
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 
     override fun onCreate() {
         super.onCreate()
         seedDemoDataIfEmpty()
+        scheduleAgentWorker()
+    }
+
+    /**
+     * Plant den Hintergrund-Agenten periodisch (15 Minuten). Bestehende
+     * Planung bleibt erhalten (KEEP), damit der WorkManager nicht doppelt
+     * läuft.
+     */
+    private fun scheduleAgentWorker() {
+        val request = PeriodicWorkRequestBuilder<SecureAgentWorker>(15, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "secureguard_agent_worker",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     }
 
     /**

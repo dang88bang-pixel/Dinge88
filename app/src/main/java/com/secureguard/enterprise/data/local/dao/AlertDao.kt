@@ -30,4 +30,7 @@ interface AlertDao {
 
     @Query("DELETE FROM alerts")
     suspend fun clear()
+
+    @Query("DELETE FROM alerts WHERE timestamp < :cutoff")
+    suspend fun deleteOlderThan(cutoff: Long): Int
 }

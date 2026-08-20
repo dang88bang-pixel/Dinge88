@@ -27,6 +27,7 @@ object AppModule {
             SecureGuardDatabase::class.java,
             SecureGuardDatabase.DATABASE_NAME
         )
+            .addMigrations(SecureGuardDatabase.MIGRATION_1_2)
             .fallbackToDestructiveMigration()
             .build()
 

@@ -62,4 +62,17 @@ interface AssetDao {
 
     @Query("SELECT COUNT(*) FROM assets")
     suspend fun count(): Int
+
+    @Query(
+        """
+        SELECT * FROM assets
+        WHERE (:filter IS NULL OR :filter = '' OR
+               shortName LIKE '%' || :filter || '%' OR
+               name LIKE '%' || :filter || '%' OR
+               mac LIKE '%' || :filter || '%')
+        ORDER BY shortName COLLATE NOCASE ASC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    suspend fun getPage(offset: Int, limit: Int, filter: String?): List<Asset>
 }
