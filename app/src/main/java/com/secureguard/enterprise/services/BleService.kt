@@ -102,11 +102,12 @@ class BleService @Inject constructor(
             .setDeviceAddress(asset.mac)
             .build()
 
-        return try {
-            runCatching {
-                scanner.startScan(listOf(filter), SETTINGS, callback)
-            }.onFailure { return null }
+        val started = runCatching {
+            scanner.startScan(listOf(filter), SETTINGS, callback)
+        }.isSuccess
+        if (!started) return null
 
+        return try {
             val scanResult = withTimeoutOrNull(SCAN_DURATION_MS) { resultDeferred.await() }
             runCatching { scanner.stopScan(callback) }
 
