@@ -39,7 +39,9 @@ import androidx.navigation.NavController
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.components.AssetCard
 import com.secureguard.enterprise.presentation.navigation.Routes
+import androidx.compose.material3.ExperimentalMaterial3Api
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssetListScreen(
     navController: NavController,

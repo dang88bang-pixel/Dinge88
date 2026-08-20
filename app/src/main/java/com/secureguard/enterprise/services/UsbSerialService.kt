@@ -2,9 +2,9 @@ package com.secureguard.enterprise.services
 
 import android.content.Context
 import android.hardware.usb.UsbManager
-import com.felhr.usbserial.UsbSerialDriver
-import com.felhr.usbserial.UsbSerialPort
-import com.felhr.usbserial.UsbSerialProber
+import com.hoho.android.usbserial.driver.UsbSerialDriver
+import com.hoho.android.usbserial.driver.UsbSerialPort
+import com.hoho.android.usbserial.driver.UsbSerialProber
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
