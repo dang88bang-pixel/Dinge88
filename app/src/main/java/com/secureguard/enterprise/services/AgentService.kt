@@ -107,7 +107,6 @@ class AgentService @Inject constructor(
 
     /** Runs one complete cycle over all whitelisted assets. */
     suspend fun runCycle(settings: AgentSettings = _agentStatus.value.settings): AgentCycleResult {
-        val assets = database.assetDao().observeWhitelisted()
         // Take a snapshot by using the first emission is awkward inside a suspend fun;
         // query via a one-shot list instead.
         val snapshot = currentWhitelistedAssets()
