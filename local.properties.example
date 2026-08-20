@@ -27,3 +27,8 @@ MQTT_BROKER_URL=
 
 # WebSocket-Fleet-Endpunkt (optional; leer = keine Verbindung)
 WEBSOCKET_URL=
+
+# MCP-Server für temporäre E-Mail-Dienste (OTP-Empfang für Registrierungen).
+# Nur für legitime Zwecke (Testumgebungen, autorisierte API-Key-Generierung).
+# Leer = Feature deaktiviert.
+MCP_SERVER_URL=

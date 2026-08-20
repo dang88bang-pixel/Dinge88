@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.clickable
+import com.secureguard.enterprise.presentation.navigation.Routes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,6 +128,33 @@ fun SettingsScreen(
                                 "deaktiviert und bedürfen ausdrücklicher Zustimmung.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("📡 Erweiterte Werkzeuge",
+                            style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Abfrageknoten (Status, Ratenlimits, Ein/Aus)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.NODE_STATUS) }
+                        )
+                        HorizontalDivider()
+                        Text(
+                            "Temporäre E-Mail (OTP für Registrierungen)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.TEMP_MAIL) }
                         )
                     }
                 }

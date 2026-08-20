@@ -58,7 +58,8 @@ class AgentService @Inject constructor(
     private val webSocketService: WebSocketService,
     private val learningEngine: LearningEngine,
     private val auditLogService: AuditLogService,
-    private val offlineQueue: OfflineQueue
+    private val offlineQueue: OfflineQueue,
+    private val tempMailService: TempMailService
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -411,6 +412,95 @@ class AgentService @Inject constructor(
             mqttService.sendCommand(action.assetMac, action.actionType)
             true
         }
+    }
+
+    // ============ TEMPORÄRE E-MAIL / REGISTRIERUNG ============
+
+    /**
+     * Automatisierte Registrierung mit temporärer E-Mail-Adresse:
+     * Inbox erstellen → (Aufrufer führt die Registrierung durch) →
+     * OTP abrufen. Nur für legitime Zwecke (Testumgebungen, autorisierte
+     * API-Key-Generierung). Ohne konfigurierten MCP-Server → Fehler.
+     */
+    suspend fun autoRegisterExternalService(
+        serviceName: String,
+        registrationUrl: String,
+        registrationData: Map<String, String>
+    ): RegistrationResult {
+        if (!tempMailService.isConfigured) {
+            return RegistrationResult(
+                success = false,
+                error = "Kein MCP-Server konfiguriert (MCP_SERVER_URL)"
+            )
+        }
+        try {
+            auditLogService.log(
+                action = "REGISTER_START",
+                details = "Registrierung bei $serviceName (URL: $registrationUrl)"
+            )
+
+            // 1. Temporäre Inbox erstellen
+            val inbox = tempMailService.createInbox()
+                ?: return RegistrationResult(success = false, error = "Inbox-Erstellung fehlgeschlagen")
+
+            // 2. Registrierung mit der temporären E-Mail durchführen
+            val registerSuccess = performRegistration(
+                serviceName = serviceName,
+                url = registrationUrl,
+                data = registrationData,
+                email = inbox.email
+            )
+            if (!registerSuccess) {
+                tempMailService.clearInbox()
+                return RegistrationResult(
+                    success = false,
+                    error = "Registrierung bei $serviceName fehlgeschlagen",
+                    email = inbox.email
+                )
+            }
+
+            // 3. Auf OTP warten
+            val otpResult = tempMailService.waitForOTP()
+            return if (otpResult?.success == true) {
+                auditLogService.log(
+                    action = "REGISTER_OTP",
+                    details = "OTP für $serviceName empfangen"
+                )
+                RegistrationResult(
+                    success = true,
+                    email = inbox.email,
+                    otp = otpResult.otp,
+                    inboxToken = inbox.token
+                )
+            } else {
+                RegistrationResult(
+                    success = false,
+                    error = "Kein OTP empfangen",
+                    email = inbox.email
+                )
+            }
+        } catch (e: Exception) {
+            auditLogService.log(
+                action = "REGISTER_ERROR",
+                details = "$serviceName: ${e.message}"
+            )
+            return RegistrationResult(
+                success = false,
+                error = e.message ?: "Unbekannter Fehler"
+            )
+        }
+    }
+
+    /** Führt die Registrierung durch (hier als HTTP-POST-Skizze). */
+    private suspend fun performRegistration(
+        serviceName: String,
+        url: String,
+        data: Map<String, String>,
+        email: String
+    ): Boolean {
+        // TODO: echte Registrierung (HTTP-POST mit email im Payload) –
+        // bewusst skizziert, um keine unautorisierten Aufrufe auszulösen.
+        return false
     }
 
     companion object {

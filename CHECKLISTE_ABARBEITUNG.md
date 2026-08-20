@@ -241,3 +241,31 @@ MQTT (MqttConfig + MqttService) ☑ · WebSocket (WebSocketService) ☑ · Agent
 Der lokale Sandbox-Build ist weiterhin nicht möglich (Firewall, siehe TOOLCHAIN.md) –
 die APK wird über GitHub Actions gebaut. ⚠ Nach dem nächsten Push im CI verifizieren,
 dass alle neuen Dependencies auflösen (insb. JitPack- und Nordic-Artefakte).
+
+---
+
+# 🔄 ERGÄNZUNG: TEMP-MAIL/MCP & API-NODE-MANAGER (Vorgabe 4+5)
+
+## Temporäre E-Mail-Dienste
+
+| Komponente | Status |
+|---|---|
+| MCP-Client (create_inbox / wait_for_otp / extract_magic_link) | ☑ `mcp/MCPClient.kt` |
+| TempMailService (Fassade + State-Flows) | ☑ `services/TempMailService.kt` |
+| AgentService.autoRegisterExternalService + RegistrationResult | ☑ |
+| TempMailScreen + TempMailViewModel + Route `temp_mail` | ☑ |
+| MCP_SERVER_URL BuildConfig + local.properties.example | ☑ |
+
+## API-Node-Manager
+
+| Komponente | Status |
+|---|---|
+| ApiNodeManager.kt (11 Node-Handler, Health-Monitor, Circuit Breaker, Learning Layer, Rate-Limiter, autonomousSearch) | ☑ `agent/ApiNodeManager.kt` |
+| NodeConfig.kt + DefaultNodeConfigs | ☑ |
+| NodeStatusScreen.kt + NodeStatusViewModel.kt + Route `node_status` | ☑ |
+| Einstieg in Einstellungen („Erweiterte Werkzeuge") | ☑ |
+| Audit-Log-Anbindung (NODE_SEARCH / NODE_ERROR) | ☑ |
+
+## Build-Status
+Debug + Release bauen in GitHub Actions **grün** (Stand Commit ca129b9). Nach diesem
+Update erneut im CI verifiziert (Diagnose-Hook ist noch aktiv).

@@ -58,6 +58,7 @@ android {
         buildConfigField("String", "HELIUM_API_KEY", "\"${apiKey("HELIUM_API_KEY")}\"")
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
         buildConfigField("String", "WEBSOCKET_URL", "\"${apiKey("WEBSOCKET_URL")}\"")
+        buildConfigField("String", "MCP_SERVER_URL", "\"${apiKey("MCP_SERVER_URL")}\"")
     }
 
     val releaseSigning = signingConfigs.create("release") {

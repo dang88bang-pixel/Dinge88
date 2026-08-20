@@ -167,3 +167,39 @@ Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs
 | `androidx.startup:startup-runtime` / `androidx.multidex` | nicht ergänzt | Nicht benötigt: minSdk 26 hat natives Multidex, und kein Initializer wird verwendet. |
 | API-Keys `Bearer`-Schema WiGle | `Authorization: Bearer <Key>` | WiGle nutzt regulär HTTP-Basic; über den Key kann beides hinterlegt werden (siehe Doku im Client). |
 | DHL/Helium-Endpunkte | Vertrag hinterlegt | Die realen APIs benötigen Zugangsdaten bzw. haben sich geändert; die Interfaces sind über `ApiServiceManager` austauschbar. |
+
+---
+
+# 🔌 Ergänzung: TempMail/MCP-Integration & ApiNodeManager
+
+**Stand:** ergänzt nach Vorgabe „Temporäre E-Mail-Dienste für Agenten" + „API-Node-Manager Agent".
+
+## 10. Temporäre E-Mail (MCP)
+
+| Komponente | Datei | Status | Kommentar |
+|---|---|---|---|
+| MCP-Client (WebSocket/JSON-RPC) | `mcp/MCPClient.kt` | ✅ | Tools `create_inbox`, `wait_for_otp`, `extract_magic_link`; URL via `MCP_SERVER_URL`; ohne Konfiguration → `null` |
+| TempMail-Service (Fassade) | `services/TempMailService.kt` | ✅ | Inbox/OTP/Magic-Link-Workflow, State-Flows, Auto-Logout |
+| Agent-Erweiterung | `services/AgentService.kt` | ✅ | `autoRegisterExternalService()` + `RegistrationResult`; `performRegistration` bewusst skizziert (keine unautorisierten Aufrufe) |
+| UI | `presentation/ui/tempmail/TempMailScreen.kt` + `ViewModel` | ✅ | Inbox anzeigen, OTP abrufen, Log; Route `temp_mail` + Einstieg in Einstellungen |
+| BuildConfig | `MCP_SERVER_URL` | ✅ | |
+
+## 11. ApiNodeManager (autonome Knoten-Verwaltung)
+
+| Komponente | Datei | Status |
+|---|---|---|
+| Kern (11 Node-Handler, Health-Monitor, Circuit Breaker, Learning Layer, Rate-Limiter) | `agent/ApiNodeManager.kt` | ✅ |
+| Standard-Konfigurationen | `agent/NodeConfig.kt` | ✅ |
+| UI (Status, Toggle, Test-Suche) | `presentation/ui/nodes/NodeStatusScreen.kt` + `ViewModel` | ✅ |
+| Navigation | `Routes.NODE_STATUS` + Einstellungen-Einstieg | ✅ |
+
+## 12. ⚠ Anpassungen gegenüber der Vorgabe (bewusst)
+
+| Vorgabe | Umsetzung | Begründung |
+|---|---|---|
+| Direkte API-Injection in `ApiNodeManager` (WiGleApi etc.) | nutzt `ApiServiceManager` | Clients sind dort zentral gekapselt (Retrofit-Instanzen, Keys) |
+| `Detection.isVerified` / `metadata` / `triangulationPoints` | existieren im Datenmodell nicht → in `message` kodiert | Modell bleibt schlank; `message` zeigt Hersteller/OTP/Status |
+| `AuditService` / `AuditActionType` | `AuditLogService.log(action, details)` | bestehende Audit-Implementierung |
+| TempMail REST-Variante (freecustom.email) | nur MCP-Variante | einheitlicher Kanal; REST-Endpunkt wäre fiktiv |
+| `searchViaTempMail` im NodeManager | nutzt `TempMailService` (MCP) | konsistente Fassade |
+| `performRegistration` | Rückgabe `false` (Skizze) | keine unautorisierten Registrierungen aus dem Repo heraus |

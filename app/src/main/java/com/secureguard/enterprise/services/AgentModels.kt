@@ -38,3 +38,15 @@ data class AgentCycleResult(
     val detections: Int = 0,
     val channelHits: Map<String, Int> = emptyMap()
 )
+
+/**
+ * Ergebnis einer automatisierten Registrierung mit temporärer E-Mail
+ * (siehe [com.secureguard.enterprise.services.AgentService.autoRegisterExternalService]).
+ */
+data class RegistrationResult(
+    val success: Boolean,
+    val email: String = "",
+    val otp: String = "",
+    val inboxToken: String = "",
+    val error: String? = null
+)
