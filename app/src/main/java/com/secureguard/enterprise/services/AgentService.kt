@@ -1,5 +1,6 @@
 package com.secureguard.enterprise.services
 
+import com.secureguard.enterprise.ct45p.CT45PLogManager
 import com.secureguard.enterprise.data.local.SecureGuardDatabase
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
@@ -59,7 +60,8 @@ class AgentService @Inject constructor(
     private val learningEngine: LearningEngine,
     private val auditLogService: AuditLogService,
     private val offlineQueue: OfflineQueue,
-    private val tempMailService: TempMailService
+    private val tempMailService: TempMailService,
+    private val ct45pLog: CT45PLogManager
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -160,7 +162,27 @@ class AgentService @Inject constructor(
         val channelHits = mutableMapOf<String, Int>()
 
         for (asset in snapshot) {
+            // CT45P-Anfragenverfolgbarkeit: jede Suche wird on-device protokolliert.
+            val searchStart = System.currentTimeMillis()
+            ct45pLog.logRequest(
+                requestType = "SEARCH_ASSET",
+                endpoint = "/api/search/${asset.mac}",
+                parameters = mapOf("assetId" to asset.id, "name" to asset.shortName)
+            )
             val result = comprehensiveSearch(asset, settings)
+            val searchDurationMs = System.currentTimeMillis() - searchStart
+            ct45pLog.logRequest(
+                requestType = "SEARCH_RESULT",
+                endpoint = "/api/search/${asset.mac}",
+                parameters = mapOf("assetId" to asset.id),
+                response = if (result.found) {
+                    "found=true,source=${result.detection?.sourceType}"
+                } else {
+                    "found=false"
+                },
+                durationMs = searchDurationMs,
+                success = result.found
+            )
             if (result.found && result.detection != null) {
                 hits++
                 val key = result.detection.sourceType.name
@@ -375,11 +397,7 @@ class AgentService @Inject constructor(
      * Offline-Queue eingereiht.
      */
     suspend fun sendAction(asset: Asset, action: String): Boolean {
-        auditLogService.log(
-            action = "ACTION",
-            details = "${action} → ${asset.shortName} (${asset.mac})"
-        )
-
+        val actionStart = System.currentTimeMillis()
         var delivered = false
 
         // 1. MQTT
@@ -403,6 +421,22 @@ class AgentService @Inject constructor(
                 payload = mapOf("assetId" to asset.id, "action" to action)
             )
         }
+
+        // CT45P-Anfragenverfolgbarkeit + Audit-Log (mit Erfolgsstatus).
+        val actionDurationMs = System.currentTimeMillis() - actionStart
+        ct45pLog.logRequest(
+            requestType = "EXECUTE_ACTION",
+            endpoint = "/api/action/$action",
+            parameters = mapOf("assetId" to asset.id, "assetMac" to asset.mac),
+            response = "delivered=$delivered",
+            durationMs = actionDurationMs,
+            success = delivered,
+            error = if (delivered) null else "Kein Kanal erreichbar – in Offline-Queue eingereiht"
+        )
+        auditLogService.log(
+            action = "ACTION",
+            details = "${action} → ${asset.shortName} (${asset.mac}) · success=$delivered"
+        )
         return delivered
     }
 

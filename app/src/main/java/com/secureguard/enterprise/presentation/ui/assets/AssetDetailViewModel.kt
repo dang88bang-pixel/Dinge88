@@ -8,6 +8,8 @@ import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.SearchResult
+import com.secureguard.enterprise.config.CT45PConfig
+import com.secureguard.enterprise.ct45p.CT45PBLEService
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.presentation.ui.common.ActionResult
 import com.secureguard.enterprise.presentation.ui.common.ActionType
@@ -43,7 +45,8 @@ class AssetDetailViewModel @Inject constructor(
     private val urbanService: UrbanService,
     private val crowdService: CrowdService,
     private val satelliteService: SatelliteService,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val ct45pBleService: CT45PBLEService
 ) : ViewModel() {
 
     private val _assetState = MutableStateFlow<Asset?>(null)
@@ -124,7 +127,11 @@ class AssetDetailViewModel @Inject constructor(
 
             val detection = when (channel) {
                 SearchChannel.ALL -> agentService.searchAsset(asset).detection
-                SearchChannel.BLE -> bleService.searchAsset(asset)
+                // Auf dem CT45P läuft der BLE-Scan über den loggenden
+                // Wrapper (on-device Anfragenverfolgbarkeit).
+                SearchChannel.BLE ->
+                    if (CT45PConfig.isCT45P()) ct45pBleService.scanForAsset(asset)
+                    else bleService.searchAsset(asset)
                 SearchChannel.WIFI -> wifiService.searchAsset(asset)
                 SearchChannel.LORA -> loraService.searchAsset(asset)
                 SearchChannel.OPTICAL -> opticalService.searchAsset(asset)

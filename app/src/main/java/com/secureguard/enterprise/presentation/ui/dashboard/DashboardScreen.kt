@@ -50,6 +50,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.ct45p.CT45PStatusBar
 import com.secureguard.enterprise.presentation.components.AssetCard
 import com.secureguard.enterprise.presentation.components.StatCard
 import com.secureguard.enterprise.presentation.navigation.Routes
@@ -115,33 +116,12 @@ fun DashboardScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // CT45P-Statusleiste: Agent-Status, letzte Aktion/Anfrage,
+            // Echtzeit-Log und 24h-Statistik – vollständige Sichtbarkeit.
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(12.dp)
-                                .background(
-                                    color = if (agentRunning) Color(0xFF2E7D32) else Color(0xFFC62828),
-                                    shape = CircleShape
-                                )
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (agentRunning) "AKTIV" else "INAKTIV",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = if (agentRunning) Color(0xFF2E7D32) else Color(0xFFC62828),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Text("📶 ${uiState.onlineAssets}/${uiState.totalAssets}")
-                    Text("🔋 ${uiState.batteryLevel}%")
-                    Text("⏱ ${uiState.lastSyncTime}")
-                }
+                CT45PStatusBar(
+                    onOpenLog = { navController.navigate(Routes.ACTIVITY_HISTORY) }
+                )
             }
 
             item {

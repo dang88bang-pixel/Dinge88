@@ -46,6 +46,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.components.ActionButton
+import com.secureguard.enterprise.presentation.components.TelemetryItem
 import com.secureguard.enterprise.presentation.ui.common.ActionType
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -366,12 +367,4 @@ fun AssetDetailScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TelemetryItem(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-    }
-}
+// TelemetryItem wurde in presentation/components/TelemetryItem.kt extrahiert.
