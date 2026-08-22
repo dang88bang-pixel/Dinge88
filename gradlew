@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# --- CI-Diagnose-Marker (nur in GitHub Actions, ohne Log-Zugriff) ---
+if [ -n "$GITHUB_REPOSITORY" ]; then
+    echo "::notice title=SG-CI-START::gradlew ausgefuehrt (Marker direkt nach Shebang)"
+    echo "::notice title=SG-ENV::TOKEN=$([ -n "$GITHUB_TOKEN" ] && echo set || echo EMPTY) | WS=$([ -n "$GITHUB_WORKSPACE" ] && echo set || echo EMPTY) | STEP_SUMMARY=$([ -n "$GITHUB_STEP_SUMMARY" ] && echo set || echo EMPTY) | JAVA_HOME=${JAVA_HOME:-EMPTY} | REF=${GITHUB_REF:-EMPTY}"
+    echo "::notice title=SG-ENV2::GITHUB-Vars: $(env | grep -o '^GITHUB_[A-Za-z_]*' | sort | tr '\n' ' ')"
+fi
+
+
 #
 # Copyright © 2015-2021 the original authors.
 #
@@ -249,4 +257,68 @@ eval "set -- $(
         tr '\n' ' '
     )" '"$@"'
 
+if [ -n "$GITHUB_REPOSITORY" ]; then
+    echo "::notice title=SG-CI-PRE-EXEC::gradlew erreicht Ende der Wrapper-Logik (vor JVM-Start)"
+fi
+# === CI-Buildlog-Erfassung (nur in GitHub Actions) ===
+# In Actions-Laeufen wird das komplette Build-Log aufgezeichnet; bei einem
+# FEHLER (inkl. JVM-Crash) wird das Log-Ende ohne Rechte/TOKEN lesbar:
+#   1) als Workflow-Annotations (CI-LOG)
+#   2) in die Step-Summary (GITHUB_STEP_SUMMARY)
+#   3) optional nach <Repo>/ci-build-log.txt (nur mit GITHUB_TOKEN)
+if [ -n "$GITHUB_REPOSITORY" ] && [ -n "$GITHUB_WORKSPACE" ]; then
+    CILOG="$GITHUB_WORKSPACE/.ci-build-full.log"
+    "$JAVACMD" "$@" > "$CILOG" 2>&1
+    CI_STATUS=$?
+    cat "$CILOG"
+    if [ "$CI_STATUS" -ne 0 ]; then
+        echo "::warning title=SG-CI-WRAPPER::Build fehlgeschlagen (Exit $CI_STATUS) – Log-Ende folgt als Annotations + Step-Summary"
+
+        # Kanal 1a: DIGEST – wichtige Zeilen aus dem GANZEN Log (Fehler-Meldung)
+        grep -aE "FAILURE:|What went wrong|Caused by|error:|^e: |Exception|Could not (not )?(be )?(resolved?|found|created?|downloaded?|compile)|Script (compilation|evaluation)|Unresolved reference|settings\.gradle|build\.gradle|BUILD FAILED" "$CILOG" | head -n 60 | tr '\n' ' ' | sed 's/::/：：/g' > "/tmp/ci-digest.txt"
+        fold -w 900 "/tmp/ci-digest.txt" > "/tmp/ci-digest-chunks.txt"
+        CI_PART=0
+        while IFS= read -r CI_CHUNK; do
+            CI_PART=$((CI_PART + 1))
+            [ -n "$CI_CHUNK" ] && echo "::warning title=CI-DIGEST-$CI_PART::$CI_CHUNK"
+        done < "/tmp/ci-digest-chunks.txt"
+
+        # Kanal 1b: LOG-ENDE (Stacktrace-Schwanz)
+        tail -n 60 "$CILOG" | tr '\n' ' ' | sed 's/::/：：/g' > "/tmp/ci-log-line.txt"
+        fold -w 900 "/tmp/ci-log-line.txt" > "/tmp/ci-log-chunks.txt"
+        CI_PART=0
+        while IFS= read -r CI_CHUNK; do
+            CI_PART=$((CI_PART + 1))
+            [ -n "$CI_CHUNK" ] && echo "::warning title=CI-LOG-$CI_PART::$CI_CHUNK"
+        done < "/tmp/ci-log-chunks.txt"
+
+        # Kanal 2: Step-Summary (Job-Seite)
+        if [ -n "$GITHUB_STEP_SUMMARY" ]; then
+            {
+                echo "## ❌ CI-Build-Fehler (Exit $CI_STATUS) – letztes Log-Fragment"
+                echo '```'
+                tail -c 20000 "$CILOG"
+                echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        # Kanal 3: Repo-Datei (nur wenn ein Token vorliegt)
+        if [ -n "$GITHUB_TOKEN" ]; then
+            CI_BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+            CI_API="https://api.github.com/repos/$GITHUB_REPOSITORY/contents/ci-build-log.txt"
+            tail -c 150000 "$CILOG" | base64 -w 0 > "/tmp/ci-log-tail.b64"
+            CI_B64=$(cat "/tmp/ci-log-tail.b64")
+            CI_SHA=$(curl -s --max-time 20 -H "Authorization: Bearer $GITHUB_TOKEN" "$CI_API?ref=$CI_BRANCH" | sed -n 's/.*"sha": *"\([0-9a-f]\{40\}\)".*/\1/p' | head -1)
+            if [ -n "$CI_SHA" ]; then
+                CI_SHA_PART=",\"sha\":\"$CI_SHA\""
+            else
+                CI_SHA_PART=""
+            fi
+            CI_BODY=$(printf '{"message":"CI-Buildlog (automatisch, letztes Fragment)","content":"%s","branch":"%s"%s}' "$CI_B64" "$CI_BRANCH" "$CI_SHA_PART")
+            curl -s --max-time 30 -X PUT -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$CI_BODY" "$CI_API" > /dev/null
+        fi
+    fi
+    rm -f "$CILOG"
+    exit "$CI_STATUS"
+fi
 exec "$JAVACMD" "$@"

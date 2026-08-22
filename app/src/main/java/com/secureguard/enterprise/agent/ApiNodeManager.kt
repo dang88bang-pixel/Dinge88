@@ -5,6 +5,7 @@ import com.secureguard.enterprise.data.model.DetectionSource
 import com.secureguard.enterprise.services.ApiServiceManager
 import com.secureguard.enterprise.services.AuditLogService
 import com.secureguard.enterprise.services.MqttService
+import com.secureguard.enterprise.services.SatelliteService
 import com.secureguard.enterprise.services.TempMailService
 import com.secureguard.enterprise.services.WebSocketService
 import kotlinx.coroutines.CoroutineScope
@@ -40,7 +41,8 @@ class ApiNodeManager @Inject constructor(
     private val mqttService: MqttService,
     private val webSocketService: WebSocketService,
     private val tempMailService: TempMailService,
-    private val auditLogService: AuditLogService
+    private val auditLogService: AuditLogService,
+    private val satelliteService: SatelliteService
 ) {
 
     companion object {
@@ -228,10 +230,24 @@ class ApiNodeManager @Inject constructor(
         )
     }
 
+    /**
+     * Mittelpunkt für Knoten mit Standort-Anfrage: der Suchkontext oder –
+     * wenn dort keine Koordinaten vorliegen – die ECHTE GPS-Position des
+     * Geräts. Ohne beide: `null` → der Knoten liefert kein Ergebnis
+     * (statt mit erfundenen Standardkoordinaten zu fragen).
+     */
+    private suspend fun resolveCenter(context: SearchContext): Pair<Double, Double>? {
+        if (context.latitude != null && context.longitude != null) {
+            return context.latitude to context.longitude
+        }
+        return satelliteService.currentLocation()?.let { it.latitude to it.longitude }
+    }
+
     private suspend fun searchViaOpenChargeMap(context: SearchContext): List<Detection> {
+        val center = resolveCenter(context) ?: return emptyList()
         val stations = apiServiceManager.searchViaOpenChargeMap(
-            context.latitude ?: 52.52,
-            context.longitude ?: 13.40
+            center.first,
+            center.second
         )
         return stations.map { s ->
             Detection(
@@ -249,9 +265,10 @@ class ApiNodeManager @Inject constructor(
     }
 
     private suspend fun searchViaDHL(context: SearchContext): List<Detection> {
+        val center = resolveCenter(context) ?: return emptyList()
         val stations = apiServiceManager.searchViaDHL(
-            context.latitude ?: 52.52,
-            context.longitude ?: 13.40
+            center.first,
+            center.second
         )
         return stations.map { s ->
             Detection(
@@ -324,9 +341,10 @@ class ApiNodeManager @Inject constructor(
     }
 
     private suspend fun searchViaHelium(context: SearchContext): List<Detection> {
+        val center = resolveCenter(context) ?: return emptyList()
         val hotspots = apiServiceManager.searchViaHelium(
-            context.latitude ?: 52.52,
-            context.longitude ?: 13.40
+            center.first,
+            center.second
         )
         return hotspots.map { h ->
             Detection(

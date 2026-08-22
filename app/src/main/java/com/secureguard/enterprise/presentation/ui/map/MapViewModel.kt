@@ -41,7 +41,9 @@ class MapViewModel @Inject constructor(
     private val _lastUpdate = MutableStateFlow("--:--")
     val lastUpdate: StateFlow<String> = _lastUpdate.asStateFlow()
 
-    private val _zoom = MutableStateFlow(15.0)
+    // Start-Zoom auf 10 (Region-Ebene); die Karte zentriert sich automatisch
+    // auf die echten Asset-Positionen, sobald Daten vorliegen.
+    private val _zoom = MutableStateFlow(10.0)
     val zoom: StateFlow<Double> = _zoom.asStateFlow()
 
     init { refresh() }

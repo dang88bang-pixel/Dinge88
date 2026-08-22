@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pfade für den FileProvider (Exporte: CT45P-Log, Audit-CSV). -->
+<paths>
+    <external-files-path
+        name="secureguard_exports"
+        path="SecureGuard/Export/" />
+    <cache-path
+        name="cache_exports"
+        path="exports/" />
+</paths>

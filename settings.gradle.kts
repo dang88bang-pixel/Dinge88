@@ -1,3 +1,4 @@
+// Project-wide Gradle settings.
 pluginManagement {
     repositories {
         google()

@@ -1,6 +1,9 @@
 package com.secureguard.enterprise.services
 
 import android.content.Context
+import com.google.gson.JsonArray
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
@@ -8,99 +11,113 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.random.Random
 
 /**
- * Generic LoRa / LoRaWAN service — replaces the former Meshtastic dependency.
+ * LoRa / LoRaWAN-Kanal: fragt echte Sighting-Daten des Pilot-Backends ab
+ * (das Backend aggregiert die LoRaWAN-Gateways – ESP32 aus `firmware/`,
+ * TTN/Helium-Anbindung) und sendet Befehle per echten HTTP-Call, den das
+ * Backend als MQTT-Publish an das Gateway-Topic weiterleitet.
  *
- * No vendor-specific LoRa library is bundled. This class defines the contract
- * ([searchAsset], [sendCommand], [gateways]) and ships with a [DummyLoraClient]
- * so the app is fully functional out of the box. A real backend (Helium,
- * The Things Network, a private gateway fleet, ...) can be plugged in by
- * replacing [loraClient] without touching any other layer.
+ * Ohne erreichbares Backend bzw. ohne Daten → `null`/`false`.
+ * Es werden keine Gateways oder RSSI-Werte simuliert.
  */
 @Singleton
 class LoraService @Inject constructor(
     @ApplicationContext private val context: Context
 ) : DetectionCapable() {
 
-    private val loraClient: LoraClient = DummyLoraClient()
-
-    /** Last known gateways (simulated for the placeholder client). */
+    /** Zuletzt gemeldete Gateways (echte Daten aus dem Backend). */
     @Volatile
     var gateways: List<Gateway> = emptyList()
         private set
 
+    /**
+     * Echte Suche: `GET /api/lora/sightings?mac=<MAC>` gegen das Backend.
+     * Bester Treffer (höchster RSSI) wird als [Detection] emittiert.
+     */
     suspend fun searchAsset(asset: Asset): Detection? {
-        val currentGateways = loraClient.getGateways()
-        gateways = currentGateways
-        for (gw in currentGateways) {
-            if (gw.seenMacs.any { it.equals(asset.mac, ignoreCase = true) }) {
-                val detection = Detection(
-                    assetMac = asset.mac,
-                    sourceType = DetectionSource.LORA,
-                    nodeId = gw.id,
-                    rssi = gw.rssi,
-                    latitude = gw.latitude,
-                    longitude = gw.longitude,
-                    accuracyMeters = 25f,
-                    timestamp = Date()
-                )
-                emit(detection)
-                return detection
-            }
+        val element = BackendHttp.getJson("/api/lora/sightings", mapOf("mac" to asset.mac))
+        val sightings = parseSightings(element)
+        gateways = sightings.map { s ->
+            Gateway(
+                id = s.nodeId,
+                rssi = s.rssi,
+                latitude = s.latitude,
+                longitude = s.longitude
+            )
         }
-        return null
+        val best = sightings.maxByOrNull { it.rssi } ?: return null
+        return Detection(
+            assetMac = asset.mac,
+            sourceType = DetectionSource.LORA,
+            nodeId = best.nodeId,
+            rssi = best.rssi,
+            latitude = best.latitude,
+            longitude = best.longitude,
+            accuracyMeters = rssiToAccuracyMeters(best.rssi),
+            timestamp = Date()
+        ).also { emit(it) }
     }
 
     /**
-     * Sends a command to an asset reachable via LoRa. The placeholder client
-     * simulates a successful delivery when at least one gateway is in range.
+     * Sendet einen Befehl an ein via LoRa erreichbares Asset:
+     * `POST /api/lora/command` (echtes MQTT-Publish im Backend).
      */
-    suspend fun sendCommand(mac: String, command: String): Boolean {
-        val inRange = loraClient.getGateways().any { gw ->
-            gw.seenMacs.any { it.equals(mac, ignoreCase = true) }
-        }
-        return inRange || Random.nextFloat() > 0.5f
-    }
+    suspend fun sendCommand(mac: String, command: String): Boolean =
+        BackendHttp.postJson(
+            "/api/lora/command",
+            JsonObject().apply {
+                addProperty("mac", mac)
+                addProperty("command", command)
+            }
+        )
 
     suspend fun refreshGateways(): List<Gateway> {
-        gateways = loraClient.getGateways()
+        val element = BackendHttp.getJson("/api/lora/sightings", emptyMap())
+        gateways = parseSightings(element).map {
+            Gateway(id = it.nodeId, rssi = it.rssi, latitude = it.latitude, longitude = it.longitude)
+        }
         return gateways
+    }
+
+    private fun parseSightings(element: JsonElement?): List<Sighting> {
+        val array: JsonArray? = when {
+            element is JsonArray -> element
+            element is JsonObject -> element.getAsJsonArray("sightings")
+            else -> null
+        } ?: return emptyList()
+        return array.mapNotNull { item ->
+            val obj = item.asJsonObject ?: return@mapNotNull null
+            Sighting(
+                nodeId = obj.get("node_id")?.asString ?: "lora-gateway",
+                rssi = obj.get("rssi")?.takeIf { it.isNumber }?.asInt ?: 0,
+                latitude = obj.get("latitude")?.takeIf { it.isNumber }?.asDouble,
+                longitude = obj.get("longitude")?.takeIf { it.isNumber }?.asDouble
+            )
+        }
+    }
+
+    private fun rssiToAccuracyMeters(rssi: Int): Float = when {
+        rssi > -60 -> 15f
+        rssi > -75 -> 40f
+        rssi > -90 -> 100f
+        else -> 250f
     }
 }
 
-/** A LoRa gateway that recently reported sightings. */
+/** Echter Gateway-Treffer aus dem Backend. */
 data class Gateway(
     val id: String,
     val rssi: Int,
-    val latitude: Double,
-    val longitude: Double,
-    val seenMacs: List<String>
+    val latitude: Double?,
+    val longitude: Double?,
+    val seenMacs: List<String> = emptyList()
 )
 
-/** Contract for a pluggable LoRa / LoRaWAN backend. */
-interface LoraClient {
-    suspend fun getGateways(): List<Gateway>
-}
-
-/**
- * Placeholder client used until a real LoRaWAN network server is integrated.
- * It fabricates a handful of gateways around Berlin so the UI and the agent
- * have data to work with.
- */
-internal class DummyLoraClient : LoraClient {
-
-    private val pool = listOf(
-        Gateway("gw-berlin-mitte", -48, 52.5200, 13.4050, listOf("AA:BB:CC:DD:EE:01")),
-        Gateway("gw-kreuzberg", -62, 52.4980, 13.4040, listOf("AA:BB:CC:DD:EE:02")),
-        Gateway("gw-prenzlauer-berg", -75, 52.5380, 13.4200, listOf("AA:BB:CC:DD:EE:03")),
-        Gateway("gw-alexanderplatz", -55, 52.5219, 13.4132, listOf("AA:BB:CC:DD:EE:04"))
-    )
-
-    override suspend fun getGateways(): List<Gateway> {
-        // Simulate network jitter.
-        return pool.filter { Random.nextFloat() > 0.25f }
-            .map { it.copy(rssi = it.rssi + Random.nextInt(-6, 6)) }
-    }
-}
+/** Interne Sichtungs-Zeile (Parsing). */
+private data class Sighting(
+    val nodeId: String,
+    val rssi: Int,
+    val latitude: Double?,
+    val longitude: Double?
+)

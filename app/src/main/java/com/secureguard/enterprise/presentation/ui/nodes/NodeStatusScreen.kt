@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.secureguard.enterprise.agent.NodeStatus
+import com.secureguard.enterprise.presentation.components.NodeStatusItem
 
 /**
  * Übersicht aller API-Abfrageknoten mit Status, Ratenlimit und
@@ -103,47 +104,4 @@ fun NodeStatusScreen(
     }
 }
 
-@Composable
-fun NodeStatusItem(
-    nodeId: String,
-    status: NodeStatus,
-    enabled: Boolean,
-    onToggle: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .background(
-                            when (status) {
-                                NodeStatus.ONLINE -> Color(0xFF4CAF50)
-                                NodeStatus.OFFLINE -> Color(0xFFF44336)
-                                NodeStatus.ERROR -> Color(0xFFFFC107)
-                                NodeStatus.RATE_LIMITED -> Color(0xFFFF9800)
-                                NodeStatus.UNKNOWN -> Color.Gray
-                            },
-                            CircleShape
-                        )
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(nodeId, style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        status.name,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Switch(checked = enabled, onCheckedChange = { onToggle() })
-        }
-    }
-}
+// NodeStatusItem wurde in presentation/components/NodeStatusItem.kt extrahiert.

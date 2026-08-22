@@ -27,6 +27,7 @@ import com.secureguard.enterprise.presentation.ui.assets.AssetDetailScreen
 import com.secureguard.enterprise.presentation.ui.assets.AssetListScreen
 import com.secureguard.enterprise.presentation.ui.assets.ScanQrScreen
 import com.secureguard.enterprise.presentation.ui.dashboard.DashboardScreen
+import com.secureguard.enterprise.presentation.ui.history.ActivityHistoryScreen
 import com.secureguard.enterprise.presentation.ui.map.MapScreen
 import com.secureguard.enterprise.presentation.ui.nodes.NodeStatusScreen
 import com.secureguard.enterprise.presentation.ui.settings.SettingsScreen
@@ -107,6 +108,9 @@ fun SecureGuardApp() {
             }
             composable(Routes.TEMP_MAIL) {
                 TempMailScreen(navController = navController)
+            }
+            composable(Routes.ACTIVITY_HISTORY) {
+                ActivityHistoryScreen(navController = navController)
             }
             composable(
                 route = Routes.ASSET_DETAIL,

@@ -156,6 +156,15 @@ fun SettingsScreen(
                                 .padding(vertical = 6.dp)
                                 .clickable { navController.navigate(Routes.TEMP_MAIL) }
                         )
+                        HorizontalDivider()
+                        Text(
+                            "📋 Aktivitätsverlauf (Audit-Log + CT45P-Log)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.ACTIVITY_HISTORY) }
+                        )
                     }
                 }
             }

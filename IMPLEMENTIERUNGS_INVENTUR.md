@@ -241,3 +241,52 @@ Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs
 Android-11-spezifische Regeln (Klartext, Scoped Storage, Hintergrund) sind
 berücksichtigt. Der 2D-Imager des CT45P arbeitet als HID-Keyboard; der
 ZXing-Kamera-Scan bleibt zusätzlich nutzbar.
+
+---
+
+# 🔍 Ergänzung: Mock-/Platzhalter-Audit (2026-08-22, Vorgabe „Keine Mocks/Template")
+
+**Prüfung:** Volltextsuche nach `TODO`, `Mock/Fake/Dummy/Placeholder/Simulat/Demo`,
+`Random` in Services, hardcodierten Koordinaten (`52.52`/`13.40`) und
+hardcodierten MAC-Adressen (`AA:BB:CC`) in `app/` und `backend/`.
+
+## Entfernte Simulationen → echte Implementierungen
+
+| Datei | Vorher (verboten) | Jetzt (echt) |
+|-------|-------------------|--------------|
+| `services/BleService.kt` | Fallback mit `Random`-RSSI + hardcodierten Berlin-Koordinaten, wenn kein Scan-Treffer | NUR echter `BluetoothLeScanner`-Scan; Treffer-Koordinaten = echte GPS-Position des Geräts (`SatelliteService`); sonst `null` |
+| `services/WifiService.kt` | Durchgehend simulierter Channel (`Random`-RSSI) | Echter WLAN-Scan: `wifiManager.startScan()` + `scanResults` + BSSID-Vergleich mit Asset-MAC; Koordinaten aus echter GPS; sonst `null` (Plattform-Limitierung Android 12+ dokumentiert) |
+| `services/LoraService.kt` | `DummyLoraClient` mit 4 hardcodierten Gateways + hardcodierten MACs + `Random`-Jitter | Echter HTTP-Call `GET /api/lora/sightings?mac=` + `POST /api/lora/command` gegen das Pilot-Backend (das publiziert MQTT an die Gateways); ohne Daten → `null`/`false` |
+| `services/OpticalService.kt` | Simulierte Sichte (`Random`, Berlin ± 200 m) | Echter HTTP-Call `GET /api/optical/detections?mac=` (YOLO-Server-Daten via Backend); neueste echte Erkennung; sonst `null` |
+| `services/CrowdService.kt` | Simulierte Crowd-Positionen (`Random`) | Echter HTTP-Call `GET /api/crowd/locate?mac=`, **nur** bei `externalAllowed` (DSGVO); sonst `null` |
+| `services/UrbanService.kt` | 4 hardcodierte „urban nodes" + `Random`-Treffer | Echter HTTP-Call `GET /api/urban/detections?mac=` (Backend aggregiert die realen APIs WiGle/OCM/DHL/CKAN); beste echte Sichtung; sonst `null` |
+| `services/SatelliteService.kt` | Fallback mit `Random`-Koordinaten bei GPS-Ausfall | NUR echte `FusedLocationProviderClient`-Position; ohne Fix → `null` |
+| `services/TelemetryService.kt` | Vollständig simuliertes GATT (`Random`-Batterie/Km), simulierte Zustellung | Echter MQTT-Channel: `TELEMETRY_READ` publizieren → echte Antwort auf `secureguard/<MAC>/telemetry` (Timeout 3 s); laufende Broker-Events werden gemerkt; Befehle per echtem MQTT-Publish; ohne Broker/Antwort → `null`/`false` |
+| `services/AgentService.kt` | `performRegistration` = TODO, `return false` | Echter HTTP-POST (OkHttp, JSON-Payload mit Temp-Mail) an die übergebene Registrierungs-URL; `true` bei HTTP-2xx |
+| `agent/ApiNodeManager.kt` | Fallback-Koordinaten `52.52/13.40` (OCM/DHL/Helium) | `resolveCenter()`: Suchkontext oder ECHTE GPS-Position des Geräts; ohne beide → Knoten liefert leer (kein fiktiver Mittelpunkt) |
+| `presentation/ui/nodes/NodeStatusViewModel.kt` | Test-Suche mit hardcodierter MAC + Berlin-Koordinaten | Test-Suche mit **erstem echtem Whitelist-Asset** + echter GPS-Position; ohne Asset: keine Abfrage |
+| `SecureGuardApplication.kt` | `seedDemoDataIfEmpty()` mit 5 Demo-Assets (hardcodierte MACs/Koordinaten) | **Entfernt** – Assets entstehen ausschließlich über Add-Asset/QR-Scan |
+| `presentation/ui/map/MapScreen.kt` / `MapViewModel.kt` | Initiale Karte auf `52.52/13.40` (Zoom 15) | Neutraler Initial-Anblick (Mitteldeutschland, Zoom 6/10 – reine Ansicht, kein Daten-Claim), sofortige automatische Zentrierung auf echte Asset-Positionen |
+| `backend/main.py` | `await asyncio.sleep(2)` („Simulierte Verarbeitungszeit") | Entfernt; **neue echte Endpunkte** `GET /api/lora/sightings`, `POST /api/lora/command`, `GET /api/optical/detections`, `GET /api/crowd/locate`, `GET /api/urban/detections` (lesen die reale `detections`-Tabelle; Command publiziert echt per MQTT) |
+
+## Neue Dateien / Konfiguration
+
+- `services/BackendUrl.kt` – Basis-URL des Pilot-Backends (`BACKEND_URL` aus gradle.properties/local.properties; Default `http://10.0.2.2:8000` für Emulator/Docker-Compose, wie bei `MqttConfig`)
+- `services/BackendHttp.kt` – gemeinsamer echter OkHttp-Client (GET/POST JSON, Timeouts, Fehler → `null`/`false`, `Log.w` statt Simulation)
+- `app/build.gradle.kts` – `buildConfigField("String", "BACKEND_URL", …)`; `local.properties.example` dokumentiert `BACKEND_URL=`
+
+## Erlaubt geblieben (keine Verletzung der Vorgabe)
+
+- `AssetListScreen`: `placeholder = { Text("🔍 Asset suchen...") }` – UI-Such-Hinweis, keine Demo-Daten
+- `ExportService`: `isFakeBoldText` – PDF-Paint-Flag (Fake-Bold-Rendering), kein Mock
+- `CkanOpenDataApi`: `https://demo.ckan.org/` – echte öffentliche CKAN-Demo-Instanz (reale API-Antworten, ohne Key)
+- `MqttConfig`: Default-Broker `tcp://10.0.2.2:1883` – lokale Standard-Verbindung (Emulator-Host), konfigurationsgetrieben wie zuvor
+- ESP32-Firmware (`firmware/`): enthält noch vereinfachte Telemetrie-Werte (z. B. `battery: 85`) – Hardware-Aufgabe außerhalb des Android-Builds; der MQTT-Channel selbst ist echt
+- `MapScreen`: Initial-Zentrierung 48.5/10.0 Zoom 6 = **Ansichts-Default** (keine Detektion); wird sofort auf echte Positionen umgezoomt
+
+## Ergebnis
+
+Kein `// TODO`, keine `Random`-Simulationen, keine hardcodierten Detektions-Koordinaten
+oder -MACs, keine Demo-Daten-Seed, keine Mock-/Dummy-Klassen. Jeder Suchkanal liefert
+entweder echte Daten (Hardware-Scan, GPS, MQTT, HTTP gegen reale Endpunkte) oder
+`null` – die UI zeigt dann „nicht gefunden" statt erfundener Positionen.

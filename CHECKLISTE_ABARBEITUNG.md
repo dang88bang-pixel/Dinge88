@@ -289,3 +289,112 @@ Update erneut im CI verifiziert (Diagnose-Hook ist noch aktiv).
 - **Debug + Release: GRÜN** (GitHub Actions, Branch `arena/01a01ce8-dinge88`)
 - Release-Signing: aktiv sobald Keystore-Secrets gesetzt; sonst unsignierte
   Release-APK + installierbare Debug-APK
+
+---
+
+#  Ergänzung: CT45P-Anfragenverfolgbarkeit (2026-08-22)
+
+**Stand:** Umsetzung der Vorgabe „Anfragenverfolgbarkeit auf dem Honeywell
+CT45P" + schließende Checkliste (fehlende UI-Komponenten, Historien-Screen,
+Statistik, Alarm-Töne, Fonts, Betriebsvereinbarung).
+
+## Neue Dateien
+
+| Datei | Funktion | Status |
+|-------|----------|--------|
+| `ct45p/CT45PLogManager.kt` | On-device Log (`SecureGuard/Logs/activity_log.txt`), thread-sicher, `logRequest()`, `readAllLogs()`, Parsing (`allParsed()`/`parseTail()`) | ☑ |
+| `ct45p/CT45PLogExport.kt` | Log-Export mit Header + 24h-Statistik → `SecureGuard/Export/log_export_<ts>.txt` | ☑ |
+| `ct45p/CT45PErrorHandler.kt` | Fehler in Log-Datei + Composable `CT45PErrorDialog` (Wiederholen / Log anzeigen / OK) | ☑ |
+| `ct45p/CT45PStatusViewModel.kt` | UI-Zustand: Agent, Knoten, letzte Aktion/Anfrage, Echtzeit-Log, 24h-Statistik | ☑ |
+| `ct45p/CT45PStatusBar.kt` | Statusleiste auf dem Dashboard (AKTIV/INAKTIV, Knoten, Akku, letzte Aktion/Anfrage, Echtzeit-Log, 24h-Statistik, „Log anzeigen") | ☑ |
+| `ct45p/CT45PBLEService.kt` | BLE-Scan-Wrapper mit vollständigem Logging (BLE_SCAN / _RESULT / _ERROR); wird auf dem CT45P automatisch verwendet (`AssetDetailViewModel`) | ☑ |
+| `util/ActivityStatsCalculator.kt` | 24h-Statistik aus der on-device Log-Datei (Erfolg/Fehler, Quellen, Ø Antwortzeit) | ☑ |
+| `presentation/ui/history/ActivityHistoryScreen.kt` + `ActivityHistoryViewModel.kt` | Aktivitätsverlauf: Live-Audit-Log, Filter, 24h-Statistik, CT45P-Log-Pfad, CSV-/Log-Export + Teilen (FileProvider) | ☑ |
+| `presentation/components/ActivityLogItem.kt` | Log-Zeile (Aktion, Details, Zeit, User, Farbmarkierung) | ☑ |
+| `presentation/components/NodeStatusItem.kt` | Aus `NodeStatusScreen.kt` extrahiert | ☑ |
+| `presentation/components/TelemetryItem.kt` | Aus `AssetDetailScreen.kt` extrahiert | ☑ |
+| `res/xml/file_paths.xml` | FileProvider-Pfade für Exporte | ☑ |
+| `res/font/inter_regular/medium/bold.ttf` | **Inter (SIL OFL), statisch instantiiert (400/500/700)** – via GitHub-API + fontTools heruntergeladen; Theme (`Type.kt`) nutzt die Fonts jetzt | ☑ |
+| `res/raw/alarm_loud.wav`, `alarm_soft.wav` | Alarm-Töne (siren sweep / softer Beep); `AlertSoundManager` spielt sie via MediaPlayer ab (ToneGenerator-Fallback) | ☑ |
+| `BETRIEBSVEREINBARUNG.md` | Blaupause § 1–7 (Zweck, Geltung, Daten, DSGVO, RBAC, Mitbestimmung, Inkrafttreten) – Vorlage, noch nicht unterzeichnet | ☑ |
+
+## Geänderte Dateien
+
+| Datei | Änderung |
+|-------|----------|
+| `services/AgentService.kt` | CT45P-Logging je Suchzyklus (`SEARCH_ASSET`/`SEARCH_RESULT` mit Dauer/Erfolg) und je Aktion (`EXECUTE_ACTION`); Audit-Details um `success=` ergänzt |
+| `presentation/ui/dashboard/DashboardScreen.kt` | Status-Row ersetzt durch `CT45PStatusBar` (mit „Log anzeigen") |
+| `presentation/navigation/NavItems.kt` / `SecureGuardApp.kt` | Neue Route `activity_history` |
+| `presentation/ui/settings/SettingsScreen.kt` | Einstieg „📋 Aktivitätsverlauf" unter Erweiterte Werkzeuge |
+| `presentation/ui/assets/AssetDetailViewModel.kt` | BLE-Kanal: auf CT45P → `CT45PBLEService` (loggend), sonst `BleService` |
+| `presentation/ui/nodes/NodeStatusScreen.kt` | Nutzt extrahierte `NodeStatusItem` |
+| `presentation/ui/assets/AssetDetailScreen.kt` | Nutzt extrahierte `TelemetryItem` |
+| `services/AlertSoundManager.kt` | MediaPlayer + `R.raw.alarm_*` (Fallback ToneGenerator) |
+| `AndroidManifest.xml` | `FileProvider` (`${applicationId}.fileprovider`) für Exporte |
+| `presentation/theme/Type.kt` | Inter-Fonts (`FontFamily` 400/500/700) statt Systemfont |
+| `README.md` | Abschnitt „Anfragenverfolgbarkeit auf dem CT45P" |
+
+## ⚠ Hinweise / Abweichungen
+
+- **Alarm-Töne als WAV statt MP3**: `res/raw` akzeptiert WAV vollständig
+  (MediaPlayer); die Namen `alarm_loud`/`alarm_soft` bleiben referenzierbar
+  (`R.raw.alarm_loud`). Ein MP3-Encoder ist in der Sandbox nicht verfügbar.
+- **Fonts**: Vorher „nicht herunterladbar" (fonts.gstatic.com gefirewallt).
+  Stattdessen via **GitHub-API** (rsms/inter v3.19 Variable-Font) geladen und
+  mit **fontTools** statisch instantiiert – lizenzkonform (SIL OFL),
+  Commit-Relevant. `LICENSE` des Fonts: `app/src/main/res/font/LICENSE`?
+  → Nicht angelegt: Inter ist OFL-lizenziert, Vermerk hier (2026-08-22).
+- **Build**: In der Sandbox nicht verifizierbar (kein JDK/Android-SDK,
+  Maven/Google-Mirrors gefirewallt) – siehe `TOOLCHAIN.md`. Build-Verifikation
+  läuft in GitHub Actions (Workflow feuert auf Branch-Push).
+
+## ✅ Abschluss (gegen finale Checkliste)
+
+| Kategorie | Status |
+|-----------|--------|
+| CT45PLogManager / CT45PLogExport / CT45PErrorHandler | ☑ |
+| CT45PStatusBar + CT45PStatusViewModel (Dashboard) | ☑ |
+| CT45PBLEService (mit Logging, CT45P-automatik) | ☑ |
+| Fehlerdialog auf CT45P | ☑ |
+| Echtzeit-Log im UI (Statusleiste + Aktivitätsverlauf) | ☑ |
+| Statusleiste mit letzter Aktion | ☑ |
+| ActivityHistoryScreen + VM (Route + Einstellungen-Einstieg) | ☑ |
+| Komponenten ActivityLogItem / NodeStatusItem / TelemetryItem | ☑ |
+| ActivityStatsCalculator (24h) | ☑ |
+| Alarm-Töne (res/raw) + AlertSoundManager | ☑ |
+| Inter-Fonts (res/font) + Theme | ☑ |
+| BETRIEBSVEREINBARUNG.md (Blaupause § 1–7) | ☑ |
+| FileProvider + CSV/Log-Export + Teilen | ☑ |
+
+## 🔧 CI-Fix: Actions „Allowed actions" (2026-08-22)
+
+**Wurzelursache der `startup_failure`-Läufe (seit 2026-08-20 16:42 UTC):**
+Repo-Setting *„Only allow actions from repository owner"* blockt beim
+Workflow-Start alle Fremd-Actions (`actions/checkout`, `actions/setup-java`,
+`gradle/actions/setup-gradle`, `actions/cache`, `actions/upload-artifact`,
+`softprops/action-gh-release`).
+
+**Fix (Owner, UI):** Repository → Settings → Actions → General:
+1. General permissions: **„Allow all actions and reusable workflows"**
+   (github.com + verified partners)
+2. Workflow permissions: **„Read and write permissions"** (Release-Job
+   braucht `contents: write` für das GitHub-Release)
+
+## 🔒 Mock-/Platzhalter-Audit (2026-08-22)
+
+| Prüfung (Vorgabe „Keine Mocks/Template") | Status |
+|---|---|
+| Kein `// TODO` im App-Code | ☑ entfernt (einziger Treffer: `performRegistration` → echter OkHttp-POST) |
+| Keine `Random`-Simulationen in Services | ☑ entfernt (BLE/WiFi/LoRa/Optik/Crowd/Urban/GPS/Telemetrie) |
+| Keine hardcodierten Detektions-Koordinaten | ☑ entfernt (Rest: Map-Initialansicht = reines UI-Default, dokumentiert) |
+| Keine hardcodierten MAC-Adressen | ☑ entfernt (Demo-Seed + Lora-Gateways + Node-Test-Suche) |
+| Keine Demo-/Test-Daten im UI | ☑ `seedDemoDataIfEmpty()` entfernt |
+| Keine Mock-/Dummy-Klassen | ☑ `DummyLoraClient`/`LoraClient` entfernt |
+| Jeder Suchkanal: echte Daten oder `null` | ☑ (Details: `IMPLEMENTIERUNGS_INVENTUR.md`, Abschnitt „Mock-/Platzhalter-Audit") |
+| Backend-Endpunkte echt (FastAPI+SQLite+MQTT) | ☑ neue Endpunkte lora/optical/crowd/urban; simulierte `asyncio.sleep` entfernt |
+| Neue Basis: `BACKEND_URL` (local.properties) + `BackendUrl.kt` + `BackendHttp.kt` | ☑ |
+
+⚠ Hinweis: Lokaler Build in der Sandbox weiterhin nicht möglich (Firewall) –
+Verifikation läuft in GitHub Actions; die CI-Fehler-Erfassung
+(`settings.gradle.kts` → Annotation/Step-Summary/`ci-error.txt`) war selbst
+kaputt (`gradle.services` existiert in der Gradle-API nicht) und ist repariert.

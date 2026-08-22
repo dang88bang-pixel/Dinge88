@@ -17,22 +17,26 @@ import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.random.Random
 
 /**
- * Active + passive Bluetooth Low Energy scanning. For an explicit asset search
- * a short (2 s) filtered scan is run; a real hit for the asset's MAC is
- * preferred. If BLE is unavailable or nothing is seen, a simulated result is
- * returned so the demo / agent pipeline stays functional.
+ * Bluetooth Low Energy -Scan (aktiver, gefilterter Scan über die
+ * Plattform-API [android.bluetooth.le.BluetoothLeScanner]).
+ *
+ * Ein Treffer liegt vor, wenn die Adresse des Scannenden Geräts mit der
+ * MAC des Assets übereinstimmt. Die Koordinaten des Treffers sind die
+ * echte GPS-Position des CT45P-Geräts zum Zeitpunkt des Treffers
+ * ([SatelliteService]); ohne GPS-Fix bleiben die Koordinaten `null`.
+ * Ohne Bluetooth, ohne Berechtigung oder ohne echten Scan-Treffer → `null`
+ * (es werden keine simulierten BLE-Ergebnisse erzeugt).
  */
 @Singleton
 class BleService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val satelliteService: SatelliteService
 ) : DetectionCapable() {
 
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
@@ -52,25 +56,8 @@ class BleService @Inject constructor(
 
     @SuppressLint("MissingPermission")
     suspend fun searchAsset(asset: Asset): Detection? {
-        val hit = if (hasScanPermission() && bluetoothAdapter != null) {
-            runHardwareScan(asset)
-        } else null
-
-        if (hit != null) return hit
-
-        // Fallback / demo result.
-        delay(150)
-        val rssi = -35 - Random.nextInt(0, 45)
-        return Detection(
-            assetMac = asset.mac,
-            sourceType = DetectionSource.BLE,
-            nodeId = "ble-sim",
-            rssi = rssi,
-            latitude = asset.latitude ?: 52.5200,
-            longitude = asset.longitude ?: 13.4050,
-            accuracyMeters = 5f,
-            timestamp = Date()
-        ).also { emit(it) }
+        if (!hasScanPermission() || bluetoothAdapter == null) return null
+        return runHardwareScan(asset)
     }
 
     @SuppressLint("MissingPermission")
@@ -112,14 +99,16 @@ class BleService @Inject constructor(
             runCatching { scanner.stopScan(callback) }
 
             scanResult?.let {
+                // Echte GPS-Position des Geräts zum Zeitpunkt des Treffers.
+                val location = satelliteService.currentLocation()
                 Detection(
                     assetMac = asset.mac,
                     sourceType = DetectionSource.BLE,
                     nodeId = "ble-${it.device?.address}",
                     rssi = it.rssi,
-                    latitude = asset.latitude,
-                    longitude = asset.longitude,
-                    accuracyMeters = 5f,
+                    latitude = location?.latitude,
+                    longitude = location?.longitude,
+                    accuracyMeters = location?.accuracy?.coerceAtLeast(1f) ?: 5f,
                     timestamp = Date()
                 ).also { d -> emit(d) }
             }

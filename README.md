@@ -134,6 +134,32 @@ Das Gerät läuft mit `targetSdk 35`, ohne dass Android-11-spezifische
 Einschränkungen greifen (Klartext-Netzwerk, Scoped Storage, Hintergrund-
 Dienste sind berücksichtigt).
 
+### 📋 Anfragenverfolgbarkeit auf dem CT45P
+
+Jede Anfrage und Aktion wird **lokal auf dem Gerät** protokolliert und im UI
+sichtbar gemacht – vollständige Transparenz für den Bediener:
+
+| Information | Wo sichtbar? |
+|-------------|--------------|
+| Zeitstempel, Anfragetyp, Endpoint, Parameter | Log-Datei, Aktivitätsverlauf |
+| Antwort (gekürzt), Dauer, Erfolg/Fehler, Fehlermeldung | Log-Datei, Statusleiste |
+| Letzte Aktion / letzte Anfrage (Echtzeit) | Dashboard-Statusleiste (`CT45PStatusBar`) |
+| 24h-Statistik (erfolgreich/fehlgeschlagen, Quellen, Ø Zeit) | Statusleiste, Aktivitätsverlauf, Log-Export |
+
+- **Log-Datei (on-device):**
+  `/storage/emulated/0/Android/data/com.secureguard.enterprise/files/SecureGuard/Logs/activity_log.txt`
+  (in jedem Dateimanager einsehbar, geschrieben von `ct45p/CT45PLogManager.kt`)
+- **Log-Export mit Statistik:** `SecureGuard/Export/log_export_<ts>.txt`
+  (`ct45p/CT45PLogExport.kt`), erreichbar über den Screen **Aktivitätsverlauf**
+  (Einstellungen → Erweiterte Werkzeuge) – inkl. CSV-Export des Audit-Logs.
+- **BLE-Scan auf dem CT45P** läuft über den loggenden Wrapper
+  `ct45p/CT45PBLEService.kt` (Start/Ergebnis/Fehler werden je Scan protokolliert);
+  der Agent protokolliert zusätzlich jeden Suchzyklus (`SEARCH_ASSET` /
+  `SEARCH_RESULT`) und jede Aktion (`EXECUTE_ACTION`).
+- **Fehlerdialog** (`ct45p/CT45PErrorHandler.kt` + `CT45PErrorDialog`):
+  Ursache, Zeit, Fehlercode, Zielgerät und Aktionen (Wiederholen /
+  Log anzeigen / OK) – der Fehler landet zusätzlich in der Log-Datei.
+
 ## 📲 Installation auf dem CT45P
 
 1. **Debug-APK** aus GitHub Actions laden: Workflow „🛡️ Build SecureGuard APK" →
