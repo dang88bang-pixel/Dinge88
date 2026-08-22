@@ -4,6 +4,7 @@ import android.content.Context
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import java.util.Date
@@ -20,10 +21,21 @@ import kotlin.random.Random
  */
 @Singleton
 class OpticalService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val settingsRepository: SettingsRepository,
+    private val remote: RemoteDetectionFetcher
 ) : DetectionCapable() {
 
     suspend fun searchAsset(asset: Asset): Detection? {
+        val remoteHit = remote.fetch(
+            settingsRepository.current.opticalEndpoint,
+            asset,
+            DetectionSource.OPTICAL
+        )
+        if (remoteHit != null) {
+            emit(remoteHit)
+            return remoteHit
+        }
         delay(300)
         // Optical matches are intentionally less reliable than BLE/LoRa.
         if (Random.nextFloat() > 0.55f) return null

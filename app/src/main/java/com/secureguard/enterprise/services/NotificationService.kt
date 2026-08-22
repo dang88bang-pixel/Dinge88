@@ -1,15 +1,19 @@
 package com.secureguard.enterprise.services
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.secureguard.enterprise.MainActivity
 import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.Asset
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,7 +25,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class NotificationService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val settingsRepository: SettingsRepository
 ) {
     private val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -64,6 +69,7 @@ class NotificationService @Inject constructor(
 
     /** Benachrichtigung nach einem abgeschlossenen Worker-Zyklus. */
     fun sendAgentCycleNotification(content: String) {
+        if (!canNotify()) return
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
@@ -115,7 +121,19 @@ class NotificationService @Inject constructor(
             .build()
     }
 
+    private fun canNotify(): Boolean {
+        if (!settingsRepository.current.notificationsEnabled) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+        return true
+    }
+
     private fun notify(id: Int, title: String, body: String, channel: String) {
+        if (!canNotify()) return
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }

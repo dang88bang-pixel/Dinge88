@@ -73,7 +73,7 @@ fun AgentConfigScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { StatusCard(uiState) }
+            item { StatusCard(uiState, onToggle = { viewModel.toggleAgent() }) }
             item { DurationCard(uiState, viewModel) }
             item { IntervalCard(uiState, viewModel) }
             item { PriorityCard(uiState, viewModel) }
@@ -91,7 +91,7 @@ fun AgentConfigScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StatusCard(uiState: AgentUiState) {
+private fun StatusCard(uiState: AgentUiState, onToggle: () -> Unit) {
     val running = uiState.agentRunning
     val color = if (running) Color(0xFF2E7D32) else Color(0xFFC62828)
     Card(
@@ -115,12 +115,19 @@ private fun StatusCard(uiState: AgentUiState) {
                 Text("⏱ Laufzeit: ${uiState.runtime}", style = MaterialTheme.typography.bodySmall)
             }
             Spacer(Modifier.height(8.dp))
-            Text("📊 Gesamtdauer: ${uiState.progress.toInt()}%",
-                style = MaterialTheme.typography.bodySmall)
+            Text(
+                if (uiState.duration == "unlimited") "📊 Gesamtdauer: unbegrenzt"
+                else "📊 Gesamtdauer: ${uiState.progress.toInt()}%",
+                style = MaterialTheme.typography.bodySmall
+            )
             LinearProgressIndicator(
                 progress = { uiState.progress / 100f },
                 modifier = Modifier.fillMaxWidth()
             )
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = onToggle, modifier = Modifier.fillMaxWidth()) {
+                Text(if (running) "⏹ Agent stoppen" else "▶ Agent starten")
+            }
         }
     }
 }

@@ -181,4 +181,40 @@ class AssetDetailViewModel @Inject constructor(
     fun clearActionResult() {
         _actionResult.value = null
     }
+
+    fun setStatus(status: AssetStatus) {
+        viewModelScope.launch {
+            val asset = _assetState.value ?: return@launch
+            repository.updateAssetStatus(
+                mac = asset.mac,
+                status = status,
+                timestamp = System.currentTimeMillis(),
+                rssi = asset.rssi,
+                lat = asset.latitude,
+                lon = asset.longitude
+            )
+            _assetState.value = repository.resolveAsset(asset.id)
+        }
+    }
+
+    fun toggleExternalAllowed() {
+        viewModelScope.launch {
+            val asset = _assetState.value ?: return@launch
+            repository.upsertAsset(
+                asset.copy(
+                    externalAllowed = !asset.externalAllowed,
+                    updatedAt = java.util.Date()
+                )
+            )
+            _assetState.value = repository.resolveAsset(asset.id)
+        }
+    }
+
+    fun deleteAsset(onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            val asset = _assetState.value ?: return@launch
+            repository.deleteAsset(asset.id)
+            onDeleted()
+        }
+    }
 }

@@ -26,6 +26,9 @@ fun requiredPermissions(): Array<String> {
         perms += Manifest.permission.BLUETOOTH_SCAN
         perms += Manifest.permission.BLUETOOTH_CONNECT
     }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        perms += Manifest.permission.NEARBY_WIFI_DEVICES
+    }
     return perms.toTypedArray()
 }
 
