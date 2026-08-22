@@ -134,6 +134,19 @@ Das Gerät läuft mit `targetSdk 35`, ohne dass Android-11-spezifische
 Einschränkungen greifen (Klartext-Netzwerk, Scoped Storage, Hintergrund-
 Dienste sind berücksichtigt).
 
+## 📦 APK von GitHub
+
+Jeder Push auf `main`/`arena/**` und jeder Pull Request baut automatisch:
+
+| Artefakt | Inhalt |
+|----------|--------|
+| **secureguard-pro-debug** | Debug-signierte APK, direkt installierbar |
+| **secureguard-pro** | Release-APK (signiert, sobald Keystore-Secrets gesetzt sind) |
+
+Pfad: Repository → **Actions** → Workflow *Build SecureGuard APK* → gewünschter Lauf → *Artifacts*.
+
+Die Benutzeroberfläche ist vollständig ausführbar: 5 Tabs (Dashboard, Assets, Karte, Aktionen, Einstellungen), Asset-Detail mit Karte/Menü/Suche, Agent-Start/Stop, PIN, Berechtigungen und optionale Backend-URLs.
+
 ## 📲 Installation auf dem CT45P
 
 1. **Debug-APK** aus GitHub Actions laden: Workflow „🛡️ Build SecureGuard APK" →

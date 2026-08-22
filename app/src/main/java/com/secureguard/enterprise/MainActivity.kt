@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import com.secureguard.enterprise.presentation.navigation.SecureGuardApp
 import com.secureguard.enterprise.presentation.theme.SecureGuardTheme
 import com.secureguard.enterprise.presentation.ui.auth.LockScreen
@@ -20,12 +21,14 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var authManager: AuthManager
     @Inject lateinit var nfcService: NfcService
+    @Inject lateinit var settingsRepository: SettingsRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            SecureGuardTheme {
+            val settings by settingsRepository.state.collectAsState()
+            SecureGuardTheme(darkTheme = settings.darkMode) {
                 val authState by authManager.state.collectAsState()
                 if (authState.enabled && authState.locked) {
                     LockScreen(

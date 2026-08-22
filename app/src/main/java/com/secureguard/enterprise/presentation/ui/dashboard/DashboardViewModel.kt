@@ -1,19 +1,22 @@
 package com.secureguard.enterprise.presentation.ui.dashboard
 
+import android.content.Context
+import android.os.BatteryManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -27,17 +30,19 @@ data class DashboardUiState(
     val activeSearches: Int = 0,
     val alertCount: Int = 0,
     val agentRunning: Boolean = false,
-    val batteryLevel: Int = 87,
+    val batteryLevel: Int = 0,
     val lastSyncTime: String = "--:--"
 )
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: SecureGuardRepository,
-    private val agentService: AgentService
+    private val agentService: AgentService,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
-    private val battery = MutableStateFlow(87)
+    private val battery = MutableStateFlow(readBattery())
     private val lastSync = MutableStateFlow("--:--")
 
     val uiState: StateFlow<DashboardUiState> = combine(
@@ -61,7 +66,7 @@ class DashboardViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = DashboardUiState()
+        initialValue = DashboardUiState(batteryLevel = readBattery())
     )
 
     val assets = repository.getWhitelistedAssets()
@@ -76,6 +81,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun refresh() {
+        battery.value = readBattery()
         lastSync.value = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
     }
 
@@ -88,15 +94,22 @@ class DashboardViewModel @Inject constructor(
     }
 
     private fun startAgent() {
+        val s = settingsRepository.current
         agentService.start(
             AgentSettings(
-                interval = 30,
-                dynamicPriority = true,
-                learningMode = true,
-                offlineOnly = true,
-                externalSources = false
+                interval = s.agentIntervalSec.coerceAtLeast(5),
+                dynamicPriority = s.dynamicPriority,
+                learningMode = s.learningMode,
+                offlineOnly = s.offlineOnly,
+                externalSources = s.externalCrowdAllowed && s.consentGiven
             )
         )
         refresh()
+    }
+
+    private fun readBattery(): Int {
+        val manager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+        val level = manager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+        return level.coerceIn(0, 100)
     }
 }

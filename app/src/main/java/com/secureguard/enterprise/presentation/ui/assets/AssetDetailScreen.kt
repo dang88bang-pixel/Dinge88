@@ -23,30 +23,44 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.components.ActionButton
 import com.secureguard.enterprise.presentation.ui.common.ActionType
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 import java.text.SimpleDateFormat
 import java.util.Locale
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,6 +78,8 @@ fun AssetDetailScreen(
     val searchResult by viewModel.searchResult.collectAsState()
     val actionResult by viewModel.actionResult.collectAsState()
     val telemetry by viewModel.telemetry.collectAsState()
+    var menuOpen by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(assetId) { viewModel.loadAsset(assetId) }
 
@@ -80,8 +96,30 @@ fun AssetDetailScreen(
                     IconButton(onClick = { viewModel.refreshTelemetry() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Aktualisieren")
                     }
-                    IconButton(onClick = { /* Menü */ }) {
+                    IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "Menü")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Status: Online") },
+                            onClick = { menuOpen = false; viewModel.setStatus(AssetStatus.ONLINE) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Status: Offline") },
+                            onClick = { menuOpen = false; viewModel.setStatus(AssetStatus.OFFLINE) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Status: Wartung") },
+                            onClick = { menuOpen = false; viewModel.setStatus(AssetStatus.MAINTENANCE) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Externe Suche umschalten") },
+                            onClick = { menuOpen = false; viewModel.toggleExternalAllowed() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Asset löschen") },
+                            onClick = { menuOpen = false; confirmDelete = true }
+                        )
                     }
                 }
             )
@@ -165,24 +203,46 @@ fun AssetDetailScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(150.dp)
+                            .height(180.dp)
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (current.latitude != null && current.longitude != null) {
+                            val context = LocalContext.current
+                            val lat = current.latitude!!
+                            val lon = current.longitude!!
+                            val mapView = remember(current.id) {
+                                MapView(context).apply {
+                                    setTileSource(TileSourceFactory.MAPNIK)
+                                    setMultiTouchControls(true)
+                                    setBuiltInZoomControls(false)
+                                    controller.setZoom(16.0)
+                                    controller.setCenter(GeoPoint(lat, lon))
+                                }
+                            }
+                            DisposableEffect(current.id) {
+                                mapView.onResume()
+                                onDispose { mapView.onPause() }
+                            }
+                            AndroidView(
+                                factory = { mapView },
+                                update = { view ->
+                                    view.overlays.clear()
+                                    val marker = Marker(view).apply {
+                                        position = GeoPoint(lat, lon)
+                                        title = current.shortName
+                                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    }
+                                    view.overlays.add(marker)
+                                    view.controller.setCenter(GeoPoint(lat, lon))
+                                    view.invalidate()
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(
-                                    "🗺️ Karten-Position",
+                                    "Keine Position bekannt",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                if (current.latitude != null && current.longitude != null) {
-                                    Text(
-                                        "📍 ${"%.4f".format(current.latitude)}, ${"%.4f".format(current.longitude)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
                             }
                         }
                     }
@@ -363,6 +423,23 @@ fun AssetDetailScreen(
                 }
             }
         }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Asset löschen?") },
+            text = { Text("„${asset?.shortName ?: assetId}“ wird unwiderruflich entfernt.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    viewModel.deleteAsset { navController.navigateUp() }
+                }) { Text("Löschen") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("Abbrechen") }
+            }
+        )
     }
 }
 

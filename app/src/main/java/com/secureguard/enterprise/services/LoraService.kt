@@ -4,6 +4,7 @@ import android.content.Context
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Date
 import javax.inject.Inject
@@ -21,7 +22,9 @@ import kotlin.random.Random
  */
 @Singleton
 class LoraService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val settingsRepository: SettingsRepository,
+    private val remote: RemoteDetectionFetcher
 ) : DetectionCapable() {
 
     private val loraClient: LoraClient = DummyLoraClient()
@@ -32,6 +35,15 @@ class LoraService @Inject constructor(
         private set
 
     suspend fun searchAsset(asset: Asset): Detection? {
+        val remoteHit = remote.fetch(
+            settingsRepository.current.loraEndpoint,
+            asset,
+            DetectionSource.LORA
+        )
+        if (remoteHit != null) {
+            emit(remoteHit)
+            return remoteHit
+        }
         val currentGateways = loraClient.getGateways()
         gateways = currentGateways
         for (gw in currentGateways) {

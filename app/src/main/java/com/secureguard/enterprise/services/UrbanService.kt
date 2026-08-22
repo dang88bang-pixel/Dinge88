@@ -4,6 +4,7 @@ import android.content.Context
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import java.util.Date
@@ -17,7 +18,9 @@ import kotlin.random.Random
  */
 @Singleton
 class UrbanService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val settingsRepository: SettingsRepository,
+    private val remote: RemoteDetectionFetcher
 ) : DetectionCapable() {
 
     private val nodes = listOf(
@@ -28,6 +31,15 @@ class UrbanService @Inject constructor(
     )
 
     suspend fun searchAsset(asset: Asset): Detection? {
+        val remoteHit = remote.fetch(
+            settingsRepository.current.urbanEndpoint,
+            asset,
+            DetectionSource.URBAN
+        )
+        if (remoteHit != null) {
+            emit(remoteHit)
+            return remoteHit
+        }
         delay(250)
         if (Random.nextFloat() > 0.45f) return null
         val node = nodes.random()

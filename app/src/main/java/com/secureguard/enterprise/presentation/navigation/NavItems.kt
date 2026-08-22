@@ -18,7 +18,7 @@ sealed class NavItem(val route: String, val label: String, val icon: ImageVector
     data object Settings : NavItem("settings", "Einstellungen", Icons.Default.Settings)
 
     companion object {
-        val bottomNavItems = listOf(Dashboard, Assets, Map, Actions)
+        val bottomNavItems = listOf(Dashboard, Assets, Map, Actions, Settings)
     }
 }
 

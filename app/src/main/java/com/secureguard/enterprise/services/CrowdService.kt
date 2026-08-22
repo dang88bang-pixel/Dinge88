@@ -4,6 +4,7 @@ import android.content.Context
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import java.util.Date
@@ -21,11 +22,22 @@ import kotlin.random.Random
  */
 @Singleton
 class CrowdService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val settingsRepository: SettingsRepository,
+    private val remote: RemoteDetectionFetcher
 ) : DetectionCapable() {
 
     suspend fun searchAsset(asset: Asset): Detection? {
         if (!asset.externalAllowed) return null
+        val remoteHit = remote.fetch(
+            settingsRepository.current.crowdEndpoint,
+            asset,
+            DetectionSource.CROWD
+        )
+        if (remoteHit != null) {
+            emit(remoteHit)
+            return remoteHit
+        }
         delay(400)
         if (Random.nextFloat() > 0.5f) return null
         return Detection(

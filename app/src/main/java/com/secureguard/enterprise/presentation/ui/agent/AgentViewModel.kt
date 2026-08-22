@@ -2,6 +2,7 @@ package com.secureguard.enterprise.presentation.ui.agent
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.secureguard.enterprise.data.repository.SettingsRepository
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -9,12 +10,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.abs
 
 data class AgentUiState(
     val agentRunning: Boolean = false,
@@ -31,14 +29,19 @@ data class AgentUiState(
 
 @HiltViewModel
 class AgentViewModel @Inject constructor(
-    private val agentService: AgentService
+    private val agentService: AgentService,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
+    private val saved = settingsRepository.current
     private val config = MutableStateFlow(
         AgentUiState(
-            interval = agentService.agentStatus.value.settings.interval,
-            dynamicPriority = agentService.agentStatus.value.settings.dynamicPriority,
-            learningMode = agentService.agentStatus.value.settings.learningMode
+            interval = saved.agentIntervalSec,
+            customInterval = saved.agentIntervalSec,
+            duration = saved.agentDuration,
+            customDays = saved.agentCustomDays,
+            dynamicPriority = saved.dynamicPriority,
+            learningMode = saved.learningMode
         )
     )
 
@@ -49,7 +52,7 @@ class AgentViewModel @Inject constructor(
         cfg.copy(
             agentRunning = status.running,
             runtime = formatUptime(status.uptimeMillis),
-            progress = if (status.running) 85f else 0f
+            progress = computeProgress(status.uptimeMillis, cfg.duration, cfg.customDays)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AgentUiState())
 
@@ -77,14 +80,39 @@ class AgentViewModel @Inject constructor(
 
     fun saveSettings() {
         val state = config.value
+        settingsRepository.update {
+            it.copy(
+                agentIntervalSec = state.interval.coerceAtLeast(5),
+                agentDuration = state.duration,
+                agentCustomDays = state.customDays,
+                dynamicPriority = state.dynamicPriority,
+                learningMode = state.learningMode
+            )
+        }
+        val persisted = settingsRepository.current
         val settings = AgentSettings(
-            interval = state.interval.coerceAtLeast(5),
-            dynamicPriority = state.dynamicPriority,
-            learningMode = state.learningMode,
-            offlineOnly = true,
-            externalSources = false
+            interval = persisted.agentIntervalSec.coerceAtLeast(5),
+            dynamicPriority = persisted.dynamicPriority,
+            learningMode = persisted.learningMode,
+            offlineOnly = persisted.offlineOnly,
+            externalSources = persisted.externalCrowdAllowed && persisted.consentGiven
         )
         agentService.start(settings)
+    }
+
+    private fun computeProgress(uptimeMs: Long, duration: String, customDays: Int): Float {
+        val total = durationMillis(duration, customDays) ?: return 0f
+        if (total <= 0L || uptimeMs <= 0L) return 0f
+        return ((uptimeMs.toDouble() / total) * 100.0).toFloat().coerceIn(0f, 100f)
+    }
+
+    private fun durationMillis(duration: String, customDays: Int): Long? = when (duration) {
+        "1h" -> 3_600_000L
+        "6h" -> 21_600_000L
+        "24h" -> 86_400_000L
+        "1w" -> 604_800_000L
+        "custom" -> customDays.coerceAtLeast(1) * 86_400_000L
+        else -> null
     }
 
     private fun formatUptime(ms: Long): String {

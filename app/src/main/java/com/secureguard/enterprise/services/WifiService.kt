@@ -30,9 +30,26 @@ class WifiService @Inject constructor(
         ContextCompat.getSystemService(context, WifiManager::class.java)
     }
 
+    @Suppress("DEPRECATION", "MissingPermission")
     suspend fun searchAsset(asset: Asset): Detection? {
         if (hasLocationPermission()) {
-            runCatching { wifiManager?.scanResults }
+            val hit = runCatching {
+                wifiManager?.scanResults?.firstOrNull { result ->
+                    result.BSSID.equals(asset.mac, ignoreCase = true)
+                }
+            }.getOrNull()
+            if (hit != null) {
+                return Detection(
+                    assetMac = asset.mac,
+                    sourceType = DetectionSource.WIFI,
+                    nodeId = hit.SSID.ifBlank { "wifi-ap" },
+                    rssi = hit.level,
+                    latitude = asset.latitude,
+                    longitude = asset.longitude,
+                    accuracyMeters = 15f,
+                    timestamp = Date()
+                ).also { emit(it) }
+            }
         }
         delay(180)
         val rssi = -50 - Random.nextInt(0, 30)
