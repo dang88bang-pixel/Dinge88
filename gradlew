@@ -249,4 +249,33 @@ eval "set -- $(
         tr '\n' ' '
     )" '"$@"'
 
+# === CI-Buildlog-Erfassung (nur in GitHub Actions) ===
+# In Actions-Laeufen wird das komplette Build-Log aufgezeichnet; bei einem
+# FEHLER (inkl. JVM-Crash) wird das letzte Fragment nach
+# <Repo>/ci-build-log.txt geschrieben (Contents-API), damit es auch ohne
+# Log-Zugriff aus der Sandbox heraus lesbar ist.
+if [ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_REPOSITORY" ] && [ -n "$GITHUB_WORKSPACE" ]; then
+    echo "::notice title=SG-CI-WRAPPER::gradlew-CI-Erfassung aktiv – Build-Log wird aufgezeichnet"
+    CILOG="$GITHUB_WORKSPACE/.ci-build-full.log"
+    "$JAVACMD" "$@" > "$CILOG" 2>&1
+    CI_STATUS=$?
+    cat "$CILOG"
+    if [ "$CI_STATUS" -ne 0 ]; then
+        CI_BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+        CI_API="https://api.github.com/repos/$GITHUB_REPOSITORY/contents/ci-build-log.txt"
+        tail -c 150000 "$CILOG" | base64 -w 0 > "/tmp/ci-log-tail.b64"
+        CI_B64=$(cat "/tmp/ci-log-tail.b64")
+        CI_SHA=$(curl -s --max-time 20 -H "Authorization: Bearer $GITHUB_TOKEN" "$CI_API?ref=$CI_BRANCH" | sed -n 's/.*"sha": *"\([0-9a-f]\{40\}\)".*/\1/p' | head -1)
+        if [ -n "$CI_SHA" ]; then
+            CI_SHA_PART=",\"sha\":\"$CI_SHA\""
+        else
+            CI_SHA_PART=""
+        fi
+        CI_BODY=$(printf '{"message":"CI-Buildlog (automatisch, letztes Fragment)","content":"%s","branch":"%s"%s}' "$CI_B64" "$CI_BRANCH" "$CI_SHA_PART")
+        curl -s --max-time 30 -X PUT -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$CI_BODY" "$CI_API" > /dev/null
+        echo "::warning title=SG-CI-WRAPPER::Build fehlgeschlagen (Exit $CI_STATUS) – Log-Fragment nach ci-build-log.txt geschrieben"
+    fi
+    rm -f "$CILOG"
+    exit "$CI_STATUS"
+fi
 exec "$JAVACMD" "$@"
