@@ -1,15 +1,34 @@
-name: Build SecureGuard APK
+name: 🛡️ Build SecureGuard APK
 
 on:
   push:
-    branches: [main, develop, 'arena/**']
-    tags: ['v*']
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
   pull_request:
+    branches: [ main, develop ]
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Zu bauender APK-Typ'
+        type: choice
+        required: false
+        default: 'all'
+        options:
+          - all
+          - debug
+          - release
 
+# Nur der neueste Lauf pro Branch/Ref wird ausgeführt; überholte werden abgebrochen.
 concurrency:
-  group: apk-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '17'
+  COMPILE_SDK: 'android-34'
+  BUILD_TOOLS: '34.0.0'
+  GRADLE_CACHE_FOLDER: ~/.gradle/caches
+  GRADLE_WRAPPER_FOLDER: ~/.gradle/wrapper
 
 jobs:
   build:
@@ -28,33 +47,67 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup JDK 17
+      - name: Setup JDK
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '17'
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android 35 platform
-        run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
-          yes | sdkmanager --licenses >/dev/null || true
-
+      # Gradle Wrapper validieren + Dependency-/Wrapper-Cache (großer Speedup).
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
-      - name: Decode release keystore
+      # Install the Android SDK cmdline-tools + required packages (einmalig,
+      # danach über actions/cache wiederverwendet).
+      - name: Install Android SDK
+        run: |
+          ANDROID_ROOT="${ANDROID_HOME:-$HOME/android-sdk}"
+          mkdir -p "$ANDROID_ROOT/cmdline-tools"
+          echo "ANDROID_HOME=$ANDROID_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_ROOT" >> "$GITHUB_ENV"
+          if [ ! -x "$ANDROID_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+            CMDLINE_VERSION=$(curl -s https://dl.google.com/android/repository/repository2-1.xml | \
+              grep -oP 'commandlinetools-linux-\K[0-9]+' | sort -V | tail -1)
+            if [ -z "$CMDLINE_VERSION" ]; then CMDLINE_VERSION=11076708; fi
+            curl -fSL -o /tmp/cmdline.zip \
+              "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_VERSION}_latest.zip"
+            unzip -q -o /tmp/cmdline.zip -d "$ANDROID_ROOT/cmdline-tools"
+            mv "$ANDROID_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_ROOT/cmdline-tools/latest"
+          fi
+          yes | "$ANDROID_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;${{ env.COMPILE_SDK }}" "build-tools;${{ env.BUILD_TOOLS }}" "platform-tools"
+
+      # Android-SDK-Komponenten zwischen Läufen cachen (erspart Download/Unzip).
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ANDROID_HOME }}
+          key: android-sdk-${{ env.COMPILE_SDK }}-${{ env.BUILD_TOOLS }}
+
+      # Release-Keystore aus Secret dekodieren (nur für Release-Builds).
+      - name: Decode Keystore
         if: matrix.task == 'assembleRelease'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > secureguard-keystore.jks
-            echo "Keystore written ($(wc -c < secureguard-keystore.jks) bytes)."
+            echo "$KEYSTORE_BASE64" | base64 -d > app/secureguard-keystore.jks
+            echo "Keystore written (size: $(wc -c < app/secureguard-keystore.jks) bytes)."
           else
-            echo "::warning::KEYSTORE_BASE64 fehlt – Release-APK wird debug-signiert oder unsigniert."
+            echo "::warning::KEYSTORE_BASE64 is not set - APK wird UNSIGNIERT gebaut."
+          fi
+
+      # Signing-Konfiguration nur dann anwenden, wenn der Keystore existiert.
+      - name: Prepare signing config
+        if: matrix.task == 'assembleRelease'
+        run: |
+          if [ -f "app/secureguard-keystore.jks" ]; then
+            echo "SG_HAS_KEYSTORE=true" >> "$GITHUB_ENV"
+          else
+            echo "SG_HAS_KEYSTORE=false" >> "$GITHUB_ENV"
           fi
 
       - name: Make Gradle wrapper executable
@@ -67,11 +120,12 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew ${{ matrix.task }} --no-daemon --stacktrace
 
-      - name: Collect APK artifacts
+      # APK benennen + Prüfsumme berechnen.
+      - name: Prepare APK artifacts
         run: |
           mkdir -p apk-out
-          find app/build/outputs/apk -name '*.apk' -exec cp {} apk-out/ \;
-          test -n "$(ls -A apk-out/*.apk 2>/dev/null)"
+          cp app/build/outputs/apk/release/*.apk apk-out/ 2>/dev/null || true
+          cp app/build/outputs/apk/debug/*.apk apk-out/ 2>/dev/null || true
           cd apk-out
           sha256sum *.apk > SHA256SUMS.txt
           ls -la
@@ -114,17 +168,29 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "SecureGuard Pro ${{ github.ref_name }}"
+          name: "🛡️ SecureGuard Pro ${{ github.ref_name }}"
           body: |
-            ## SecureGuard Enterprise
+            ## 🛡️ SecureGuard Enterprise
 
-            Installierbare APK mit vollständiger Benutzeroberfläche
-            (Dashboard, Assets, Karte, Aktionen, Einstellungen).
+            ### ✅ Funktionen
+            - 📡 LoRa/LoRaWAN
+            - 🧠 Selbstlernender Agent
+            - 🗺️ OpenStreetMap-Karte
+            - 🎮 Fernsteuerung (Alarm, Motor, Batterie)
+            - 👁️ Optische Erkennung
+            - 🌍 Apple/Google Crowdsourcing (nur mit Einwilligung)
+            - 🏙️ Urbane Infrastruktur
+            - 📡 GPS/GLONASS/Galileo
+            - 🔒 DSGVO-konform
 
-            - Debug-APK: Artefakt `secureguard-pro-debug` (dieser Workflow)
-            - Release-APK: `secureguard-pro` (signiert, wenn Keystore-Secrets gesetzt)
+            ### 📦 Download
+            - **APK**: `secureguard-pro.apk`
 
-            Prüfsummen: `SHA256SUMS.txt`
+            ### 🔑 Signatur
+            - APK **signiert**, wenn die Keystore-Secrets gesetzt sind.
+            - Sonst wird eine **unsignierte** APK erzeugt (`app-release-unsigned.apk`).
+
+            > 🔐 Prüfsummen siehe `SHA256SUMS.txt` im Release.
           files: |
             ./apk/*.apk
             ./apk/SHA256SUMS.txt
