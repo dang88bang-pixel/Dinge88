@@ -257,7 +257,7 @@ if [ -n "${GITHUB_ACTIONS:-}" ]; then
     CI_STATUS=$?
     cat "$CILOG"
     if [ "$CI_STATUS" -ne 0 ]; then
-        grep -aE "FAILURE:|What went wrong|Caused by:|^e: |BUILD FAILED|Could not |Unresolved reference|SDK location|Failed to find target|OutOfMemory" "$CILOG" \
+        grep -aE "FAILURE:|What went wrong|Caused by:|^e: |BUILD FAILED|Could not |Unresolved reference|SDK location|Failed to find target|OutOfMemory|AAR metadata|compileSdk|requires Android" "$CILOG" \
             | head -n 40 | sed 's/::/：：/g' > /tmp/ci-digest.txt || true
         CI_PART=0
         while IFS= read -r CI_LINE; do
