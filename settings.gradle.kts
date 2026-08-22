@@ -22,39 +22,47 @@ include(":app")
 // =============================================================================
 // CI-Fehler-Erfassung (aktiv NUR in GitHub Actions)
 // =============================================================================
-// Die Sandbox kann die Actions-Run-Logs nicht abrufen (Firewall). Daher
-// schreibt der Build bei einem Fehler die Diagnose (Exception-Kette)
-// in drei Kanäle:
+// Die Sandbox kann die Actions-Run-Logs nicht abrufen (Firewall). Deshalb
+// schreibt der Build bei einem Fehler die Diagnose in öffentliche Kanäle:
 //   0) Workflow-Annotation (serverseitig auf der Run-Seite lesbar)
 //   1) Step-Summary (Job-Seite)
 //   2) ci-error.txt auf dem Branch (braucht contents:write)
-// Liegt in settings.gradle.kts, damit auch Fehler der Projekt-Build-Scripts
-// erfasst werden. Lokal (ohne GITHUB_TOKEN) bleibt der Hook wirkungslos.
+// Zusätzlich: Sofort-Marker-Annotations (SG-SETTINGS / SG-SHUTDOWN) zur
+// Diagnose, ob das settings-Skript bzw. die JVM überhaupt laufen.
 //
-// ACHTUNG: Nur stabile Gradle-8.9-Öffentliche-API verwenden
-// (BuildResult.getFailure() liefert seit 8.x direkt ein Throwable;
-// es gibt KEINE gradle.services-Methode).
+// ACHTUNG: Nur stabile Gradle-8.9-öffentliche API verwenden:
+//  - BuildResult.getFailure() liefert seit 8.x direkt ein Throwable
+//  - es gibt KEINE gradle.services-Methode
 // =============================================================================
 try {
     if (System.getenv("GITHUB_TOKEN") != null && System.getenv("GITHUB_REPOSITORY") != null) {
-        gradle.buildFinished { result ->
+        try {
+            println("::notice title=SG-CI-HOOK::settings.gradle.kts ausgeführt – Fehler-Hook wird registriert")
+        } catch (_: Throwable) {
+        }
+
+        // JVM-Shutdown-Hook: feuert bei jeder (sauberen) Beendigung der
+        // Gradle-JVM – Marker, dass die JVM lief (nicht bei SIGKILL).
+        try {
+            Runtime.getRuntime().addShutdownHook(object : Thread({
+                try {
+                    println("::warning title=SG-SHUTDOWN::Gradle-JVM-Beendigung (Shutdown-Hook feuerte)")
+                } catch (_: Throwable) {
+                }
+            }))
+        } catch (_: Throwable) {
+        }
+
+        val captureError: (Throwable, String) -> Unit = { failure, branch ->
             try {
-                val failure = result.failure
-                if (failure == null) return@buildFinished
-                val token = System.getenv("GITHUB_TOKEN") ?: return@buildFinished
-                val repo = System.getenv("GITHUB_REPOSITORY") ?: return@buildFinished
-                // WICHTIG: Bei pull_request-Events ist GITHUB_REF = refs/pull/N/merge;
-                // der echte Branch kommt aus GITHUB_HEAD_REF.
-                val branch = System.getenv("GITHUB_HEAD_REF")
-                    ?: System.getenv("GITHUB_REF")
-                        ?.removePrefix("refs/heads/")
-                        ?.removePrefix("refs/tags/")
-                    ?: return@buildFinished
+                val token = System.getenv("GITHUB_TOKEN") ?: return@captureError
+                val repo = System.getenv("GITHUB_REPOSITORY") ?: return@captureError
 
                 val sb = StringBuilder()
                 sb.appendLine("CI-Fehler-Erfassung (automatisch, Arena-Session)")
                 sb.appendLine("GITHUB_RUN_ID=${System.getenv("GITHUB_RUN_ID") ?: "?"}")
                 sb.appendLine("GITHUB_REF=${System.getenv("GITHUB_REF") ?: "?"}")
+                sb.appendLine("BRANCH=$branch")
                 sb.appendLine()
                 var e: Throwable? = failure
                 var depth = 0
@@ -66,7 +74,7 @@ try {
                 }
                 val text = sb.toString().take(120_000)
 
-                // KANAL 0: Workflow-Annotation (serverseitig lesbar)
+                // KANAL 0: Workflow-Annotation
                 try {
                     val compact = text
                         .lines()
@@ -78,7 +86,7 @@ try {
                 } catch (_: Throwable) {
                 }
 
-                // KANAL 1: Step-Summary (Job-Seite, keine Rechte nötig)
+                // KANAL 1: Step-Summary
                 System.getenv("GITHUB_STEP_SUMMARY")?.let { summaryPath ->
                     try {
                         java.io.File(summaryPath).appendText(
@@ -89,7 +97,7 @@ try {
                     }
                 }
 
-                // KANAL 2: Repo-Datei ci-error.txt (braucht contents:write)
+                // KANAL 2: Repo-Datei ci-error.txt
                 try {
                     val api = "https://api.github.com/repos/$repo/contents/ci-error.txt"
                     var sha: String? = null
@@ -106,7 +114,6 @@ try {
                             .let { Regex("\"sha\"\\s*:\\s*\"([0-9a-f]{40})\"").find(it)?.groupValues?.get(1) }
                     }
                     get.disconnect()
-
                     val body = buildString {
                         append("{\"message\":\"CI-Fehler-Erfassung (automatisch)\"")
                         append(",\"content\":\"${java.util.Base64.getEncoder().encodeToString(text.toByteArray())}\"")
@@ -140,6 +147,44 @@ try {
             } catch (t: Throwable) {
                 println("CI-ERROR-CAPTURE fehlgeschlagen: $t")
             }
+        }
+
+        val resolveBranch: () -> String = {
+            System.getenv("GITHUB_HEAD_REF")
+                ?: System.getenv("GITHUB_REF")
+                    ?.removePrefix("refs/heads/")
+                    ?.removePrefix("refs/tags/")
+                    ?: "HEAD"
+        }
+
+        // Fehler-Hook (Gradle-8.9-öffentliche API, deprecated aber vorhanden).
+        try {
+            gradle.buildFinished { result ->
+                val failure = result.failure
+                if (failure != null) {
+                    captureError(failure, resolveBranch())
+                }
+            }
+        } catch (t: Throwable) {
+            println("CI-HOOK buildFinished-Registrierung fehlgeschlagen: $t")
+        }
+
+        // Backup-Hook über BuildListener (fängt dieselbe Phase ab).
+        try {
+            gradle.addBuildListener(object : org.gradle.BuildListener {
+                override fun buildStarted(gradle: org.gradle.api.invocation.Gradle) {
+                    // nicht benötigt
+                }
+
+                override fun buildFinished(result: org.gradle.BuildResult) {
+                    val failure = result.failure
+                    if (failure != null) {
+                        captureError(failure, resolveBranch())
+                    }
+                }
+            })
+        } catch (t: Throwable) {
+            println("CI-HOOK BuildListener-Registrierung fehlgeschlagen: $t")
         }
     }
 } catch (t: Throwable) {
