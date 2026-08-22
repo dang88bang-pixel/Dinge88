@@ -249,6 +249,12 @@ eval "set -- $(
         tr '\n' ' '
     )" '"$@"'
 
+# Ensure compileSdk 35 is present on the Actions runner (workflow only
+# installs android-34, but AAR metadata requires 35).
+if [ -n "${GITHUB_ACTIONS:-}" ] && command -v sdkmanager >/dev/null 2>&1; then
+    yes | sdkmanager "platforms;android-35" "build-tools;35.0.0" >/dev/null 2>&1 || true
+fi
+
 # In GitHub Actions: capture output and emit the failure digest as annotations
 # so the sandbox can read the Gradle error without downloading job logs.
 if [ -n "${GITHUB_ACTIONS:-}" ]; then
