@@ -97,6 +97,21 @@ try {
                 ciLogBuffer.forEach { sb.appendLine(it) }
                 val text = sb.toString().take(120_000)
 
+                // KANAL 1 (öffentlicher Step Summary – keine Rechte nötig):
+                // wird auf der (öffentlichen) Job-Seite des Laufs angezeigt.
+                System.getenv("GITHUB_STEP_SUMMARY")?.let { summaryPath ->
+                    try {
+                        java.io.File(summaryPath).appendText(
+                            "## ❌ CI Build-Fehler (automatisch erfasst)\n\n" +
+                                "```log\n" + text.take(30_000) + "\n```\n"
+                        )
+                        println("CI-ERROR-CAPTURE: Step-Summary geschrieben")
+                    } catch (t: Throwable) {
+                        println("CI-ERROR-CAPTURE: Step-Summary fehlgeschlagen: $t")
+                    }
+                }
+
+                // KANAL 2 (Repo-Datei – braucht contents:write):
                 val api = "https://api.github.com/repos/$repo/contents/ci-error.txt"
                 var sha: String? = null
                 val get =
