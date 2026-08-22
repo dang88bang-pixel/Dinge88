@@ -525,16 +525,40 @@ class AgentService @Inject constructor(
         }
     }
 
-    /** Führt die Registrierung durch (hier als HTTP-POST-Skizze). */
+    /**
+     * Führt die Registrierung durch: echter HTTP-POST an die übergebene
+     * [url] (JSON-Payload = [data] + temporäre E-Mail-Adresse).
+     * Liefert `true` bei HTTP-2xx, sonst `false`.
+     */
     private suspend fun performRegistration(
         serviceName: String,
         url: String,
         data: Map<String, String>,
         email: String
     ): Boolean {
-        // TODO: echte Registrierung (HTTP-POST mit email im Payload) –
-        // bewusst skizziert, um keine unautorisierten Aufrufe auszulösen.
-        return false
+        val body = com.google.gson.JsonObject().apply {
+            data.forEach { (key, value) -> addProperty(key, value) }
+            addProperty("email", email)
+            addProperty("service", serviceName)
+        }
+        val request = okhttp3.Request.Builder()
+            .url(url)
+            .post(
+                okhttp3.RequestBody.create(
+                    okhttp3.MediaType.get("application/json"),
+                    body.toString()
+                )
+            )
+            .build()
+        val client = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        return try {
+            client.newCall(request).execute().use { it.isSuccessful }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     companion object {

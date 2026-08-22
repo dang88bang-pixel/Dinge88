@@ -379,3 +379,22 @@ Workflow-Start alle Fremd-Actions (`actions/checkout`, `actions/setup-java`,
    (github.com + verified partners)
 2. Workflow permissions: **„Read and write permissions"** (Release-Job
    braucht `contents: write` für das GitHub-Release)
+
+## 🔒 Mock-/Platzhalter-Audit (2026-08-22)
+
+| Prüfung (Vorgabe „Keine Mocks/Template") | Status |
+|---|---|
+| Kein `// TODO` im App-Code | ☑ entfernt (einziger Treffer: `performRegistration` → echter OkHttp-POST) |
+| Keine `Random`-Simulationen in Services | ☑ entfernt (BLE/WiFi/LoRa/Optik/Crowd/Urban/GPS/Telemetrie) |
+| Keine hardcodierten Detektions-Koordinaten | ☑ entfernt (Rest: Map-Initialansicht = reines UI-Default, dokumentiert) |
+| Keine hardcodierten MAC-Adressen | ☑ entfernt (Demo-Seed + Lora-Gateways + Node-Test-Suche) |
+| Keine Demo-/Test-Daten im UI | ☑ `seedDemoDataIfEmpty()` entfernt |
+| Keine Mock-/Dummy-Klassen | ☑ `DummyLoraClient`/`LoraClient` entfernt |
+| Jeder Suchkanal: echte Daten oder `null` | ☑ (Details: `IMPLEMENTIERUNGS_INVENTUR.md`, Abschnitt „Mock-/Platzhalter-Audit") |
+| Backend-Endpunkte echt (FastAPI+SQLite+MQTT) | ☑ neue Endpunkte lora/optical/crowd/urban; simulierte `asyncio.sleep` entfernt |
+| Neue Basis: `BACKEND_URL` (local.properties) + `BackendUrl.kt` + `BackendHttp.kt` | ☑ |
+
+⚠ Hinweis: Lokaler Build in der Sandbox weiterhin nicht möglich (Firewall) –
+Verifikation läuft in GitHub Actions; die CI-Fehler-Erfassung
+(`settings.gradle.kts` → Annotation/Step-Summary/`ci-error.txt`) war selbst
+kaputt (`gradle.services` existiert in der Gradle-API nicht) und ist repariert.

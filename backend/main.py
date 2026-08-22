@@ -10,7 +10,6 @@
 #   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 # Oder: docker compose up --build
 
-import asyncio
 import json
 import os
 import sqlite3
@@ -227,6 +226,70 @@ async def list_detections(limit: int = 100):
     return [dict(r) for r in rows]
 
 
+# ============ CHANNEL-ENDPUNKTE (Suchkanäle der App) ============
+# LIEFERN NUR ECHTE DATEN: neueste Sichtungen pro Asset/Channel aus der
+# detections-Tabelle (gefüllt u. a. über POST /api/detections und den
+# MQTT-Import). Keine simulierten Werte.
+
+
+def _sightings(asset_mac: str, source_type: str, limit: int = 20) -> list:
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT node_id, rssi, latitude, longitude, timestamp "
+        "FROM detections WHERE asset_mac = ? AND source_type = ? "
+        "ORDER BY timestamp DESC LIMIT ?",
+        (asset_mac.upper(), source_type, limit),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+class LoraCommand(BaseModel):
+    mac: str
+    command: str
+
+
+@app.get("/api/lora/sightings")
+async def lora_sightings(mac: str):
+    """Echte LoRa/LoRaWAN-Sichtungen des Assets (via Gateways)."""
+    return {"sightings": _sightings(mac, "LORA")}
+
+
+@app.post("/api/lora/command")
+async def lora_command(cmd: LoraCommand):
+    """Echtes MQTT-Publish an das Gateway/Asset-Command-Topic."""
+    ok = publish_command(cmd.mac.upper(), cmd.command)
+    return {"delivered": ok}
+
+
+@app.get("/api/optical/detections")
+async def optical_detections(mac: str):
+    """Echte optische Erkennungen des Assets (YOLO-Server)."""
+    return {"detections": _sightings(mac, "OPTICAL")}
+
+
+@app.get("/api/crowd/locate")
+async def crowd_locate(mac: str):
+    """Letzte echte Crowdsource-Position des Assets (Find-My-Proxy)."""
+    rows = _sightings(mac, "CROWD", limit=1)
+    latest = rows[0] if rows else None
+    if latest is None or latest["latitude"] is None or latest["longitude"] is None:
+        return {"found": False}
+    return {
+        "found": True,
+        "latitude": latest["latitude"],
+        "longitude": latest["longitude"],
+        "accuracy": 100,  # Kanal-Konstante für Crowd-Netzwerke (Meter)
+        "network": latest["node_id"] or "crowd-proxy",
+    }
+
+
+@app.get("/api/urban/detections")
+async def urban_detections(mac: str):
+    """Echte urbanen Infrastruktur-Sichtungen (WiGle/OCM/DHL/CKAN via Backend)."""
+    return {"detections": _sightings(mac, "URBAN")}
+
+
 @app.post("/api/alerts")
 async def add_alert(alert: Alert):
     conn = get_db()
@@ -305,8 +368,6 @@ async def process_action(action: Action) -> None:
     conn.commit()
     conn.close()
 
-    # Simulierte Verarbeitungszeit für Demo-Setups
-    await asyncio.sleep(2)
     print(f"Aktion {action.action_type} für {action.asset_id} ausgeführt (mqtt={ok})")
 
 

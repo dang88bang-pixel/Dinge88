@@ -32,3 +32,7 @@ WEBSOCKET_URL=
 # Nur für legitime Zwecke (Testumgebungen, autorisierte API-Key-Generierung).
 # Leer = Feature deaktiviert.
 MCP_SERVER_URL=
+
+# SecureGuard-Pilot-Backend (FastAPI, backend/main.py) – Basis-URL für die
+# Suchkanäle LoRa/Optik/Crowd/Urban. Beispiel (LAN):
+#BACKEND_URL=http://192.168.1.50:8000

@@ -4,18 +4,23 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.agent.ApiNodeManager
 import com.secureguard.enterprise.agent.NodeStatus
+import com.secureguard.enterprise.data.repository.SecureGuardRepository
+import com.secureguard.enterprise.services.SatelliteService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class NodeStatusViewModel @Inject constructor(
-    private val apiNodeManager: ApiNodeManager
+    private val apiNodeManager: ApiNodeManager,
+    private val repository: SecureGuardRepository,
+    private val satelliteService: SatelliteService
 ) : ViewModel() {
 
     val nodeStatus: StateFlow<Map<String, NodeStatus>> =
@@ -45,13 +50,27 @@ class NodeStatusViewModel @Inject constructor(
         }
     }
 
-    /** Führt eine komplette Abfrage über alle Knoten aus (Test-Suche). */
+    /**
+     * Führt eine komplette Abfrage über alle Knoten aus (Test-Suche) –
+     * mit einem ECHTEN Asset aus der Whitelist und der echten GPS-Position
+     * des Geräts als Mittelpunkt. Ohne Asset wird nicht abgefragt.
+     */
     fun runFullQuery() {
         viewModelScope.launch {
+            val assets = try {
+                repository.getWhitelistedAssets().first()
+            } catch (e: Exception) {
+                emptyList()
+            }
+            val asset = assets.firstOrNull() ?: run {
+                refresh()
+                return@launch
+            }
+            val location = satelliteService.currentLocation()
             apiNodeManager.queryAllNodes(
-                mac = "AA:BB:CC:DD:EE:01",
-                latitude = 52.52,
-                longitude = 13.40
+                mac = asset.mac,
+                latitude = location?.latitude,
+                longitude = location?.longitude
             )
             refresh()
         }

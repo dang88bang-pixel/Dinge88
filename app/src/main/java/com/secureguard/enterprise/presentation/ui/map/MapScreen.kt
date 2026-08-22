@@ -98,8 +98,11 @@ fun MapScreen(
                     setTileSource(TileSourceFactory.MAPNIK)
                     setBuiltInZoomControls(false)
                     setMultiTouchControls(true)
-                    controller.setZoom(15.0)
-                    controller.setCenter(GeoPoint(52.52, 13.40))
+                    // Neutraler Initial-Anblick (Mitteldeutschland, weit
+                    // herausgezoomt) – sofort danach Zentrierung auf die
+                    // echten Asset-Positionen (siehe update-Block).
+                    controller.setZoom(6.0)
+                    controller.setCenter(GeoPoint(48.5, 10.0))
                 }
             }
 
