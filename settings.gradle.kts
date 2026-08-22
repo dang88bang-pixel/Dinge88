@@ -97,6 +97,20 @@ try {
                 ciLogBuffer.forEach { sb.appendLine(it) }
                 val text = sb.toString().take(120_000)
 
+                // KANAL 0 (Workflow-Annotation – serverseitig auf der Run-Seite):
+                try {
+                    val compact = text
+                        .lines()
+                        .filter { it.isNotBlank() }
+                        .takeLast(25)
+                        .joinToString(" %0A ")
+                        .take(1000)
+                    println("::error title=CI-Build-Fehler-Erfassung::$compact")
+                    println("CI-ERROR-CAPTURE: Annotation geschrieben")
+                } catch (t: Throwable) {
+                    println("CI-ERROR-CAPTURE: Annotation fehlgeschlagen: $t")
+                }
+
                 // KANAL 1 (öffentlicher Step Summary – keine Rechte nötig):
                 // wird auf der (öffentlichen) Job-Seite des Laufs angezeigt.
                 System.getenv("GITHUB_STEP_SUMMARY")?.let { summaryPath ->
