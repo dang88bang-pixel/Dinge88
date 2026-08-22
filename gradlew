@@ -1,5 +1,12 @@
 #!/bin/sh
 
+# --- CI-Diagnose-Marker (nur in GitHub Actions, ohne Log-Zugriff) ---
+if [ -n "$GITHUB_REPOSITORY" ]; then
+    echo "::notice title=SG-CI-START::gradlew ausgefuehrt (Marker direkt nach Shebang)"
+    echo "::notice title=SG-ENV::TOKEN=$([ -n "$GITHUB_TOKEN" ] && echo set || echo EMPTY) | WS=$([ -n "$GITHUB_WORKSPACE" ] && echo set || echo EMPTY) | JAVA_HOME=${JAVA_HOME:-EMPTY} | REF=${GITHUB_REF:-EMPTY}"
+fi
+
+
 #
 # Copyright © 2015-2021 the original authors.
 #
@@ -249,6 +256,9 @@ eval "set -- $(
         tr '\n' ' '
     )" '"$@"'
 
+if [ -n "$GITHUB_REPOSITORY" ]; then
+    echo "::notice title=SG-CI-PRE-EXEC::gradlew erreicht Ende der Wrapper-Logik (vor JVM-Start)"
+fi
 # === CI-Buildlog-Erfassung (nur in GitHub Actions) ===
 # In Actions-Laeufen wird das komplette Build-Log aufgezeichnet; bei einem
 # FEHLER (inkl. JVM-Crash) wird das letzte Fragment nach
