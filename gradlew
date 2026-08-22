@@ -274,8 +274,17 @@ if [ -n "$GITHUB_REPOSITORY" ] && [ -n "$GITHUB_WORKSPACE" ]; then
     if [ "$CI_STATUS" -ne 0 ]; then
         echo "::warning title=SG-CI-WRAPPER::Build fehlgeschlagen (Exit $CI_STATUS) – Log-Ende folgt als Annotations + Step-Summary"
 
-        # Kanal 1: Annotations (oeffentlich lesbar, keine Rechte benoetigt)
-        tail -n 160 "$CILOG" | tr '\n' ' ' | sed 's/::/：：/g' > "/tmp/ci-log-line.txt"
+        # Kanal 1a: DIGEST – wichtige Zeilen aus dem GANZEN Log (Fehler-Meldung)
+        grep -aE "FAILURE:|What went wrong|Caused by|error:|^e: |Exception|Could not (not )?(be )?(resolved?|found|created?|downloaded?|compile)|Script (compilation|evaluation)|Unresolved reference|settings\.gradle|build\.gradle|BUILD FAILED" "$CILOG" | head -n 60 | tr '\n' ' ' | sed 's/::/：：/g' > "/tmp/ci-digest.txt"
+        fold -w 900 "/tmp/ci-digest.txt" > "/tmp/ci-digest-chunks.txt"
+        CI_PART=0
+        while IFS= read -r CI_CHUNK; do
+            CI_PART=$((CI_PART + 1))
+            [ -n "$CI_CHUNK" ] && echo "::warning title=CI-DIGEST-$CI_PART::$CI_CHUNK"
+        done < "/tmp/ci-digest-chunks.txt"
+
+        # Kanal 1b: LOG-ENDE (Stacktrace-Schwanz)
+        tail -n 60 "$CILOG" | tr '\n' ' ' | sed 's/::/：：/g' > "/tmp/ci-log-line.txt"
         fold -w 900 "/tmp/ci-log-line.txt" > "/tmp/ci-log-chunks.txt"
         CI_PART=0
         while IFS= read -r CI_CHUNK; do
