@@ -365,3 +365,17 @@ Statistik, Alarm-Töne, Fonts, Betriebsvereinbarung).
 | Inter-Fonts (res/font) + Theme | ☑ |
 | BETRIEBSVEREINBARUNG.md (Blaupause § 1–7) | ☑ |
 | FileProvider + CSV/Log-Export + Teilen | ☑ |
+
+## 🔧 CI-Fix: Actions „Allowed actions" (2026-08-22)
+
+**Wurzelursache der `startup_failure`-Läufe (seit 2026-08-20 16:42 UTC):**
+Repo-Setting *„Only allow actions from repository owner"* blockt beim
+Workflow-Start alle Fremd-Actions (`actions/checkout`, `actions/setup-java`,
+`gradle/actions/setup-gradle`, `actions/cache`, `actions/upload-artifact`,
+`softprops/action-gh-release`).
+
+**Fix (Owner, UI):** Repository → Settings → Actions → General:
+1. General permissions: **„Allow all actions and reusable workflows"**
+   (github.com + verified partners)
+2. Workflow permissions: **„Read and write permissions"** (Release-Job
+   braucht `contents: write` für das GitHub-Release)
