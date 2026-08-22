@@ -249,4 +249,33 @@ eval "set -- $(
         tr '\n' ' '
     )" '"$@"'
 
+# In GitHub Actions: capture output and emit the failure digest as annotations
+# so the sandbox can read the Gradle error without downloading job logs.
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    CILOG="${GITHUB_WORKSPACE:-.}/.ci-build-full.log"
+    "$JAVACMD" "$@" > "$CILOG" 2>&1
+    CI_STATUS=$?
+    cat "$CILOG"
+    if [ "$CI_STATUS" -ne 0 ]; then
+        grep -aE "FAILURE:|What went wrong|Caused by:|^e: |BUILD FAILED|Could not |Unresolved reference|SDK location|Failed to find target|OutOfMemory" "$CILOG" \
+            | head -n 40 | sed 's/::/：：/g' > /tmp/ci-digest.txt || true
+        CI_PART=0
+        while IFS= read -r CI_LINE; do
+            [ -z "$CI_LINE" ] && continue
+            CI_PART=$((CI_PART + 1))
+            echo "::error title=CI-DIGEST-$CI_PART::$CI_LINE"
+        done < /tmp/ci-digest.txt
+        if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            {
+                echo "## CI-Build-Fehler (Exit $CI_STATUS)"
+                echo '```'
+                tail -c 16000 "$CILOG"
+                echo
+                echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+        fi
+    fi
+    rm -f "$CILOG"
+    exit "$CI_STATUS"
+fi
 exec "$JAVACMD" "$@"
