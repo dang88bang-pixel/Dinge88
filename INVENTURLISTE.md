@@ -132,3 +132,24 @@ Node-RED (:1880) ──MQTT──▶ Broker    Alerts, …)  WebSocket
                                                       │
                                             Broadcast an alle Clients
 ```
+
+---
+
+## 9. Benutzeroberfläche (Web-Dashboard) – vollständig integriert
+
+| Element | Bindung | Status |
+|---|---|---|
+| **Live-Dashboard** `frontend/index.html` | Vom Backend unter `http://<host>:8000/` ausgeliefert (Static-Mount, API/`/docs` behalten Vorrang) | ✅ live |
+| Status-Pills (Backend/MQTT/WS/Worker/Node-RED) | `GET /api/health` (5 s Polling) + WS-Zustand + Worker-Guard (35 s) | ✅ |
+| Stats-Karten (Assets/Detektionen/Alerts/Befehle/Zugestellt/Uptime) | `GET /api/stats` + Live-Refresh bei jedem WS-Event | ✅ |
+| Asset-Tabelle + Ping-Button | `GET/POST /api/assets` + `sendCmd(MAC,'PING')` | ✅ |
+| Asset-Registrierungsformular | `POST /api/assets` (Validierung MAC-Format) | ✅ |
+| Detektions-Historie | `GET /api/detections` + Live-Append via WS-Broadcast | ✅ |
+| **Live-Ereignis-Feed** | WebSocket `/ws` (detection/alert/alert_resolved/command_status/ack), Auto-Reconnect | ✅ |
+| Befehls-Formular (ALARM/LIGHT/PING) | WS-Command → Backend → MQTT → Gateway-Worker; ACK + Status im Feed | ✅ |
+| Alert-Liste + „✔ Erledigt"-Button | `PATCH /api/alerts/{id}/resolve` (neu) + Broadcast an alle Clients | ✅ |
+| „Erledigte entfernen" | `DELETE /api/alerts` (neu, bereinigt aufgelöste) | ✅ |
+| Befehlshistorie | `GET /api/commands` (Status delivered/failed) | ✅ |
+
+**Neue Backend-Endpunkte für die UI:** `PATCH /api/alerts/{id}/resolve` · `DELETE /api/alerts`
+**UI-Interaktionsketten:** 10/10 verifiziert (Registrierung, Live-Feed, Befehl+ACK, Alert+Resolve+Broadcast, Historien, Stats)

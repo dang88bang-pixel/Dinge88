@@ -387,6 +387,31 @@ async def list_alerts(unresolved_only: bool = False):
     return [dict(r) for r in rows]
 
 
+@app.patch("/api/alerts/{alert_id}/resolve")
+async def resolve_alert(alert_id: int):
+    """Markiert einen Alert als erledigt (UI-Aktion) und broadcastet den Wechsel."""
+    conn = get_db()
+    cur = conn.execute("UPDATE alerts SET resolved = 1 WHERE id = ?", (alert_id,))
+    updated = cur.rowcount
+    conn.commit()
+    conn.close()
+    if updated == 0:
+        return {"status": "not_found"}
+    await manager.broadcast_async({"type": "alert_resolved", "alertId": alert_id})
+    return {"status": "ok"}
+
+
+@app.delete("/api/alerts")
+async def clear_resolved_alerts():
+    """Entfernt alle bereits erledigten Alerts."""
+    conn = get_db()
+    cur = conn.execute("DELETE FROM alerts WHERE resolved = 1")
+    removed = cur.rowcount
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "removed": removed}
+
+
 @app.post("/api/actions/execute")
 async def execute_action(action: Action, background_tasks: BackgroundTasks):
     """Queued Aktion: wird asynchron über MQTT an das Gateway/Asset geschickt."""
@@ -492,6 +517,22 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as exc:
         print(f"WebSocket-Fehler: {exc}")
         manager.disconnect(websocket)
+
+
+# ============ BENUTZEROBERFLÄCHE (Web-Dashboard) ============
+
+# Liefert das Live-Dashboard (frontend/index.html) unter http://<host>:8000/
+# aus – komplett an dieselbe API/WebSocket/MQTT-Infrastruktur gebunden.
+# Der Mount wird als letzte Route registriert, sodass /api/*, /ws und /docs
+# Vorrang behalten.
+import os as _os
+from pathlib import Path as _Path
+
+_FRONTEND_DIR = _Path(__file__).resolve().parent.parent / "frontend"
+if _FRONTEND_DIR.is_dir():
+    from fastapi.staticfiles import StaticFiles as _StaticFiles
+
+    app.mount("/", _StaticFiles(directory=str(_FRONTEND_DIR), html=True), name="ui")
 
 
 # ============ START ============
