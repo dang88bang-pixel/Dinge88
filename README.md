@@ -11,8 +11,15 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 
 ---
 
+## 📦 Direct Release Download
+
+**Ziel: Direkte Release-APK:** [Dinge88-release.apk herunterladen](https://github.com/dingeldangbang/genesis-orchestrator-v1/releases/download/v1.12.0/DinGelSchwinG-v1.12.0-release.apk)
+
+---
+
 ## Inhaltsverzeichnis
 
+- [Release Download](#-direct-release-download)
 - [Funktionsübersicht](#-funktionsübersicht)
 - [Architektur](#️-architektur)
 - [Aktionsketten (End-to-End)](#-aktionsketten-end-to-end)
@@ -737,6 +744,7 @@ Workflow `.github/workflows/build-release.yml`:
 - **Trigger:** Push auf `main`/`develop`, Tags `v*`, Pull Requests, manuell
 - **JDK:** 17 · **SDK:** android-34 · **Build-Tools:** 34.0.0 · **Gradle:** 8.9
 - **Artefakte:** `secureguard-pro-debug` (Debug-APK), `secureguard-pro` (Release-APK)
+- **Direkte Release-APK:** [Dinge88-release.apk herunterladen](https://github.com/dingeldangbang/genesis-orchestrator-v1/releases/download/v1.12.0/DinGelSchwinG-v1.12.0-release.apk)
 - **Release-Signing:** Optional via `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
 
 ### Lokal bauen
@@ -801,10 +809,11 @@ MCP_SERVER_URL=http://api.example.com:8000
 
 ## 📲 Installation
 
-1. **Debug-APK** aus GitHub Actions laden → `adb install secureguard-pro-debug.apk`
-2. Berechtigungen erteilen: Standort, Bluetooth, Kamera, Benachrichtigungen
-3. Einstellungen → Backend-Endpunkte konfigurieren
-4. Optional: Foreground-Dienst starten für dauerhaften Betrieb
+1. **Direkte Release-APK:** [Dinge88-release.apk herunterladen](https://github.com/dingeldangbang/genesis-orchestrator-v1/releases/download/v1.12.0/DinGelSchwinG-v1.12.0-release.apk) → `adb install DinGelSchwinG-v1.12.0-release.apk`
+2. **Debug-APK** aus GitHub Actions laden → `adb install secureguard-pro-debug.apk`
+3. Berechtigungen erteilen: Standort, Bluetooth, Kamera, Benachrichtigungen
+4. Einstellungen → Backend-Endpunkte konfigurieren
+5. Optional: Foreground-Dienst starten für dauerhaften Betrieb
 
 ---
 

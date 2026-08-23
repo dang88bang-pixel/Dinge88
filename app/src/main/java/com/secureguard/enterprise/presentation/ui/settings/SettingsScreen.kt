@@ -288,7 +288,7 @@ fun SettingsScreen(
 
             item {
                 Text(
-                    "SecureGuard Enterprise v1.0.0 · generisches LoRa/LoRaWAN",
+                    "SecureGuard Enterprise v1.12.0 · generisches LoRa/LoRaWAN",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp)
