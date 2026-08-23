@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Warning
@@ -77,6 +79,12 @@ fun DashboardScreen(
                 }
                 IconButton(onClick = { navController.navigate(Routes.SENSOR_FUSION) }) {
                     Icon(Icons.Default.Explore, contentDescription = "Sensor-Fusion")
+                }
+                IconButton(onClick = { navController.navigate(Routes.SECURITY) }) {
+                    Icon(Icons.Default.Security, contentDescription = "Security")
+                }
+                IconButton(onClick = { navController.navigate(Routes.ESP32_CONFIG) }) {
+                    Icon(Icons.Default.Memory, contentDescription = "ESP32 Config")
                 }
                 IconButton(onClick = { navController.navigate(Routes.AGENT_CONFIG) }) {
                     Icon(Icons.Default.SmartToy, contentDescription = "Agent-Konfiguration")

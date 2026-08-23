@@ -169,6 +169,24 @@ fun SettingsScreen(
                                 .clickable { navController.navigate(Routes.TEMP_MAIL) }
                         )
                         HorizontalDivider()
+                        Text(
+                            "Security & Integrity Center",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.SECURITY) }
+                        )
+                        HorizontalDivider()
+                        Text(
+                            "ESP32 Gateway Konfiguration",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.ESP32_CONFIG) }
+                        )
+                        HorizontalDivider()
                         Spacer(Modifier.height(8.dp))
                         Text("🤖 Vordergrund-Dienst", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(4.dp))

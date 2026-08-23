@@ -33,6 +33,8 @@ import com.secureguard.enterprise.presentation.ui.settings.SettingsScreen
 import com.secureguard.enterprise.presentation.ui.tempmail.TempMailScreen
 import com.secureguard.enterprise.presentation.ui.terminal.TerminalScreen
 import com.secureguard.enterprise.presentation.ui.sensorfusion.SensorFusionScreen
+import com.secureguard.enterprise.presentation.ui.security.SecurityScreen
+import com.secureguard.enterprise.presentation.ui.esp32.Esp32ConfigScreen
 
 private const val ANIM_MS = 250
 
@@ -115,6 +117,12 @@ fun SecureGuardApp() {
             }
             composable(Routes.SENSOR_FUSION) {
                 SensorFusionScreen(navController = navController)
+            }
+            composable(Routes.SECURITY) {
+                SecurityScreen(navController = navController)
+            }
+            composable(Routes.ESP32_CONFIG) {
+                Esp32ConfigScreen(navController = navController)
             }
             composable(
                 route = Routes.ASSET_DETAIL,
