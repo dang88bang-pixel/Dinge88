@@ -5,7 +5,6 @@ import com.secureguard.enterprise.data.model.DetectionSource
 import com.secureguard.enterprise.services.ApiServiceManager
 import com.secureguard.enterprise.services.AuditLogService
 import com.secureguard.enterprise.services.MqttService
-import com.secureguard.enterprise.services.TempMailService
 import com.secureguard.enterprise.services.WebSocketService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +38,6 @@ class ApiNodeManager @Inject constructor(
     private val apiServiceManager: ApiServiceManager,
     private val mqttService: MqttService,
     private val webSocketService: WebSocketService,
-    private val tempMailService: TempMailService,
     private val auditLogService: AuditLogService
 ) {
 
@@ -117,15 +115,6 @@ class ApiNodeManager @Inject constructor(
             timeoutMs = 8_000
         )
         registerNode(
-            id = "ckan",
-            name = "CKAN Open Data",
-            type = NodeType.API,
-            handler = { ctx -> searchViaCKAN(ctx) },
-            priority = 30,
-            rateLimit = RateLimit(requestsPerMinute = 20),
-            timeoutMs = 10_000
-        )
-        registerNode(
             id = "googlegeo",
             name = "Google Geolocation",
             type = NodeType.API,
@@ -171,15 +160,6 @@ class ApiNodeManager @Inject constructor(
             priority = 75,
             rateLimit = RateLimit(requestsPerMinute = 100),
             timeoutMs = 5_000
-        )
-        registerNode(
-            id = "tempmail",
-            name = "TempMail",
-            type = NodeType.API,
-            handler = { ctx -> searchViaTempMail(ctx) },
-            priority = 25,
-            rateLimit = RateLimit(requestsPerMinute = 5),
-            timeoutMs = 45_000
         )
     }
 
@@ -229,10 +209,9 @@ class ApiNodeManager @Inject constructor(
     }
 
     private suspend fun searchViaOpenChargeMap(context: SearchContext): List<Detection> {
-        val stations = apiServiceManager.searchViaOpenChargeMap(
-            context.latitude ?: 52.52,
-            context.longitude ?: 13.40
-        )
+        val lat = context.latitude ?: return emptyList()
+        val lon = context.longitude ?: return emptyList()
+        val stations = apiServiceManager.searchViaOpenChargeMap(lat, lon)
         return stations.map { s ->
             Detection(
                 assetMac = context.mac,
@@ -249,10 +228,9 @@ class ApiNodeManager @Inject constructor(
     }
 
     private suspend fun searchViaDHL(context: SearchContext): List<Detection> {
-        val stations = apiServiceManager.searchViaDHL(
-            context.latitude ?: 52.52,
-            context.longitude ?: 13.40
-        )
+        val lat = context.latitude ?: return emptyList()
+        val lon = context.longitude ?: return emptyList()
+        val stations = apiServiceManager.searchViaDHL(lat, lon)
         return stations.map { s ->
             Detection(
                 assetMac = context.mac,
@@ -268,25 +246,12 @@ class ApiNodeManager @Inject constructor(
         }
     }
 
-    private suspend fun searchViaCKAN(context: SearchContext): List<Detection> {
-        val datasets = apiServiceManager.searchViaCKAN(context.mac)
-        return datasets.map { r ->
-            Detection(
-                assetMac = context.mac,
-                sourceType = DetectionSource.API,
-                nodeId = r.id ?: "ckan",
-                rssi = 0,
-                message = "Datensatz: ${r.title ?: "?"}",
-                timestamp = Date()
-            )
-        }
-    }
-
     private suspend fun searchViaGoogleGeo(context: SearchContext): List<Detection> {
+        // Reine BSSID-Suche: nur die echte MAC wird übermittelt, keine
+        // erfundene Signalstärke (signalStrength = null → Feld entfällt).
         val accessPoints = listOf(
             com.secureguard.enterprise.services.apis.WifiAccessPoint(
-                macAddress = context.mac,
-                signalStrength = -45
+                macAddress = context.mac
             )
         )
         val location = apiServiceManager.searchViaGoogleGeolocation(accessPoints) ?: return emptyList()
@@ -324,10 +289,9 @@ class ApiNodeManager @Inject constructor(
     }
 
     private suspend fun searchViaHelium(context: SearchContext): List<Detection> {
-        val hotspots = apiServiceManager.searchViaHelium(
-            context.latitude ?: 52.52,
-            context.longitude ?: 13.40
-        )
+        val lat = context.latitude ?: return emptyList()
+        val lon = context.longitude ?: return emptyList()
+        val hotspots = apiServiceManager.searchViaHelium(lat, lon)
         return hotspots.map { h ->
             Detection(
                 assetMac = context.mac,
@@ -363,26 +327,6 @@ class ApiNodeManager @Inject constructor(
             )
         }
         return emptyList()
-    }
-
-    private suspend fun searchViaTempMail(context: SearchContext): List<Detection> {
-        if (!tempMailService.isConfigured) return emptyList()
-        val inbox = tempMailService.createInbox() ?: return emptyList()
-        val otp = tempMailService.waitForOTP(timeoutMs = 45_000)
-        return listOf(
-            Detection(
-                assetMac = context.mac,
-                sourceType = DetectionSource.API,
-                nodeId = inbox.inboxId,
-                rssi = 0,
-                message = if (otp?.success == true) {
-                    "TempMail OTP: ${otp.otp} von ${otp.from}"
-                } else {
-                    "TempMail-Inbox: ${inbox.email} (kein OTP)"
-                },
-                timestamp = Date()
-            )
-        )
     }
 
     // ============ HEALTH-MONITOR (CIRCUIT BREAKER) ============

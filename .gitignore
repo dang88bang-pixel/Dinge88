@@ -32,3 +32,19 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Artefakte / Fremdarchive nicht ins Repo
+*.zip
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Datenbank-/Backupdateien
+*.db
+*.sqlite
+data/
+nodered/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

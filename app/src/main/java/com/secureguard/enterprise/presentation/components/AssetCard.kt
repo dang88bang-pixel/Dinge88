@@ -20,10 +20,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
+import com.secureguard.enterprise.util.AccessibilityHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -44,7 +47,15 @@ fun AssetCard(
     }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics {
+                // TalkBack: vollständiger, sprechender Zustand statt Symbol-Fragmenten
+                contentDescription =
+                    "${asset.shortName}, ${AccessibilityHelper.contentDescriptionForStatus(asset.status.name)}, " +
+                        "Signal ${asset.rssi} dBm" +
+                        (asset.batteryLevel?.let { ", Akku $it Prozent" } ?: "")
+            },
         onClick = onClick,
         colors = CardDefaults.cardColors(
             containerColor = statusColor.copy(alpha = 0.06f)

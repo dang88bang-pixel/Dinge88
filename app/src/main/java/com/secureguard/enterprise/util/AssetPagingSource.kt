@@ -3,16 +3,26 @@ package com.secureguard.enterprise.util
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.secureguard.enterprise.data.model.Asset
+import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 
 /**
  * Paging-Source für Lazy Loading der Asset-Liste (Paging 3).
- * Nutzbar mit `Pager(PagingConfig(pageSize = 20)) { AssetPagingSource(repo, filter) }`
- * und `collectAsLazyPagingItems()` in der Compose-UI.
+ *
+ * Filter (Suchtext + Status) werden über Provider-Funktionen gelesen, damit
+ * die laufende Suche/der Tab-Wechsel ohne Neubau des Pagers wirkt.
+ *
+ * Nutzung:
+ * ```
+ * Pager(PagingConfig(pageSize = 20)) {
+ *     AssetPagingSource(repo, filterProvider = { query }, statusProvider = { tab })
+ * }.flow.cachedIn(viewModelScope)
+ * ```
  */
 class AssetPagingSource(
     private val repository: SecureGuardRepository,
-    private val filter: String? = null
+    private val filterProvider: () -> String? = { null },
+    private val statusProvider: () -> AssetStatus? = { null }
 ) : PagingSource<Int, Asset>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Asset> {
@@ -22,7 +32,8 @@ class AssetPagingSource(
             val assets = repository.getAssetsPaginated(
                 offset = page * pageSize,
                 limit = pageSize,
-                filter = filter?.takeIf { it.isNotBlank() }
+                filter = filterProvider()?.takeIf { it.isNotBlank() },
+                status = statusProvider()
             )
             LoadResult.Page(
                 data = assets,

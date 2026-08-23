@@ -52,6 +52,12 @@ class WebSocketService @Inject constructor() {
 
     val isConfigured: Boolean get() = serverUrl.isNotBlank()
 
+    @Volatile
+    private var connectionOpen: Boolean = false
+
+    /** Verbindung aktiv (Handshake abgeschlossen, Socket nicht geschlossen)? */
+    val isConnected: Boolean get() = connectionOpen && webSocket != null
+
     /** Baut die WebSocket-Verbindung auf. */
     fun connect(url: String = serverUrl) {
         if (url.isBlank()) {
@@ -65,6 +71,7 @@ class WebSocketService @Inject constructor() {
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                connectionOpen = true
                 _events.tryEmit(WebSocketEvent.Connected)
             }
 
@@ -85,10 +92,12 @@ class WebSocketService @Inject constructor() {
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                connectionOpen = false
                 _events.tryEmit(WebSocketEvent.Disconnected(reason))
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                connectionOpen = false
                 _events.tryEmit(WebSocketEvent.Error(t.message ?: "Verbindung fehlgeschlagen"))
             }
         })
@@ -115,6 +124,7 @@ class WebSocketService @Inject constructor() {
     }
 
     fun disconnect() {
+        connectionOpen = false
         try {
             webSocket?.close(1000, "Normal closure")
         } catch (_: Exception) {

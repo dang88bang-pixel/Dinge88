@@ -3,6 +3,10 @@ package com.secureguard.enterprise.services
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import com.secureguard.enterprise.security.Permission
+import com.secureguard.enterprise.security.Role
+import com.secureguard.enterprise.security.RoleManager
+import com.secureguard.enterprise.security.User
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +45,38 @@ class AuthManager @Inject constructor(
     val state: StateFlow<AuthState> = _state.asStateFlow()
 
     private val secureRandom = SecureRandom()
+
+    // ============ RBAC (Rollen- und Rechteverwaltung) ============
+
+    /**
+     * Aktueller Benutzer (Einzelgerät: ADMIN-Standard). Die Rolle wird
+     * persistiert und kann für die Server-/Multi-User-Anbindung pro
+     * Gerät gesetzt werden.
+     */
+    private val _currentUser = MutableStateFlow(loadUser())
+    val currentUser: StateFlow<User> = _currentUser.asStateFlow()
+
+    /** Wechselt die Rolle des Geräts (z. B. bei Übergabe an OPERATOR). */
+    fun setCurrentRole(role: Role) {
+        prefs.edit().putString(KEY_ROLE, role.name).apply()
+        _currentUser.value = loadUser()
+    }
+
+    /** Prüft eine Berechtigung über den [RoleManager] (RBAC-Kette). */
+    fun hasPermission(permission: Permission): Boolean =
+        RoleManager.hasPermission(_currentUser.value, permission)
+
+    private fun loadUser(): User {
+        val role = runCatching {
+            Role.valueOf(prefs.getString(KEY_ROLE, Role.ADMIN.name) ?: Role.ADMIN.name)
+        }.getOrDefault(Role.ADMIN)
+        return User(
+            id = "local-" + (prefs.getString(KEY_DEVICE_ID, null) ?: "device"),
+            name = android.os.Build.MODEL ?: "SecureGuard-Gerät",
+            role = role,
+            permissions = RoleManager.permissionsFor(role)
+        )
+    }
 
     fun isPinConfigured(): Boolean = prefs.contains(KEY_HASH)
 
@@ -159,5 +195,7 @@ class AuthManager @Inject constructor(
         private const val KEY_SALT = "pin_salt"
         private const val KEY_LOCKED_AT = "locked_at"
         private const val KEY_LAST_UNLOCK = "last_unlock"
+        private const val KEY_ROLE = "user_role"
+        private const val KEY_DEVICE_ID = "device_id"
     }
 }

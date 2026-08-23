@@ -1,243 +1,141 @@
 # 🔍 Implementierungs-Inventur – SecureGuard Enterprise
 
-**Stand:** laufende Prüfung. Legende: ✅ real & ausführbar · 🟡 real, aber von Hardware-/Backend-Verfügbarkeit abhängig · 🔧 Mock / Platzhalter / Demo
+**Stand:** Vollprüfung 2026-08-23 – komplette Aktions-/Interaktionskette, alle
+Abhängigkeiten und Anbindungen geprüft. Alle Platzhalter, Mocks, Demo- und
+Simulationsanteile wurden **entfernt und durch echte Implementierungen bzw.
+ehrliches „nicht gefunden“ (null) ersetzt**.
 
-> **Betriebsvereinbarung:** Ist eine **Blaupause** (Pilot-Projekt) – sie wird nur hinterlegt
-> ([`BETRIEBSVEREINBARUNG.md`](./BETRIEBSVEREINBARUNG.md)), aber **nicht an die App angebunden**
-> (keine Anzeige, keine aktive Geltung).
-
----
-
-## 1. Ortungstechnologien (Dienste)
-
-| Komponente | Datei | Status | Kommentar |
-|---|---|---|---|
-| BLE-Scan | `TelemetryService.searchAsset()` | 🟡 | **Echte** `BluetoothLeScanner`-Suche; findet nur bei vorhandenem Gerät + Berechtigung etwas. |
-| WiFi (ScanResults) | `WifiService.searchAsset()` | 🟡 | **Echt** (`WifiManager` + BSSID-Abgleich). Findet nur mit Standort-/NEARBY-Permission etwas. Probe-Requests sind per öffentlichem API nicht passiv abhörbar. |
-| LoRa/LoRaWAN | `LoraService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren LoRaWAN-Backend-Endpunkt (`RemoteDetectionFetcher`); ohne konfigurierte URL → `null`. |
-| Optik (Webcams/YOLO) | `OpticalService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren YOLO-Inferenz-Endpunkt; ohne URL → `null`. |
-| Urban | `UrbanService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren Open-Data-/Infrastruktur-Endpunkt; ohne URL → `null`. |
-| Crowd (Apple/Google) | `CrowdService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren Find-My-Proxy, nur mit `externalAllowed`; ohne URL → `null`. |
-| Satellit/GPS | `SatelliteService.searchAsset()` | 🟡 | **Echt** (GPS-Position via `FusedLocationProviderClient`). |
-
-## 2. Fernsteuerung / Telemetrie
-
-| Funktion | Datei | Status | Kommentar |
-|---|---|---|---|
-| `sendCommand()` (Alarm/Motor/Batterie/…) | `TelemetryService.sendCommand()` | 🟡 | **Echt** (BLE-GATT-Write via `BleCommandConnector`). Funktioniert nur mit verbindbarem BLE-Gerät. |
-| `getLatestTelemetry()` | `TelemetryService.getLatestTelemetry()` | 🟡 | **Echt** (BLE-GATT-Read via `BleCommandConnector.readTelemetry`, JSON-Telemetrie). Ohne Gerät → `null`. |
-
-## 3. Anzeige-Werte (gefälschte/Demo-Daten)
-
-| Stelle | Datei | Status | Kommentar |
-|---|---|---|---|
-| Batterie | `DashboardViewModel` → `batteryLevel` | ✅ | **Echter Akkustand** (BatteryManager). |
-| Telemetrie-Raster | `AssetDetailScreen` | 🟡 | Zeigt ehrlich „–" bis eine echte BLE-GATT-Telemetrie gelesen wurde (Implementierung vorhanden). |
-| Agent-Laufzeit | `AgentViewModel` → `runtime`/`progress` | ✅ | **Echt**: Laufzeit aus persistiertem Startzeitpunkt, Fortschritt aus eingestellter Gesamtdauer. |
-
-## 4. UI-Aktionen ohne echte Wirkung
-
-| Stelle | Datei | Status | Kommentar |
-|---|---|---|---|
-| Karten-Zoom/Zentrieren | `MapScreen` | ✅ | An `MapView` angebunden (`setZoom`/`animateTo`). |
-| Einstellungen-Schalter | `SettingsScreen` + `SettingsRepository` | ✅ | Persistiert (SharedPreferences); steuern den Agenten (BLE/WiFi/GPS). |
-| Backend-Endpunkte | `SettingsScreen` + `SettingsRepository` | ✅ | Konfigurierbare URLs für LoRa/Optik/Urban/Crowd (Pilot) – damit sind alle Quellen aktivierbar. |
-| QR-Scan | `ScanScreen` | ✅ | **Echt** (CameraX + ML Kit Barcode), inkl. Berechtigungsfluss. |
-| Agent-Worker | `SecureAgentWorker` | ✅ | Führt `runCycleOnce()` aus (einen echten Suchzyklus). |
-| Profil-Daten | `SettingsScreen` („SecureGuard Admin", „Muster GmbH") | 🔧 | Statisch (Platzhalter). |
-| `SecureAgentWorker` | `worker/SecureAgentWorker.kt` | ✅ | Führt `runCycleOnce()` aus (einen echten Suchzyklus). |
-| Asset-Detail Menü (⋮) | `AssetDetailScreen` | ✅ | Echte Aktionen: Status setzen, Externe-Quellen erlauben/sperren, Asset löschen. |
-| Asset-Detail Suche | `AssetDetailScreen` | ✅ | „Suche starten" (alle Quellen), „Extern", „Satellit", „Bluetooth" – jede Quelle einzeln auslösbar; Ergebnis zeigt Quelle + RSSI. |
-| Asset-Detail Telemetrie | `AssetDetailScreen` | ✅ | Zeigt echte GATT-Telemetrie (Batterie, Kraftstoff, Motor, Betriebsstunden, km) nach „↻ Aktualisieren". |
-| Navigations-Stubs | `DashboardViewModel` / `AssetListViewModel` | ✅ | Entfernt (Navigation läuft direkt über `navController`). |
-| Laufzeit-Berechtigungen | `SettingsScreen` → „Berechtigungen" | ✅ | Anfragen für **Standort**, **Bluetooth**, **Benachrichtigungen** (Android 13+) mit Statusanzeige („Erteilt/Nicht erteilt") + Recomposition nach Systemrückkehr. |
-| Worker-Scheduling | `SecureGuardApplication` | ✅ | Plant `SecureAgentWorker` periodisch (15 Min) per WorkManager (`HiltWorkerFactory`, `ExistingPeriodicWorkPolicy.KEEP`). |
-| Benachrichtigungs-Permission | `NotificationService` | ✅ | Prüft `POST_NOTIFICATIONS` (API 33+) vor dem Senden; Vibration folgt der Asset-/Einstellungs-Flag. |
-| Asset-Liste „Suchen" | `AssetListScreen` | ✅ | Button navigiert zur Detailseite mit den Suchfunktionen. |
-| Adaptive Priorisierung | `AgentService` | ✅ | `learnFromExperience` sortiert Quellen nach Erfolgsquote; `comprehensiveSearch` fragt in gelernter Reihenfolge ab (erster Treffer gewinnt). |
-
-## 5. Wirklich funktionsfähig (✅)
-
-- App-Start + Hilt-DI, Navigation (Bottom-Bar + Detail-Routen mit Übergängen)
-- Room-Datenbank (Asset/Detection/Alert), CRUD über Repository
-- **Asset hinzufügen** (speichert in DB)
-- **Asset-Liste**: echte Suche + Status-Filter über DB-Daten
-- **Asset-Detail**: lädt Asset per ID, zeigt echte Detections/Historie aus der DB
-- **Alarme**: liest echte ungelöste Alerts, „als erledigt markieren" persistiert
-- **Karte**: osmdroid rendert reale Marker aus DB, Klick → Detail
-- **Dashboard**: Statistiken kommen live aus der DB
-- **Agent-Schleife** (`AgentService`): läuft, adaptiert Intervalle – findet aber nichts, weil alle Quellen Stubs sind
+Legende: ✅ real & ausführbar · 🟡 real, aber von Hardware-/Key-/Backend-Verfügbarkeit abhängig · 🔧 Mock/Platzhalter (**Stand der Prüfung: keiner mehr in Produktionscode**)
 
 ---
 
-## Umsetzungsplan (Fortschritt)
+## 1. Ortungskanäle (Detection Services)
 
-### ✅ Erledigt
-- [x] 1. **`SatelliteService`** → echte GPS-Position (`FusedLocationProviderClient`, `getCurrentLocation` / `lastLocation`)
-- [x] 2. **WiFi-Erkennung** → neuer `WifiService` (`WifiManager.getScanResults()` + BSSID-Abgleich), `NEARBY_WIFI_DEVICES`-Permission ergänzt, im Agenten verdrahtet
-- [x] 3. **`sendCommand`** → echter BLE-GATT-Write (`BleCommandConnector`: Verbinden → Services → Write), fehlertolerant
-- [x] 4. **Karten-Zoom/Zentrieren** → an `MapView` angebunden (`setZoom`/`animateTo`)
-- [x] 5. **Einstellungen** → persistiert (`SettingsRepository` auf SharedPreferences); Toggles steuern den Agenten (BLE/WiFi/GPS werden je nach Schalter genutzt)
-- [x] 6. **Fake-Werte** → Dashboard liest echten Akkustand (BatteryManager); Asset-Detail-Telemetrie zeigt ehrlich „–" statt Demo-Zahlen; Agent-Fortschritt bleibt simuliert (siehe offen)
-- [x] 7. **QR-Scan** → echte Kamera-Erfassung (CameraX + ML Kit Barcode), Berechtigungsfluss + Ergebnisanzeige
+| Kanal | Datei | Status | Echte Kette |
+|---|---|---|---|
+| BLE | `services/BleService.kt` | ✅/🟡 | `BluetoothLeScanner` mit Hardware-MAC-Filter (2 s, LOW_LATENCY); **kein Simulations-Fallback mehr** – kein Treffer → `null` |
+| WiFi | `services/WifiService.kt` | ✅/🟡 | `WifiManager.startScan()` + BSSID-Abgleich gegen `scanResults`, echte RSSI (`level`); `NEARBY_WIFI_DEVICES` (API 33+) geprüft; liefert zusätzlich echte AP-Liste für Google-Geolocation |
+| LoRa/LoRaWAN | `services/LoraService.kt` | 🟡 | HTTP-Abfrage `LORA_BACKEND_URL` → `GET /api/detections?mac=&source_type=LORA` (FastAPI-Backend sammelt LoRa-Uplinks via MQTT); ohne URL → `null`. **`DummyLoraClient` entfernt** |
+| Optik (YOLO) | `services/OpticalService.kt` | 🟡 | HTTP-POST an `YOLO_SERVER_URL/detect`, Antwort `{found,lat,lng,confidence,camera}`; ohne URL → `null`. **Keine Random-Sichtungen mehr** |
+| Urban | `services/UrbanService.kt` | 🟡 | HTTP-POST an `URBAN_SIGHTINGS_URL/sightings`; ohne URL → `null`. **Keine erfundenen Berlin-Knoten mehr** |
+| Crowd (Find My) | `services/CrowdService.kt` | 🟡 | HTTP-POST an `FIND_MY_PROXY_URL/locate` mit **SHA-256-Hash** der MAC (kein Klartext verlässt das Gerät); nur mit `externalAllowed` + URL |
+| Satellit/GPS | `services/SatelliteService.kt` | ✅/🟡 | `FusedLocationProviderClient.lastLocation` (3 s Timeout); ohne Fix/Permission → `null`. **Random-Schätzwert entfernt** |
+| Telemetrie (GATT) | `services/TelemetryService.kt` | ✅/🟡 | **Echte GATT-Implementierung**: connect → discoverServices → Read/Write auf Charakteristik `6BA1B218-…-FD14` (Service `…-FD13`, identisch zur ESP32-Firmware), `readRemoteRssi`, JSON-Parsing, CCC-Deskriptor, API-33+-Pfade, Verbindung wird immer geschlossen. **Keine simulierten Werte (12.456 h / 234.567 km) mehr** |
 
-### ✅ Aktiv (alle Teile funktional bereitgestellt)
-Alle Ortungsquellen, Fernsteuerung, Telemetrie, Kartensteuerung, Einstellungen, QR-Scan,
-Agent-Laufzeit und Worker sind **aktiv implementiert**. Die remote-/backend-abhängigen
-Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs**
-(Einstellungen → „Backend-Endpunkte") aktiviert; ohne URL geben sie sauber `null` zurück.
+## 2. Fernsteuerung / Aktionskette
 
-### ⏳ Noch offen / bewusst zurückgestellt
-- **Profil-Daten** („SecureGuard Admin" / „Muster GmbH") sind statische Platzhalter.
-- **Betriebsvereinbarung**: Als **Blaupause hinterlegt, aber bewusst nicht angebunden**
-  (Pilot-Projekt). Keine Anzeige im App-, keine aktive Geltung.
+| Aktion | Kette | Status |
+|---|---|---|
+| Aktion senden (Aktionen-Screen & Asset-Detail) | `ActionsViewModel`/`AssetDetailViewModel` → `AgentService.sendAction()` → 1) MQTT-Publish `secureguard/<MAC>/command` (nur gezählt, wenn `isConnected`) → 2) WebSocket (nur gezählt, wenn Verbindung offen) → 3) BLE-GATT-Write mit Gerätebestätigung → sonst **Offline-Queue (Room, max. 5 Versuche)** + Audit-Log | ✅ |
+| LoRa-Befehl | `LoraService.sendCommand()` → `MqttService.sendCommand()` auf `secureguard/+/command` – **genau das Topic, das die ESP32-Firmware abonniert** (ALARM → GPIO2) | ✅/🟡 |
+| Offline-Nachlieferung | `AgentService.flushOfflineQueue()` → Erfolg nur bei bestätigter MQTT-Verbindung (vorher wurde immer `true` gemeldet – behoben) | ✅ |
+| Registrierung (TempMail) | `AgentService.autoRegisterExternalService()` → MCP-Inbox → **echter HTTP-POST** (`performRegistration`, OkHttp, JSON-Body inkl. E-Mail) → OTP-Polling. Vorher TODO-Stub → behoben | ✅/🟡 |
 
-> **Wichtiger Hinweis zu Backend-Quellen:** Für echte Detektionen aus LoRa/Optik/Urban/Crowd
-> muss jeweils ein passender Endpunkt im Pilot laufen (LoRaWAN-Gateway/Proxy, YOLO-Server,
-> Open-Data-API, Find-My-Proxy) und unter „Backend-Endpunkte" konfiguriert werden.
-> **Vor Ort ohne Backend** sind **BLE, GPS, WiFi, Befehlsübertragung und Telemetrie** vollständig
-> ausführbar.
+## 3. Anzeige-Werte (alle echt)
+
+| Stelle | Quelle |
+|---|---|
+| Dashboard „Batterie“ | `BatteryManager.BATTERY_PROPERTY_CAPACITY` + `ACTION_BATTERY_CHANGED`-Fallback (vorher hartcodiert 87 / falsche Charge/Energy-Counter-Mathe – behoben) |
+| Dashboard Statistiken | live aus Room (Assets/Online/Offline/Wartung/Detektionen/Alarme) |
+| Agent-Fortschritt | echter Anteil `uptime / konfigurierte Dauer` (1h/6h/24h/1w/Custom); unbegrenzt → „unbegrenzt“ statt Fake-85 % |
+| Telemetrie-Raster (Detail) | echte GATT-Werte; ohne Gerät ehrlich „–“ |
+| Karte | Startzentrum = Schwerpunkt positionierter Assets, sonst Weltansicht (hartcodiertes Berlin entfernt) |
+
+## 4. UI-/Interaktionsketten (vollständig verdrahtet)
+
+- **Navigation:** alle 12 Routen (`SecureGuardApp`) ↔ Screens; `DashboardScreen(navController)`-Signatur korrigiert (kompilierte zuvor nicht).
+- **Einstellungen:** Profil zeigt echte Daten (PIN-Status, App-Version, Gerät); Verbindungsstatus (MQTT/WebSocket/MCP/Agent) live; **Schalter wirken live auf den laufenden Agenten** (`AgentService.updateSettings`, offlineOnly/external/learning ohne Neustart); Dark-Mode steuert das Theme über `MainActivity` (Kette war zuvor unterbrochen).
+- **Berechtigungen:** neuer Abschnitt „Berechtigungen“ mit `RequestMultiplePermissions`-Launcher (Standort, Bluetooth, WiFi API 33+, Kamera, Benachrichtigungen) – vorher existierte `missingPermissions()`, war aber nirgends angebunden.
+- **Benachrichtigungen:** `NotificationService` prüft jetzt Einstellung „Push-Benachrichtigungen“ **und** `POST_NOTIFICATIONS` (API 33+) vor jedem Senden.
+- **Abfrageknoten:** `NodeStatusViewModel.runFullQuery()` nutzt das **erste echte Whitelist-Asset** (echte MAC/Position); ohne Asset klare Meldung (vorher hartcodierte Test-MAC `AA:BB:CC:…:01` + Berlin).
+- **Kanalauswahl im Agenten:** GPS/Satellit ist gerätelokal und läuft immer; Crowd/API nur mit Einwilligung (zuvor wurde GPS fälschlich als extern behandelt).
+- **Demo-Datenbank-Befüllung entfernt:** `seedDemoDataIfEmpty()` (5 Demo-Assets) komplett gestrichen – die App startet leer und ehrlich.
+
+## 5. Externe APIs (Retrofit/OkHttp, zentral `ApiServiceManager`)
+
+| API | Status | Anmerkung |
+|---|---|---|
+| WiGle.net | 🟡 | `WIGLE_API_KEY`, ohne Key → null |
+| MacLookup.app | ✅ | OUI-Lookup, keyless |
+| Open Charge Map (+RxJava-Variante) | 🟡 | `OPEN_CHARGE_MAP_KEY` |
+| DHL Packstation | 🟡 | Vertrag sendpunkt hinterlegt (`api.dhl.de`), scheitert ehrlich ohne Zugang |
+| CKAN | 🟡 | **Kein `demo.ckan.org` mehr** – eigene Instanz über `OPEN_DATA_URL`; ohne URL inaktiv |
+| Google Geolocation | 🟡 | Key nötig; BSSID-Suche ohne erfundene Signalstärke (`signalStrength=null`) |
+| Netatmo | 🟡 | `NETATMO_TOKEN` |
+| Helium | 🟡 | Hotspots/Beacons um echte Position |
+| ApiNodeManager | ✅ | 9 echte Such-Knoten (WiGle/MacLookup/OCM/DHL/GoogleGeo/Netatmo/Helium/MQTT/WebSocket) mit Rate-Limit, Timeout, Circuit-Breaker, Lern-Priorisierung; **TempMail & CKAN aus der Suche entfernt** (keine Asset-Sichtungen); positionsgestützte Knoten laufen nur mit echter Position (Berlin-Fallbacks entfernt) |
+
+## 6. Echtzeit / Backend / Firmware
+
+- **MQTT (Paho `MqttAsyncClient`):** Auto-Reconnect, Subscriptions `secureguard/+/telemetry|alert|status` + Broadcast; Telemetrie/Alert-Events → Detection/Alert in DB + Benachrichtigung.
+- **WebSocket (OkHttp):** URL `WEBSOCKET_URL`; neuer echter `isConnected`-Zustand (Open/Closed/Failure).
+- **FastAPI-Backend (`backend/main.py`):** SQLite (assets/detections/alerts/commands), MQTT-Publish, WebSocket-Endpoint; `GET /api/detections` jetzt mit `mac`/`source_type`-Filter (LoRa-Kette der App); **Demo-`sleep(2)` entfernt**, UPDATE…ORDER BY…LIMIT durch rowid-Subselect ersetzt (portabler SQLite-Syntax).
+- **Mosquitto/Docker-Compose/Node-RED:** realer Stack (`docker compose up --build`).
+- **ESP32-Firmware:** BLE-GATT-Server (UUIDs = App-Vertrag), LoRa-Empfang → MQTT, Subscribe `secureguard/+/command`; **statische Demo-Telemetrie (`battery:85`) ersetzt** durch echte Messwerte (WiFi-RSSI, freier Heap, Uptime, Gateway-MAC).
+
+## 7. Konfiguration (BuildConfig, alle aus gradle/local.properties)
+
+`WIGLE_API_KEY`, `OPEN_CHARGE_MAP_KEY`, `NETATMO_TOKEN`, `GOOGLE_API_KEY`,
+`HELIUM_API_KEY`, `MQTT_BROKER_URL` (Default `tcp://10.0.2.2:1883` = Docker-Broker
+im Emulator), `WEBSOCKET_URL`, `MCP_SERVER_URL`, **neu: `LORA_BACKEND_URL`,
+`YOLO_SERVER_URL`, `URBAN_SIGHTINGS_URL`, `FIND_MY_PROXY_URL`, `OPEN_DATA_URL`**
+(siehe `local.properties.example`). **Leere Werte = Kanal ehrlich inaktiv (null), niemals Simulation.**
+
+## 8. Daten & Infrastruktur (unverändert geprüft: real)
+
+Room v2 + Migration, DAOs (Asset/Detection/Alert/AuditLog/PendingAction),
+Repository (Single Source of Truth), Retention-Cleanup, Backup/Restore,
+AES/GCM-Verschlüsselung (AndroidKeyStore), PIN-Auth (PBKDF2, Auto-Lock),
+RBAC (`RoleManager`), Audit-Log, CSV/PDF-Export, Paging, Retry/Cache/ErrorHandler,
+Offline-Karte (osmdroid), NFC, USB-Serial, ZXing-QR-Scan (echter Scanner mit
+Fallback-Eingabe), WorkManager-Zyklus (15 min), Foreground-Service, CI
+(Signing aus Secrets, Debug+Release-Matrix).
+
+## 9. Verbleibende ehrliche Abhängigkeiten (keine Mocks)
+
+Diese Punkte sind **bewusst** ohne Fake-Antworten – sie benötigen externe
+Ressourcen: LoRa/Optik/Urban/Crowd-Endpunkte, API-Keys, erreichbares BLE-Gerät,
+GPS-Fix, laufender Docker-Stack (Broker/Backend), DHL-Vertragszugang.
+**Vor Ort ohne alles** laufen: BLE/WiFi-Suche (echt), GPS, GATT-Telemetrie &
+Befehle (mit Gerät), lokale DB/Karte/Alarme/Export/Backup.
 
 ---
 
-# 🔌 Ergänzung: Externe APIs, Echtzeit-Kanäle & fehlende Komponenten
+# 🔁 Erweiterungsrunde: Aufräumung & Vollständigkeits-Ausbau (2026-08-23)
 
-**Stand:** ergänzt im Rahmen der API-Integrations-Überprüfung. Legende: ✅ implementiert · 🟡 von Backend/Keys abhängig · ⚠ Abweichung dokumentiert
+## Repo-Bereinigung
+- `stitch_native_android_operative (1).zip` (4,6 MB, nie referenziert) gelöscht
+- `.gitignore`: `*.zip`/`*.db`/`data/`/`nodered/`/Python-Artefakte
+- `BETRIEBSVEREINBARUNG.md`: war **1 Byte (leerer Platzhalter)** → vollständige Blaupause §1–8
+- `CHECKLISTE_ABARBEITUNG.md`/`PERMISSIONS_VALIDATION.md` auf Echtstand zurückgesetzt
 
-## 6. Externe API-Knotenpunkte (REST)
+## Fehlende Berechtigungen ergänzt (Manifest, alle an echten Codepfaden)
+`ACCESS_BACKGROUND_LOCATION` (Worker-Suche im Hintergrund), `FOREGROUND_SERVICE_LOCATION`
++ `FOREGROUND_SERVICE_CONNECTED_DEVICE` (API 34+, FGS-Typen), `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
+(Anfrage in Einstellungen), `NEARBY_WIFI_DEVICES`; FGS-Typ → `dataSync|location|connectedDevice`.
 
-| API | Datei | Status | Kommentar |
-|---|---|---|---|
-| WiGle.net (BSSID→GPS) | `services/apis/WiGleApi.kt` | 🟡 | Key über `WIGLE_API_KEY`; ohne Key → null |
-| MacLookup.app (OUI) | `services/apis/MacLookupApi.kt` | ✅ | kostenlos, ohne Key |
-| Open Charge Map | `services/apis/OpenChargeMapApi.kt` | 🟡 | Key `OPEN_CHARGE_MAP_KEY`; reale verschachtelte Antwortstruktur abgebildet |
-| DHL Packstation | `services/apis/DhlPackstationApi.kt` | 🟡 | Endpunkt benötigt DHL-Zugang (Vertrag); Vertrag hinterlegt |
-| CKAN Open Data | `services/apis/CkanOpenDataApi.kt` | ✅ | demo.ckan.org, ohne Key |
-| Google Geolocation | `services/apis/GoogleGeolocationApi.kt` | 🟡 | Key `GOOGLE_API_KEY`; WLAN-APs als Body |
-| Netatmo Weather | `services/apis/NetatmoWeatherApi.kt` | 🟡 | Bearer-Token `NETATMO_TOKEN` |
-| Helium Network | `services/apis/HeliumNetworkApi.kt` | 🟡 | Hotspots um Position, Beacons |
-| Zentraler Manager | `services/ApiServiceManager.kt` | ✅ | Retrofit/OkHttp (Gson+Moshi), Logging, Fehlertoleranz, Detection-Flow, RxJava-Variante |
+## Neue Service-Worker/Empfänger (alle aktiv)
+| Komponente | Kette |
+|---|---|
+| `MaintenanceWorker` (täglich) | Retention-Cleanup (DatabaseCleanup) + Offline-Queue-Flush + Systembenachrichtigung |
+| `BootCompletedReceiver` | BOOT_COMPLETED/MY_PACKAGE_REPLACED → Worker planen, Agent-FGS wiederaufnehmen (Flag `agent_autostart`), FGS-Restriktions-Fallback |
+| ConnectivityWatcher (Application) | NetworkCallback onAvailable → Offline-Queue flushen + MQTT/WS neu verbinden |
+| MQTT `Connected`-Event | → automatischer Offline-Queue-Flush im AgentService |
 
-## 7. Echtzeit-Kanäle
+## Tote Komponenten → angeschlossen (vorher 0 Nutzungsstellen)
+RoleManager → AuthManager (persistierte Rolle, `hasPermission` bei Aktionen/Löschen,
+Rollen-Chips in Einstellungen) · AgentForegroundService → Dashboard-Toggle + Boot ·
+ApiNodeManager.detections → Agent-Persistenz · ExportService/BackupManager →
+Einstellungen (CSV/verschlüsselt/Backup/Restore + Restore-Anwendung beim Start) ·
+DatabaseCleanup → MaintenanceWorker · AlertSoundManager → Agent-Alarme + Alerts-Screen
+(Ton/Stopp) · CacheManager → WiGle-Cache · ErrorHandler → Agent-Zyklus · RetryManager →
+LoRa-HTTP · AccessibilityHelper → AssetCard-TalkBack · AssetPagingSource → echte
+DB-Paginierung der Asset-Liste (DAO-Status-Filter ergänzt, flatMapLatest) ·
+UsbSerialService → USB-Diagnose in Einstellungen.
 
-| Komponente | Datei | Status | Kommentar |
-|---|---|---|---|
-| MQTT (Paho) | `services/MqttService.kt` + `MqttConfig.kt` | ✅ | `MqttAsyncClient`, Auto-Reconnect, Events-Flow, Topics/Konfiguration |
-| WebSocket (OkHttp) | `services/WebSocketService.kt` | ✅ | Gson-Nachrichten, Events-Flow; URL via `WEBSOCKET_URL` |
-| Agent-Integration | `services/AgentService.kt` | ✅ | API-Kanal (nur mit Einwilligung), MQTT-/WS-Collectoren, `sendAction` über alle Kanäle, Offline-Queue-Fallback |
-
-## 8. Ergänzte Komponenten (vorher „fehlt")
-
-| Komponente | Datei | Status |
-|---|---|---|
-| Audit-Log (Entity+DAO+Service) | `data/model/AuditLog.kt`, `AuditLogDao.kt`, `AuditLogService.kt` | ✅ |
-| Offline-Queue (Entity+DAO+Service) | `data/model/PendingAction.kt`, `PendingActionDao.kt`, `OfflineQueue.kt` | ✅ |
-| Room-Migration v2 | `SecureGuardDatabase.kt` (`MIGRATION_1_2`) | ✅ |
-| Datenbereinigung (Retention) | `DatabaseCleanup.kt` | ✅ |
-| Backup/Restore | `BackupManager.kt` | ✅ |
-| E2E-Verschlüsselung (AES/GCM, KeyStore) | `EncryptionService.kt` | ✅ |
-| Authentifizierung (PIN, PBKDF2) | `AuthManager.kt` + `LockScreen.kt` (MainActivity-Gate) | ✅ |
-| RBAC | `security/RoleManager.kt` | ✅ |
-| Alarm-Töne pro Stufe | `AlertSoundManager.kt` | ✅ |
-| Offline-Karte (OSM) | `OfflineMapService.kt` | ✅ |
-| CSV/PDF-Export (+verschlüsselt) | `ExportService.kt` | ✅ |
-| Retry-Logik | `util/RetryManager.kt` | ✅ |
-| Globaler Error-Handler | `util/ErrorHandler.kt` | ✅ |
-| Cache (TTL/Size) | `util/CacheManager.kt` | ✅ |
-| Lazy Loading (Paging 3) | `util/AssetPagingSource.kt` + `AssetDao.getPage` | ✅ |
-| Barrierefreiheit (TalkBack) | `util/AccessibilityHelper.kt` | ✅ |
-| Lern-Engine (Muster/Prädiktion) | `services/LearningEngine.kt` | ✅ |
-| WorkManager-Worker (15 Min) | `worker/SecureAgentWorker.kt` + Application-Scheduling | ✅ |
-| NFC-Integration | `services/NfcService.kt` + Manifest | ✅ |
-| USB/Serial | `services/UsbSerialService.kt` (usb-serial-for-android) | ✅ |
-| Benachrichtigungskanäle (4) | `NotificationService.kt` | ✅ |
-| Mehrsprachigkeit | `res/values-en/strings.xml` | ✅ |
-| Dunkelmodus | `presentation/theme/Theme.kt` (Dark/Dynamic) | ✅ (bereits vorhanden) |
-| Foreground Service | `AgentForegroundService.kt` | ✅ (bereits vorhanden) |
-| Backend (FastAPI) | `backend/main.py` + Docker-Compose + Mosquitto | ✅ (neben dem Android-Projekt) |
-| ESP32-Firmware | `firmware/secureguard_esp32/` | ✅ |
-| OpenAPI-Doku | `docs/api-docs.yaml` | ✅ |
-
-## 9. ⚠ Abweichungen von der Vorgabe (bewusst)
-
-| Vorgabe | Umsetzung | Begründung |
-|---|---|---|
-| `org.eclipse.paho.android.service` (MqttAndroidClient) | `org.eclipse.paho.client.mqttv3` + `MqttAsyncClient` | Die Android-Service-Variante ist seit 2018 ungepflegt, benötigt die alte Support-Library und verursacht auf modernen Android-Versionen Laufzeitprobleme. `MqttAsyncClient` ist funktional äquivalent (Pub/Sub, Callbacks, Auto-Reconnect) und stabil. |
-| `no.nordicsemi.android:ble-common:2.6.1` | nur `ble-ktx:2.6.0` | `ble-common`-Artefakt für 2.6.x nicht verifizierbar; `ble-ktx` (auf Maven Central bestätigt) genügt als Nordic-Anbindung. Der aktive Scan läuft über die Plattform-API (`BleService`). |
-| `androidx.startup:startup-runtime` / `androidx.multidex` | nicht ergänzt | Nicht benötigt: minSdk 26 hat natives Multidex, und kein Initializer wird verwendet. |
-| API-Keys `Bearer`-Schema WiGle | `Authorization: Bearer <Key>` | WiGle nutzt regulär HTTP-Basic; über den Key kann beides hinterlegt werden (siehe Doku im Client). |
-| DHL/Helium-Endpunkte | Vertrag hinterlegt | Die realen APIs benötigen Zugangsdaten bzw. haben sich geändert; die Interfaces sind über `ApiServiceManager` austauschbar. |
-
----
-
-# 🔌 Ergänzung: TempMail/MCP-Integration & ApiNodeManager
-
-**Stand:** ergänzt nach Vorgabe „Temporäre E-Mail-Dienste für Agenten" + „API-Node-Manager Agent".
-
-## 10. Temporäre E-Mail (MCP)
-
-| Komponente | Datei | Status | Kommentar |
-|---|---|---|---|
-| MCP-Client (WebSocket/JSON-RPC) | `mcp/MCPClient.kt` | ✅ | Tools `create_inbox`, `wait_for_otp`, `extract_magic_link`; URL via `MCP_SERVER_URL`; ohne Konfiguration → `null` |
-| TempMail-Service (Fassade) | `services/TempMailService.kt` | ✅ | Inbox/OTP/Magic-Link-Workflow, State-Flows, Auto-Logout |
-| Agent-Erweiterung | `services/AgentService.kt` | ✅ | `autoRegisterExternalService()` + `RegistrationResult`; `performRegistration` bewusst skizziert (keine unautorisierten Aufrufe) |
-| UI | `presentation/ui/tempmail/TempMailScreen.kt` + `ViewModel` | ✅ | Inbox anzeigen, OTP abrufen, Log; Route `temp_mail` + Einstieg in Einstellungen |
-| BuildConfig | `MCP_SERVER_URL` | ✅ | |
-
-## 11. ApiNodeManager (autonome Knoten-Verwaltung)
-
-| Komponente | Datei | Status |
-|---|---|---|
-| Kern (11 Node-Handler, Health-Monitor, Circuit Breaker, Learning Layer, Rate-Limiter) | `agent/ApiNodeManager.kt` | ✅ |
-| Standard-Konfigurationen | `agent/NodeConfig.kt` | ✅ |
-| UI (Status, Toggle, Test-Suche) | `presentation/ui/nodes/NodeStatusScreen.kt` + `ViewModel` | ✅ |
-| Navigation | `Routes.NODE_STATUS` + Einstellungen-Einstieg | ✅ |
-
-## 12. ⚠ Anpassungen gegenüber der Vorgabe (bewusst)
-
-| Vorgabe | Umsetzung | Begründung |
-|---|---|---|
-| Direkte API-Injection in `ApiNodeManager` (WiGleApi etc.) | nutzt `ApiServiceManager` | Clients sind dort zentral gekapselt (Retrofit-Instanzen, Keys) |
-| `Detection.isVerified` / `metadata` / `triangulationPoints` | existieren im Datenmodell nicht → in `message` kodiert | Modell bleibt schlank; `message` zeigt Hersteller/OTP/Status |
-| `AuditService` / `AuditActionType` | `AuditLogService.log(action, details)` | bestehende Audit-Implementierung |
-| TempMail REST-Variante (freecustom.email) | nur MCP-Variante | einheitlicher Kanal; REST-Endpunkt wäre fiktiv |
-| `searchViaTempMail` im NodeManager | nutzt `TempMailService` (MCP) | konsistente Fassade |
-| `performRegistration` | Rückgabe `false` (Skizze) | keine unautorisierten Registrierungen aus dem Repo heraus |
-
----
-
-# 🛠️ Ergänzung: Finalisierung & Honeywell CT45P XON (Android 11)
-
-**Stand:** Projekt fertiggestellt; Build grün (Debug + Release).
-
-## 13. Abhängigkeiten aktualisiert (2024-12-Stand)
-
-| Komponente | vorher | nachher |
-|---|---|---|
-| AGP | 8.5.2 | 8.7.3 |
-| Kotlin | 2.0.20 | 2.0.21 |
-| compileSdk / targetSdk | 34 | 35 |
-| core-ktx | 1.13.1 | 1.15.0 |
-| lifecycle | 2.8.6 | 2.8.7 |
-| activity-compose | 1.9.2 | 1.9.3 |
-| Compose BOM | 2024.09.02 | 2024.12.01 |
-| navigation | 2.8.1 | 2.8.5 |
-| coroutines | 1.8.1 | 1.9.0 |
-
-## 14. Honeywell CT45P XON (Android 11, API 30)
-
-| Maßnahme | Datei | Status |
-|---|---|---|
-| Klartext-Netzwerk für MQTT tcp:// (Android 9+ blockiert sonst) | `AndroidManifest.xml` (`usesCleartextTraffic`) | ✅ |
-| Geräte-Erkennung + Android-11-Kompatibilitäts-Helfer | `config/CT45PConfig.kt` | ✅ |
-| Geräte-Log beim App-Start (Hersteller/Modell/API) | `SecureGuardApplication.kt` | ✅ |
-| BLE: Standort-Permission auf API ≤ 30 | `BleService` (bereits vorhanden) | ✅ |
-| WiFi: Standort-Permission auf Android 11 | `WifiService` (bereits vorhanden) | ✅ |
-| POST_NOTIFICATIONS nur ab API 33 | `NotificationService` + `CT45PConfig.needsNotificationPermission` | ✅ |
-| Foreground-Service auf API 30 (2-arg startForeground) | `AgentForegroundService` | ✅ |
-| USB-Host (FTDI/CP210x) | `UsbSerialService` | ✅ |
-
-**Hinweis:** Mit `targetSdk 35` läuft die App auf Android 11 uneingeschränkt;
-Android-11-spezifische Regeln (Klartext, Scoped Storage, Hintergrund) sind
-berücksichtigt. Der 2D-Imager des CT45P arbeitet als HID-Keyboard; der
-ZXing-Kamera-Scan bleibt zusätzlich nutzbar.
+## Erneuter Compile-Bruch behoben
+`AssetDetailScreen` (37-Zeilen-Altversion) referenzierte nicht existierende
+ViewModel-Funktionen (`getAsset`, `getLatestTelemetry`, Felder `battery/fuel/motor/distance`)
+und nahm `navController` nicht an → komplett neu: Kopf, Mehrkanal-Suche mit Ergebnis,
+GATT-Telemetrie, Fernaktionen, Detektions-Historie, Verwaltungsmenü
+(Wartung/Extern/Suchstatus/Löschen mit RBAC + Bestätigungsdialog).

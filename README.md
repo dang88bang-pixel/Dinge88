@@ -20,8 +20,8 @@ von einem **selbstlernenden Agenten**.
 | 🔗 **Echtzeit** | MQTT (Paho) und WebSocket (OkHttp) für Telemetrie/Alerts/Befehle |
 | 🧠 **Agent** | Selbstlernend (LearningEngine: Muster, Prädiktion, adaptives Intervall), priorisiert erfolgreiche Kanäle |
 | 🔔 **Alarme** | Audit-Log, Push-Benachrichtigungen (4 Kanäle), Alarm-Töne pro Stufe, Command-Log |
-| 🔒 **Sicherheit** | PIN-Sperre (PBKDF2), AES/GCM-Verschlüsselung (AndroidKeyStore), RBAC-Rollenmodell |
-| 💾 **Daten** | Room mit Migration v2, Retention-Bereinigung, Backup/Restore, Offline-Queue, CSV/PDF-Export |
+| 🔒 **Sicherheit** | PIN-Sperre (PBKDF2), AES/GCM-Verschlüsselung (AndroidKeyStore), RBAC-Rollenmodell (ADMIN/MANAGER/OPERATOR/VIEWER, wirksam geprüft bei Aktionen & Löschen) |
+| 💾 **Daten** | Room mit Migration v2, tägliche Retention-Bereinigung (MaintenanceWorker), Backup/Restore (zweiphasig), Offline-Queue mit Netzwerk-/MQTT-Nachlieferung, CSV/PDF-Export (auch verschlüsselt), DB-Paginierung (Paging 3) |
 | 📷 **QR-Scan** | Integrierter Scanner (ZXing) zum Anlernen neuer Assets |
 | 📟 **Hardware** | NFC-Tags, USB/Serial (usb-serial-for-android), ESP32-Firmware (`firmware/`) |
 
@@ -44,14 +44,15 @@ app/src/main/java/com/secureguard/enterprise/
 │   └── apis/            # WiGleApi, MacLookupApi, OpenChargeMapApi, DhlPackstationApi,
 │                        # CkanOpenDataApi, GoogleGeolocationApi, NetatmoWeatherApi, HeliumNetworkApi
 ├── util/                # ErrorHandler, RetryManager, CacheManager, AssetPagingSource, AccessibilityHelper
-├── worker/              # SecureAgentWorker (WorkManager, 15-Min-Takt)
+├── worker/              # SecureAgentWorker (15-Min-Suchzyklus), MaintenanceWorker (tägliche Bereinigung)
+├── receiver/            # BootCompletedReceiver (Worker/Agent nach Reboot wieder aufnehmen)
 ├── presentation/
 │   ├── components/      # AssetCard, StatCard, ActionButton
 │   ├── navigation/      # NavHost + Bottom-Navigation
 │   ├── theme/           # Material 3 Theme (Light/Dark/Dynamic)
 │   └── ui/              # Dashboard, Assets, Map, Actions, Agent, Settings, Alerts, Auth (LockScreen)
 ├── MainActivity.kt      # + PIN-Sperre (AuthManager) + NFC-Verarbeitung
-└── SecureGuardApplication.kt  # Hilt, WorkManager-Scheduling, Demo-Seed
+└── SecureGuardApplication.kt  # Hilt, WorkManager-Scheduling
 ```
 
 ## 🔌 Externe APIs & Echtzeit-Kanäle
@@ -62,7 +63,7 @@ app/src/main/java/com/secureguard/enterprise/
 | MacLookup.app | `services/apis/MacLookupApi.kt` | OUI-Auflösung (Hersteller) |
 | Open Charge Map | `services/apis/OpenChargeMapApi.kt` | Ladesäulen (auch RxJava) |
 | DHL Packstation | `services/apis/DhlPackstationApi.kt` | Paketstationen |
-| CKAN Open Data | `services/apis/CkanOpenDataApi.kt` | Smart-City-Datensätze |
+| CKAN Open Data | `services/apis/CkanOpenDataApi.kt` | Smart-City-Datensätze (eigene Instanz via `OPEN_DATA_URL`) |
 | Google Geolocation | `services/apis/GoogleGeolocationApi.kt` | WLAN-Triangulation |
 | Netatmo Weather | `services/apis/NetatmoWeatherApi.kt` | Wetterstationen |
 | Helium Network | `services/apis/HeliumNetworkApi.kt` | LoRaWAN-Hotspots |
@@ -72,7 +73,10 @@ app/src/main/java/com/secureguard/enterprise/
 API-Keys werden über `local.properties` (Vorlage: `local.properties.example`) bzw.
 `gradle.properties` gesetzt und landen als `BuildConfig`-Felder
 (`WIGLE_API_KEY`, `OPEN_CHARGE_MAP_KEY`, `NETATMO_TOKEN`, `GOOGLE_API_KEY`,
-`HELIUM_API_KEY`, `MQTT_BROKER_URL`, `WEBSOCKET_URL`, `MCP_SERVER_URL`).
+`HELIUM_API_KEY`, `MQTT_BROKER_URL`, `WEBSOCKET_URL`, `MCP_SERVER_URL`,
+`LORA_BACKEND_URL`, `YOLO_SERVER_URL`, `URBAN_SIGHTINGS_URL`,
+`FIND_MY_PROXY_URL`, `OPEN_DATA_URL`). Leere Werte deaktivieren den jeweiligen
+Kanal ehrlich (keine Treffer, keine Demo-Daten).
 
 ## 🖥️ Backend & Firmware
 
@@ -81,10 +85,12 @@ API-Keys werden über `local.properties` (Vorlage: `local.properties.example`) b
 - `firmware/secureguard_esp32/` – ESP32-Gateway (LoRa + BLE + MQTT)
 - `docs/api-docs.yaml` – OpenAPI-Spezifikation des Backends
 
-Der `LoraService` hält sich bewusst an einen generischen `LoraClient`-Vertrag.
-Die eingebaute `DummyLoraClient`-Implementierung liefert Demo-Daten; für den
-Produktivbetrieb lässt sich z. B. Helium, The Things Network oder eine eigene
-Gateway-Flotte andocken, ohne andere Schichten zu ändern.
+Der `LoraService` fragt echte LoRaWAN-Uplinks ab: das mitgelieferte FastAPI-Backend
+sammelt LoRa-Pakete der Gateways über MQTT, die App liest sie per
+`GET /api/detections?mac=…&source_type=LORA` (`LORA_BACKEND_URL`). Befehle gehen
+als echtes MQTT-Publish auf `secureguard/<MAC>/command` – exakt das Topic, das die
+ESP32-Firmware abonniert. Ohne konfiguriertes Backend liefert der Kanal ehrlich
+„kein Treffer“ (keine Simulation).
 
 ## 🔨 Build
 

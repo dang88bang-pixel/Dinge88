@@ -20,7 +20,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.Date
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -59,11 +65,15 @@ class AgentService @Inject constructor(
     private val learningEngine: LearningEngine,
     private val auditLogService: AuditLogService,
     private val offlineQueue: OfflineQueue,
-    private val tempMailService: TempMailService
+    private val tempMailService: TempMailService,
+    private val apiNodeManager: com.secureguard.enterprise.agent.ApiNodeManager,
+    private val errorHandler: com.secureguard.enterprise.util.ErrorHandler,
+    private val alertSoundManager: AlertSoundManager
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var loopJob: Job? = null
+    private var apiNodeCollectorJob: Job? = null
     private var mqttCollectorJob: Job? = null
     private var webSocketCollectorJob: Job? = null
 
@@ -100,6 +110,8 @@ class AgentService @Inject constructor(
         mqttCollectorJob = null
         webSocketCollectorJob?.cancel()
         webSocketCollectorJob = null
+        apiNodeCollectorJob?.cancel()
+        apiNodeCollectorJob = null
         mqttService.disconnect()
         webSocketService.disconnect()
         _agentStatus.value = _agentStatus.value.copy(running = false)
@@ -116,14 +128,28 @@ class AgentService @Inject constructor(
         webSocketCollectorJob = scope.launch {
             webSocketService.events.collect { event -> handleWebSocketEvent(event) }
         }
+        // Treffer der API-Abfrageknoten (WiGle/Helium/MQTT-Anfragen …)
+        // persistieren und auf bekannte Assets anwenden.
+        apiNodeCollectorJob = scope.launch {
+            apiNodeManager.detections.collect { detection ->
+                runCatching {
+                    database.detectionDao().insert(detection)
+                    updateAssetIfKnown(detection)
+                }
+            }
+        }
         mqttService.connect()
         if (webSocketService.isConfigured) webSocketService.connect()
     }
 
-    private suspend fun runLoop(settings: AgentSettings) {
+    private suspend fun runLoop(initialSettings: AgentSettings) {
+        val startedAt = System.currentTimeMillis()
         while (scope.isActive) {
+            // Live-Einstellungen: updateSettings() wirkt ohne Neustart.
+            val settings = _agentStatus.value.settings
             val cycleStart = System.currentTimeMillis()
             val result = runCatching { runCycle(settings) }
+                .onFailure { errorHandler.handleError(it, "Agent-Zyklus") }
                 .getOrDefault(AgentCycleResult())
 
             val now = System.currentTimeMillis()
@@ -145,6 +171,19 @@ class AgentService @Inject constructor(
                 "Zyklus ${cycleCount.get()} · ${result.assetsChecked} Assets geprüft · " +
                     "${result.detections} Treffer"
             )
+
+            // Begrenzte Gesamtdauer: Agent stoppt sich nach Ablauf selbst.
+            val durationMs = initialSettings.durationHours?.times(3_600_000L)
+            if (durationMs != null && now - startedAt >= durationMs) {
+                scope.launch {
+                    auditLogService.log(
+                        action = "AGENT_DURATION_END",
+                        details = "Konfigurierte Laufzeit (${initialSettings.durationHours}h) erreicht – Agent stoppt"
+                    )
+                }
+                stop()
+                return
+            }
 
             val elapsed = System.currentTimeMillis() - cycleStart
             delay((intervalMs - elapsed).coerceAtLeast(0L))
@@ -235,14 +274,16 @@ class AgentService @Inject constructor(
         all[DetectionSource.OPTICAL] = { opticalService.searchAsset(asset) }
         all[DetectionSource.URBAN] = { urbanService.searchAsset(asset) }
 
-        // External / internet channels are only used when permitted.
+        // Satellit/GPS ist gerätelokal (kein Datenabfluss) – immer verfügbar.
+        all[DetectionSource.SATELLITE] = { satelliteService.searchAsset(asset) }
+
+        // Externe Internet-Kanäle nur mit ausdrücklicher Freigabe.
         if (!settings.offlineOnly || settings.externalSources) {
             if (asset.externalAllowed || settings.externalSources) {
                 all[DetectionSource.CROWD] = { crowdService.searchAsset(asset) }
                 // Externe REST-APIs (WiGle.net etc.) – nur mit Einwilligung.
                 all[DetectionSource.API] = { apiServiceManager.searchViaWiGle(asset.mac) }
             }
-            all[DetectionSource.SATELLITE] = { satelliteService.searchAsset(asset) }
         }
 
         if (!settings.learningMode) return all.toList()
@@ -286,6 +327,17 @@ class AgentService @Inject constructor(
 
     private suspend fun handleMqttEvent(event: MqttEvent) {
         when (event) {
+            is MqttEvent.Connected -> {
+                // Nach (Wieder-)Verbindung wartende Offline-Aktionen nachliefern.
+                val delivered = flushOfflineQueue()
+                if (delivered > 0) {
+                    auditLogService.log(
+                        action = "OFFLINE_FLUSH",
+                        details = "$delivered Aktionen nach MQTT-Wiederverbindung zugestellt"
+                    )
+                }
+            }
+
             is MqttEvent.Telemetry -> {
                 val detection = Detection(
                     assetMac = event.assetMac,
@@ -311,6 +363,9 @@ class AgentService @Inject constructor(
                         message = event.message,
                         timestamp = Date()
                     )
+                )
+                alertSoundManager.playForSeverity(
+                    com.secureguard.enterprise.data.model.AlertSeverity.WARNING.name
                 )
                 notificationService.sendAlertNotification(
                     "MQTT-Alert",
@@ -345,14 +400,24 @@ class AgentService @Inject constructor(
             is WebSocketEvent.Alert -> {
                 val mac = event.data["mac"] as? String ?: event.data["assetMac"] as? String
                 if (mac != null) {
+                    val severity = runCatching {
+                        com.secureguard.enterprise.data.model.AlertSeverity.valueOf(
+                            (event.data["severity"] as? String ?: "CRITICAL").uppercase()
+                        )
+                    }.getOrDefault(com.secureguard.enterprise.data.model.AlertSeverity.CRITICAL)
                     database.alertDao().insert(
                         com.secureguard.enterprise.data.model.Alert(
                             assetId = mac.uppercase(),
                             type = com.secureguard.enterprise.data.model.AlertType.SECURITY,
-                            severity = com.secureguard.enterprise.data.model.AlertSeverity.CRITICAL,
+                            severity = severity,
                             message = event.data["message"] as? String ?: "WebSocket-Alert",
                             timestamp = Date()
                         )
+                    )
+                    alertSoundManager.playForSeverity(severity.name)
+                    notificationService.sendAlertNotification(
+                        "WebSocket-Alert",
+                        event.data["message"] as? String ?: "Kritisches Ereignis"
                     )
                 }
             }
@@ -371,8 +436,8 @@ class AgentService @Inject constructor(
 
     /**
      * Führt eine Aktion über alle verfügbaren Kanäle aus (MQTT, WebSocket,
-     * BLE-GATT). Bei fehlender Verbindung wird die Aktion in die
-     * Offline-Queue eingereiht.
+     * BLE-GATT). Zustellung gilt nur bei bestätigter Verbindung; sonst wird
+     * die Aktion in die Offline-Queue eingereiht.
      */
     suspend fun sendAction(asset: Asset, action: String): Boolean {
         auditLogService.log(
@@ -382,17 +447,17 @@ class AgentService @Inject constructor(
 
         var delivered = false
 
-        // 1. MQTT
+        // 1. MQTT (Gateway/ESP32 abonniert secureguard/+/command)
         mqttService.sendCommand(asset.mac, action)
         if (mqttService.isConnected) delivered = true
 
-        // 2. WebSocket
-        if (webSocketService.isConfigured) {
+        // 2. WebSocket (nur wenn die Verbindung wirklich offen ist)
+        if (webSocketService.isConfigured && webSocketService.isConnected) {
             webSocketService.sendCommand(asset.id, action)
             delivered = true
         }
 
-        // 3. BLE/GATT (Telemetrie-Kanal)
+        // 3. BLE/GATT (Write auf die Command-Charakteristik, mit Bestätigung)
         if (telemetryService.sendCommand(asset.mac, action)) delivered = true
 
         // 4. Offline-Fallback: Aktion persistieren, wenn nichts zugestellt wurde.
@@ -406,11 +471,35 @@ class AgentService @Inject constructor(
         return delivered
     }
 
-    /** Zustellung der Offline-Queue über alle Kanäle. */
+    /** Zustellung der Offline-Queue — Erfolg nur bei bestätigter MQTT-Zustellung. */
     suspend fun flushOfflineQueue(): Int {
         return offlineQueue.retryPending { action ->
-            mqttService.sendCommand(action.assetMac, action.actionType)
-            true
+            if (mqttService.isConnected) {
+                mqttService.sendCommand(action.assetMac, action.actionType)
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    /**
+     * Ändert die Laufzeit-Einstellungen des Agenten live (ohne Neustart).
+     * Wird von den Einstellungen der UI verwendet, damit Schalter die
+     * laufende Suche unmittelbar steuern.
+     */
+    @Synchronized
+    fun updateSettings(transform: (AgentSettings) -> AgentSettings) {
+        val current = _agentStatus.value.settings
+        val next = transform(current)
+        _agentStatus.value = _agentStatus.value.copy(settings = next)
+        scope.launch {
+            auditLogService.log(
+                action = "AGENT_SETTINGS",
+                details = "Intervall=${next.interval}s, offlineOnly=${next.offlineOnly}, " +
+                    "external=${next.externalSources}, learning=${next.learningMode}, " +
+                    "duration=${next.durationHours ?: "unbegrenzt"}h"
+            )
         }
     }
 
@@ -491,16 +580,40 @@ class AgentService @Inject constructor(
         }
     }
 
-    /** Führt die Registrierung durch (hier als HTTP-POST-Skizze). */
+    /**
+     * Führt die Registrierung durch: echter HTTP-POST der Registrierungsdaten
+     * (inkl. der temporären E-Mail) an [url]. Erfolg = HTTP 2xx-Antwort.
+     */
     private suspend fun performRegistration(
         serviceName: String,
         url: String,
         data: Map<String, String>,
         email: String
-    ): Boolean {
-        // TODO: echte Registrierung (HTTP-POST mit email im Payload) –
-        // bewusst skizziert, um keine unautorisierten Aufrufe auszulösen.
-        return false
+    ): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val payload = com.google.gson.JsonObject().apply {
+                addProperty("email", email)
+                addProperty("service", serviceName)
+                data.forEach { (key, value) -> addProperty(key, value) }
+            }
+            val body = payload.toString()
+                .toRequestBody("application/json; charset=utf-8".toMediaType())
+            val request = Request.Builder()
+                .url(url)
+                .post(body)
+                .header("User-Agent", "SecureGuardEnterprise/1.0")
+                .build()
+            registrationHttpClient.newCall(request).execute().use { response ->
+                response.isSuccessful
+            }
+        }.getOrDefault(false)
+    }
+
+    private val registrationHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
     }
 
     companion object {

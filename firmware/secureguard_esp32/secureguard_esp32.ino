@@ -6,6 +6,12 @@
  *   - BLE-Peripheral mit Telemetrie-Characteristic (für die App)
  *   - MQTT-Befehle empfangen (z. B. ALARM) und verarbeiten
  *
+ * Telemetrie-Vertrag (BLE-Characteristic 6BA1B218-...-FD14, JSON):
+ *   {"type":"telemetry","gateway":"<mac>","rssi":<wifi-rssi>,
+ *    "heap":<freier heap>,"uptime":<millis>}
+ *   Asset-Telemetrie (battery/fuel/motorOk/tiresOk/hours/km/lat/lng)
+ *   sendet das Endgerät selbst – das Gateway liefert nur echte Werte.
+ *
  * Benötigte Bibliotheken (Arduino IDE Library Manager):
  *   - MCCI LoRa (oder SandeepMistry/arduino-LoRa)
  *   - ESP32 BLE Arduino
@@ -105,10 +111,15 @@ void loop() {
   }
 
   // --- BLE-Telemetrie (alle 5 Sekunden) ---
+  // Echte Messwerte des Gateways: WiFi-RSSI, freier Heap, Laufzeit.
+  // (Keine Akku-Messung verbaut → kein „battery“-Feld, die App zeigt dann
+  // ehrlich „–“ statt eines erfundenen Werts.)
   static unsigned long lastBLE = 0;
   if (millis() - lastBLE > 5000) {
-    String telemetry = "{\"type\":\"telemetry\",\"battery\":85,\"rssi\":-45,\"timestamp\":\"" +
-                       String(millis()) + "\"}";
+    String telemetry = "{\"type\":\"telemetry\",\"gateway\":\"" + String(WiFi.macAddress()) +
+                       "\",\"rssi\":" + String(WiFi.RSSI()) +
+                       ",\"heap\":" + String(ESP.getFreeHeap()) +
+                       ",\"uptime\":" + String(millis()) + "}";
     pCharacteristic->setValue(telemetry.c_str());
     pCharacteristic->notify();
     lastBLE = millis();

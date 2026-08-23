@@ -28,7 +28,8 @@ data class GeolocationRequest(
 
 data class WifiAccessPoint(
     @SerializedName("macAddress") val macAddress: String,
-    @SerializedName("signalStrength") val signalStrength: Int = 0,
+    /** Null = weglassen (reine BSSID-Suche ohne erfundene Signalstärke). */
+    @SerializedName("signalStrength") val signalStrength: Int? = null,
     @SerializedName("age") val age: Int? = null,
     @SerializedName("channel") val channel: Int? = null,
     @SerializedName("signalToNoiseRatio") val signalToNoiseRatio: Int? = null

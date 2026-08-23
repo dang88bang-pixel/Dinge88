@@ -59,6 +59,13 @@ android {
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
         buildConfigField("String", "WEBSOCKET_URL", "\"${apiKey("WEBSOCKET_URL")}\"")
         buildConfigField("String", "MCP_SERVER_URL", "\"${apiKey("MCP_SERVER_URL")}\"")
+        // Pilot-Endpunkte: ohne konfigurierte URL liefert der jeweilige Kanal
+        // ehrlich „nicht gefunden“ (null) – keine Simulation.
+        buildConfigField("String", "LORA_BACKEND_URL", "\"${apiKey("LORA_BACKEND_URL")}\"")
+        buildConfigField("String", "YOLO_SERVER_URL", "\"${apiKey("YOLO_SERVER_URL")}\"")
+        buildConfigField("String", "URBAN_SIGHTINGS_URL", "\"${apiKey("URBAN_SIGHTINGS_URL")}\"")
+        buildConfigField("String", "FIND_MY_PROXY_URL", "\"${apiKey("FIND_MY_PROXY_URL")}\"")
+        buildConfigField("String", "OPEN_DATA_URL", "\"${apiKey("OPEN_DATA_URL")}\"")
     }
 
     val releaseSigning = signingConfigs.create("release") {
