@@ -26,7 +26,7 @@ concurrency:
 env:
   JAVA_VERSION: '17'
   COMPILE_SDK: 'android-34'
-  BUILD_TOOLS: '34.0.0'
+  BUILD_TOOLS: '35.0.0'
   GRADLE_CACHE_FOLDER: ~/.gradle/caches
   GRADLE_WRAPPER_FOLDER: ~/.gradle/wrapper
 
