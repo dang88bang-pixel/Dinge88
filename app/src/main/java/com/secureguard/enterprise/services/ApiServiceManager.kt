@@ -158,9 +158,6 @@ class ApiServiceManager @Inject constructor(
                 detection
             } else null
         }
-        } catch (e: Exception) {
-            null
-        }
     }
 
     /** MacLookup.app: MAC → Hersteller (OUI-Auflösung). */
