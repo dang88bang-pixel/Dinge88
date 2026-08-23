@@ -95,6 +95,19 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    private fun startAgent() {
+        agentService.start(
+            AgentSettings(
+                interval = 30,
+                dynamicPriority = true,
+                learningMode = true,
+                offlineOnly = true,
+                externalSources = false
+            )
+        )
+        refresh()
+    }
+
     /**
      * Liest den echten Geräte-Akkustand: primär über
      * [BatteryManager.BATTERY_PROPERTY_CAPACITY], alternativ über den

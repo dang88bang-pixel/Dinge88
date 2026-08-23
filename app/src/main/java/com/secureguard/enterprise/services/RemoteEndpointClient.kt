@@ -46,7 +46,8 @@ class RemoteEndpointClient @Inject constructor() {
 
     /**
      * POST `body` (JSON) an `url` und Parsen der Antwort als JSON-Objekt.
-     * `null` bei Fehler oder Nicht-2xx-Status.
+     * `null` bei Fehler, Nicht-2xx-Status oder wenn die Antwort kein
+     * JSON-Objekt ist.
      */
     suspend fun postJson(url: String, body: JsonObject, apiKey: String? = null): JsonObject? =
         execute(
@@ -59,7 +60,7 @@ class RemoteEndpointClient @Inject constructor() {
                 }
                 .post(gson.toJson(body).toRequestBody(jsonMediaType))
                 .build()
-        )
+        )?.takeIf { it.isJsonObject }?.asJsonObject
 
     /**
      * POST `body` (JSON) an `url`; liefert nur, ob die Anfrage mit HTTP 2xx

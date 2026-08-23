@@ -51,19 +51,19 @@ class WifiService @Inject constructor(
         } else null
 
         val hit = results?.firstOrNull {
-            it.bssid.equals(asset.mac, ignoreCase = true)
+            it.BSSID.equals(asset.mac, ignoreCase = true)
         }
 
         if (hit != null) {
             val detection = Detection(
                 assetMac = asset.mac,
                 sourceType = DetectionSource.WIFI,
-                nodeId = "wifi-ap ${hit.bssid}",
+                nodeId = "wifi-ap ${hit.BSSID}",
                 rssi = hit.level,
                 latitude = asset.latitude,
                 longitude = asset.longitude,
                 accuracyMeters = 15f,
-                message = "SSID: ${hit.ssid.ifBlank { "unbekannt" }}",
+                message = "SSID: ${hit.SSID.ifBlank { "unbekannt" }}",
                 timestamp = Date()
             )
             emit(detection)
