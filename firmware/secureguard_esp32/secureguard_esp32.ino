@@ -259,6 +259,49 @@ void callback(char* topic, byte* payload, unsigned int length) {
         ESP.restart();
     } else if (message.indexOf("CONFIG") >= 0) {
         parseAndSaveConfig(message);
+    } else if (message.indexOf("BATTERY") >= 0) {
+        // Batterie-Status sofort senden
+        readSensors();
+        char resp[128];
+        snprintf(resp, sizeof(resp),
+            "{\"type\":\"battery\",\"percent\":%d,\"voltage\":%.2f}",
+            batteryPercent, (analogRead(BATTERY_PIN) / 4095.0) * 3.3 * 2.0);
+        char topic[64];
+        snprintf(topic, sizeof(topic), "secureguard/%s/telemetry", device_id);
+        client.publish(topic, resp);
+        Serial.println("BATTERY-Status gesendet");
+    } else if (message.indexOf("MESSAGE") >= 0) {
+        // Nachricht empfangen: LED 3x kurz blinken als Bestätigung
+        for (int i = 0; i < 3; i++) {
+            digitalWrite(2, HIGH);
+            delay(100);
+            digitalWrite(2, LOW);
+            delay(100);
+        }
+        Serial.println("MESSAGE empfangen – LED-Bestätigung");
+    } else if (message.indexOf("POSITION") >= 0) {
+        // Positions-Anfrage: GPS-Daten senden (via WiFi-Position oder gespeicherte Koords)
+        char resp[128];
+        snprintf(resp, sizeof(resp),
+            "{\"type\":\"position\",\"ip\":\"%s\",\"wifi_rssi\":%d,\"device\":\"%s\"}",
+            WiFi.localIP().toString().c_str(), WiFi.RSSI(), device_id);
+        char topic[64];
+        snprintf(topic, sizeof(topic), "secureguard/%s/telemetry", device_id);
+        client.publish(topic, resp);
+        Serial.println("POSITION gesendet");
+    } else if (message.indexOf("TELEMETRY") >= 0) {
+        // Vollständige Telemetrie sofort senden
+        readSensors();
+        char resp[256];
+        snprintf(resp, sizeof(resp),
+            "{\"type\":\"telemetry\",\"battery\":%d,\"wifi_rssi\":%d,\"lora_rssi\":%d,"
+            "\"uptime\":%lu,\"ip\":\"%s\",\"device\":\"%s\"}",
+            batteryPercent, wifiRssi, loraRssi, uptimeSeconds,
+            WiFi.localIP().toString().c_str(), device_id);
+        char topic[64];
+        snprintf(topic, sizeof(topic), "secureguard/%s/telemetry", device_id);
+        client.publish(topic, resp);
+        Serial.println("TELEMETRY gesendet");
     }
 }
 
