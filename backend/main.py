@@ -535,6 +535,57 @@ if _FRONTEND_DIR.is_dir():
     app.mount("/", _StaticFiles(directory=str(_FRONTEND_DIR), html=True), name="ui")
 
 
+# ============ DATEI-UPLOAD (UI-Designs / Anhänge) ============
+
+from fastapi import UploadFile, File as FileField  # noqa: E402
+
+UPLOAD_DIR = _Path(os.environ.get("UPLOAD_DIR", "/home/user/uploads"))
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+_ALLOWED_EXT = {".html", ".htm", ".css", ".js", ".json", ".md", ".txt", ".zip", ".png", ".jpg", ".svg"}
+
+
+@app.get("/api/upload")
+async def list_uploads():
+    """Listet hochgeladene Dateien (Name, Größe, Zeit)."""
+    files = []
+    for p in sorted(UPLOAD_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+        if p.is_file():
+            st = p.stat()
+            files.append({"name": p.name, "size": st.st_size,
+                          "modified": datetime.fromtimestamp(st.st_mtime).isoformat()})
+    return files
+
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = FileField(...)):
+    """Nimmt eine Datei entgegen (z. B. UI-Design code.html) und speichert sie."""
+    ext = _Path(file.filename or "upload.bin").suffix.lower()
+    if ext not in _ALLOWED_EXT:
+        return {"status": "error", "error": f"Dateityp {ext} nicht erlaubt",
+                "allowed": sorted(_ALLOWED_EXT)}
+    safe = _Path(file.filename or "upload.bin").name  # Pfad-Traversal verhindern
+    target = UPLOAD_DIR / safe
+    data = await file.read()
+    target.write_bytes(data)
+    print(f"Upload gespeichert: {target} ({len(data)} Bytes)")
+    await manager.broadcast_async({
+        "type": "upload", "name": safe, "size": len(data),
+        "message": f"Datei hochgeladen: {safe} ({len(data)} Bytes)",
+    })
+    return {"status": "ok", "name": safe, "size": len(data)}
+
+
+@app.get("/api/upload/{name}")
+async def get_upload(name: str):
+    """Liefert eine hochgeladene Datei zurück (Vorschau/Download)."""
+    from fastapi.responses import FileResponse
+    safe = _Path(name).name
+    target = UPLOAD_DIR / safe
+    if not target.is_file():
+        return {"status": "not_found"}
+    return FileResponse(str(target), filename=safe)
+
+
 # ============ START ============
 
 if __name__ == "__main__":
