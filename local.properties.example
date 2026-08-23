@@ -6,8 +6,6 @@ WIGLE_API_KEY=your_wigle_key_here
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
 NETATMO_TOKEN=your_netatmo_token_here
 GOOGLE_API_KEY=your_google_key_here
-HELIUM_API_KEY=your_helium_key_here
-
 # Backend-Endpunkte (für Pilot)
 MQTT_BROKER_URL=mqtt://broker.example.com:1883
 WEBSOCKET_URL=ws://api.example.com:8000/ws

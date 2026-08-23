@@ -3,4 +3,6 @@
     <string name="app_name">SecureGuard Pro</string>
     <string name="agent_channel_name">Agent status</string>
     <string name="alerts_channel_name">Security alerts</string>
+    <string name="telemetry_channel_name">Telemetry data</string>
+    <string name="system_channel_name">System messages</string>
 </resources>

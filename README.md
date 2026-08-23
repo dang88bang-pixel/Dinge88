@@ -761,7 +761,6 @@ cp local.properties.example local.properties
 | `OPEN_CHARGE_MAP_KEY` | local.properties | ApiServiceManager |
 | `NETATMO_TOKEN` | local.properties | ApiServiceManager |
 | `GOOGLE_API_KEY` | local.properties | ApiServiceManager |
-| `HELIUM_API_KEY` | local.properties | (optional, Helium ist public) |
 | `MQTT_BROKER_URL` | local.properties | MqttConfig |
 | `WEBSOCKET_URL` | local.properties | WebSocketService |
 | `MCP_SERVER_URL` | local.properties | MCPClient |
@@ -777,7 +776,6 @@ WIGLE_API_KEY=your_wigle_key_here
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
 NETATMO_TOKEN=your_netatmo_token_here
 GOOGLE_API_KEY=your_google_key_here
-HELIUM_API_KEY=your_helium_key_here
 MQTT_BROKER_URL=mqtt://broker.example.com:1883
 WEBSOCKET_URL=ws://api.example.com:8000/ws
 MCP_SERVER_URL=http://api.example.com:8000
