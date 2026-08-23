@@ -51,7 +51,7 @@ app/src/main/java/com/secureguard/enterprise/
 │   ├── theme/           # Material 3 Theme (Light/Dark/Dynamic)
 │   └── ui/              # Dashboard, Assets, Map, Actions, Agent, Settings, Alerts, Auth (LockScreen)
 ├── MainActivity.kt      # + PIN-Sperre (AuthManager) + NFC-Verarbeitung
-└── SecureGuardApplication.kt  # Hilt, WorkManager-Scheduling, Demo-Seed
+└── SecureGuardApplication.kt  # Hilt, WorkManager-Scheduling
 ```
 
 ## 🔌 Externe APIs & Echtzeit-Kanäle
@@ -82,9 +82,19 @@ API-Keys werden über `local.properties` (Vorlage: `local.properties.example`) b
 - `docs/api-docs.yaml` – OpenAPI-Spezifikation des Backends
 
 Der `LoraService` hält sich bewusst an einen generischen `LoraClient`-Vertrag.
-Die eingebaute `DummyLoraClient`-Implementierung liefert Demo-Daten; für den
-Produktivbetrieb lässt sich z. B. Helium, The Things Network oder eine eigene
-Gateway-Flotte andocken, ohne andere Schichten zu ändern.
+Im Produktivbetrieb wird ein echter LoRaWAN-Backend-Endpunkt konfiguriert
+(Einstellungen → „Backend-Endpunkte", `HttpLoraClient`), z. B. The Things
+Network oder eine eigene Gateway-Flotte. Die `DummyLoraClient`-Simulation ist
+**nur noch im expliziten Demo-Modus** aktiv (Einstellungen → „Demo-Modus");
+ohne Demo-Modus liefern nicht erreichbare Quellen ehrlich „nicht gefunden".
+
+**Demo-Modus:** Über die Einstellungen zuschaltbar – alle Detektions-Kanäle
+(BLE, WiFi, LoRa, Optik, Urban, Crowd, Satellit) simulieren dann gekennzeichnete
+Ergebnisse („(Demo)"), und es können 5 Beispiel-Assets geladen werden.
+Standardmäßig ist der Modus **aus**; die App arbeitet ausschließlich mit echten
+Messungen (BLE-Scan, WiFi-Scan, GPS, BLE-GATT-Telemetrie/-Befehle,
+konfigurierbare HTTP-Endpunkte, echte REST-APIs wie govdata/CKAN, WiGle,
+MacLookup, OpenChargeMap, DHL Location Finder).
 
 ## 🔨 Build
 

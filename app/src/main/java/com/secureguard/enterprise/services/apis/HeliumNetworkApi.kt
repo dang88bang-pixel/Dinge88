@@ -8,8 +8,11 @@ import retrofit2.http.Query
 /**
  * Helium Network API – LoRaWAN-Hotspots in der Nähe.
  *
- * Basis-URL: `https://api.helium.io/`, Pfad `v1/hotspots/lat/{lat}/lon/{lon}`
- * (Hotspots um eine Position) bzw. `v1/hotspots/{id}/beacons`.
+ * Die ursprüngliche `https://api.helium.io/` v1-API ist abgeschaltet.
+ * Basis-URL ist daher konfigurierbar über `HELIUM_API_BASE_URL`
+ * (Standard: Community-Mirror `https://helium-api.stakejoy.com/`; alternativ
+ * eigener Proxy). Pfade: `v1/hotspots/lat/{lat}/lon/{lon}` bzw.
+ * `v1/hotspots/{id}/beacons`.
  */
 interface HeliumNetworkApi {
 

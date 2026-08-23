@@ -17,6 +17,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -68,10 +69,20 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(8.dp))
-                        Text("Benutzer: Wache Mitte", style = MaterialTheme.typography.bodyMedium)
-                        Text("Organisation: SecureGuard Enterprise",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedTextField(
+                            value = state.profileName,
+                            onValueChange = viewModel::setProfileName,
+                            label = { Text("Benutzer") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = state.profileOrg,
+                            onValueChange = viewModel::setProfileOrg,
+                            label = { Text("Organisation") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
                     }
                 }
             }
@@ -136,6 +147,76 @@ fun SettingsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
+                        Text("🧪 Demo-Modus",
+                            style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Im Demo-Modus liefern die Detektions-Kanäle (BLE, WiFi, LoRa, " +
+                                "Optik, Urban, Crowd, Satellit) simulierte Daten und es werden " +
+                                "5 Beispiel-Assets geladen – gekennzeichnet mit „(Demo)“. " +
+                                "Ausgeschaltet arbeitet die App ausschließlich mit echten " +
+                                "Messungen; nicht erreichbare Quellen melden ehrlich „nicht " +
+                                "gefunden“.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        SwitchRow(
+                            if (state.demoDataLoaded) "Demo-Modus (Daten geladen)"
+                            else "Demo-Modus (simulierte Kanäle)",
+                            state.demoMode,
+                            viewModel::setDemoMode
+                        )
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("🔗 Backend-Endpunkte (echte Quellen)",
+                            style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Sobald eine URL gesetzt ist, fragt der jeweilige Kanal den echten " +
+                                "Endpunkt ab (statt nur im Demo-Modus zu simulieren). " +
+                                "Leer = Kanal inaktiv.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        EndpointField(
+                            label = "LoRaWAN-Gateways (GET, JSON)",
+                            value = state.loraEndpoint,
+                            onChange = viewModel::setLoraEndpoint
+                        )
+                        EndpointField(
+                            label = "LoRa API-Key (optional, Bearer)",
+                            value = state.loraApiKey,
+                            onChange = viewModel::setLoraApiKey,
+                            obscure = true
+                        )
+                        EndpointField(
+                            label = "Optik-Inferenz (POST, YOLO-Server)",
+                            value = state.opticalEndpoint,
+                            onChange = viewModel::setOpticalEndpoint
+                        )
+                        EndpointField(
+                            label = "Urban-Infrastruktur (GET)",
+                            value = state.urbanEndpoint,
+                            onChange = viewModel::setUrbanEndpoint
+                        )
+                        EndpointField(
+                            label = "Crowd-/Find-My-Proxy (GET)",
+                            value = state.crowdEndpoint,
+                            onChange = viewModel::setCrowdEndpoint
+                        )
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text("📡 Erweiterte Werkzeuge",
                             style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(8.dp))
@@ -184,5 +265,28 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     ) {
         Text(label, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EndpointField(
+    label: String,
+    value: String,
+    onChange: (String) -> Unit,
+    obscure: Boolean = false
+) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text(label, style = MaterialTheme.typography.bodySmall)
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text("https://…") },
+            visualTransformation = if (obscure)
+                androidx.compose.ui.text.input.PasswordVisualTransformation()
+            else androidx.compose.ui.text.input.VisualTransformation.None
+        )
     }
 }

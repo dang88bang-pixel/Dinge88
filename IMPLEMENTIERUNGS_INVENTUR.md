@@ -1,10 +1,16 @@
 # 🔍 Implementierungs-Inventur – SecureGuard Enterprise
 
-**Stand:** laufende Prüfung. Legende: ✅ real & ausführbar · 🟡 real, aber von Hardware-/Backend-Verfügbarkeit abhängig · 🔧 Mock / Platzhalter / Demo
+**Stand:** Mock-/Demo-Audit abgearbeitet (alle Simulationen ersetzt bzw. hinter expliziten Demo-Modus gestellt). Legende: ✅ real & ausführbar · 🟡 real, aber von Hardware-/Backend-Verfügbarkeit abhängig · 🔧 Mock / Platzhalter / Demo
 
 > **Betriebsvereinbarung:** Ist eine **Blaupause** (Pilot-Projekt) – sie wird nur hinterlegt
 > ([`BETRIEBSVEREINBARUNG.md`](./BETRIEBSVEREINBARUNG.md)), aber **nicht an die App angebunden**
 > (keine Anzeige, keine aktive Geltung).
+
+> **Demo-Modus (neu):** Alle Detektions-Kanäle arbeiten standardmäßig mit echten Quellen
+> (Hardware bzw. konfigurierbare Endpunkte). **Simulation nur noch, wenn der Demo-Modus in
+> den Einstellungen explizit aktiviert wird** (`RuntimeSettings.demoMode`); simulierte
+> Ergebnisse sind mit „(Demo)" gekennzeichnet. Ohne Demo-Modus melden nicht erreichbare
+> Quellen ehrlich „nicht gefunden" (`null`).
 
 ---
 
@@ -12,28 +18,29 @@
 
 | Komponente | Datei | Status | Kommentar |
 |---|---|---|---|
-| BLE-Scan | `TelemetryService.searchAsset()` | 🟡 | **Echte** `BluetoothLeScanner`-Suche; findet nur bei vorhandenem Gerät + Berechtigung etwas. |
-| WiFi (ScanResults) | `WifiService.searchAsset()` | 🟡 | **Echt** (`WifiManager` + BSSID-Abgleich). Findet nur mit Standort-/NEARBY-Permission etwas. Probe-Requests sind per öffentlichem API nicht passiv abhörbar. |
-| LoRa/LoRaWAN | `LoraService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren LoRaWAN-Backend-Endpunkt (`RemoteDetectionFetcher`); ohne konfigurierte URL → `null`. |
-| Optik (Webcams/YOLO) | `OpticalService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren YOLO-Inferenz-Endpunkt; ohne URL → `null`. |
-| Urban | `UrbanService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren Open-Data-/Infrastruktur-Endpunkt; ohne URL → `null`. |
-| Crowd (Apple/Google) | `CrowdService.searchAsset()` | 🟡 | **Aktiv** über konfigurierbaren Find-My-Proxy, nur mit `externalAllowed`; ohne URL → `null`. |
-| Satellit/GPS | `SatelliteService.searchAsset()` | 🟡 | **Echt** (GPS-Position via `FusedLocationProviderClient`). |
+| BLE-Scan | `BleService.searchAsset()` | ✅/🔧 | **Echte** `BluetoothLeScanner`-Suche (2 s, MAC-Filter). Ohne Treffer → `null`; Simulation nur im Demo-Modus (`ble-sim (Demo)`). |
+| WiFi (ScanResults) | `WifiService.searchAsset()` | ✅/🔧 | **Echt**: `startScan()` + `scanResults`, BSSID-Abgleich mit Asset-MAC, echte RSSI. Ohne Treffer → `null`; Simulation nur im Demo-Modus. |
+| LoRa/LoRaWAN | `LoraService.searchAsset()` | 🟡/🔧 | **Echt** über konfigurierbaren LoRaWAN-Endpunkt (`HttpLoraClient`, Einstellungen → Backend-Endpunkte); Downlink via `POST <url>/downlink`. Ohne URL → `null`; `DummyLoraClient` nur im Demo-Modus. |
+| Optik (Webcams/YOLO) | `OpticalService.searchAsset()` | 🟡/🔧 | **Echt** über konfigurierbaren Inferenz-Endpunkt (`POST`, JSON-Vertrag im KDoc); ohne URL → `null`; Simulation nur im Demo-Modus. |
+| Urban | `UrbanService.searchAsset()` | 🟡/🔧 | **Echt** über konfigurierbaren Infrastruktur-/Open-Data-Endpunkt (`GET ?mac=`); ohne URL → `null`; Simulation nur im Demo-Modus. |
+| Crowd (Apple/Google) | `CrowdService.searchAsset()` | 🟡/🔧 | **Echt** über konfigurierbaren Find-My-Proxy (`GET ?mac=`), nur mit `externalAllowed`; ohne URL → `null`; Simulation nur im Demo-Modus. |
+| Satellit/GPS | `SatelliteService.searchAsset()` | ✅/🔧 | **Echt** (GPS-Position via `FusedLocationProviderClient` als Geräte-Referenzpunkt); ohne Fix → `null`; Schätzung nur im Demo-Modus. |
 
 ## 2. Fernsteuerung / Telemetrie
 
 | Funktion | Datei | Status | Kommentar |
 |---|---|---|---|
-| `sendCommand()` (Alarm/Motor/Batterie/…) | `TelemetryService.sendCommand()` | 🟡 | **Echt** (BLE-GATT-Write via `BleCommandConnector`). Funktioniert nur mit verbindbarem BLE-Gerät. |
-| `getLatestTelemetry()` | `TelemetryService.getLatestTelemetry()` | 🟡 | **Echt** (BLE-GATT-Read via `BleCommandConnector.readTelemetry`, JSON-Telemetrie). Ohne Gerät → `null`. |
+| `sendCommand()` (Alarm/Motor/Batterie/…) | `TelemetryService.sendCommand()` | 🟡/🔧 | **Echt**: BLE-GATT-Write-with-Response via `BleCommandConnector` (UUIDs wie ESP32-Firmware). Erfolg nur bei Gerätebestätigung; Simulation nur im Demo-Modus. |
+| `getLatestTelemetry()` / `fetchTelemetry()` | `TelemetryService` | 🟡/🔧 | **Echt**: BLE-GATT-Read, JSON-Vertrag der Firmware (`battery`, `rssi`, optional `fuel`, `hours`, `km`, `lat`, `lng`); ohne Gerät → `null`; Simulation nur im Demo-Modus. |
 
-## 3. Anzeige-Werte (gefälschte/Demo-Daten)
+## 3. Anzeige-Werte (keine gefälschten Daten mehr)
 
 | Stelle | Datei | Status | Kommentar |
 |---|---|---|---|
-| Batterie | `DashboardViewModel` → `batteryLevel` | ✅ | **Echter Akkustand** (BatteryManager). |
-| Telemetrie-Raster | `AssetDetailScreen` | 🟡 | Zeigt ehrlich „–" bis eine echte BLE-GATT-Telemetrie gelesen wurde (Implementierung vorhanden). |
-| Agent-Laufzeit | `AgentViewModel` → `runtime`/`progress` | ✅ | **Echt**: Laufzeit aus persistiertem Startzeitpunkt, Fortschritt aus eingestellter Gesamtdauer. |
+| Batterie | `DashboardViewModel` → `batteryLevel` | ✅ | **Echter Akkustand** (`BatteryManager.BATTERY_PROPERTY_CAPACITY`, Fallback `ACTION_BATTERY_CHANGED`); nicht auslesbar → „–" statt Fake. |
+| Telemetrie-Raster | `AssetDetailScreen` | ✅ | Zeigt ehrlich „–" bis eine echte BLE-GATT-Telemetrie gelesen wurde. |
+| Agent-Laufzeit/-Fortschritt | `AgentViewModel` → `runtime`/`progress` | ✅ | **Echt**: Laufzeit aus `AgentStatus.uptimeMillis`; Fortschritt = verstrichene/geplante Laufzeit (`durationHours`) bzw. Zyklusfortschritt; Agent stoppt automatisch nach Ablauf. |
+| Dashboard-Statistiken | `DashboardViewModel` | ✅ | Live aus der Room-DB. **Hinweis:** Ohne Demo-Modus startet die DB leer (kein Auto-Seed mehr); Demo-Assets nur noch explizit über Einstellungen. |
 
 ## 4. UI-Aktionen ohne echte Wirkung
 
@@ -44,7 +51,7 @@
 | Backend-Endpunkte | `SettingsScreen` + `SettingsRepository` | ✅ | Konfigurierbare URLs für LoRa/Optik/Urban/Crowd (Pilot) – damit sind alle Quellen aktivierbar. |
 | QR-Scan | `ScanScreen` | ✅ | **Echt** (CameraX + ML Kit Barcode), inkl. Berechtigungsfluss. |
 | Agent-Worker | `SecureAgentWorker` | ✅ | Führt `runCycleOnce()` aus (einen echten Suchzyklus). |
-| Profil-Daten | `SettingsScreen` („SecureGuard Admin", „Muster GmbH") | 🔧 | Statisch (Platzhalter). |
+| Profil-Daten | `SettingsScreen` | ✅ | Editierbar und lokal persistiert (`profile_name`/`profile_org`, Standard „Wache Mitte"/„SecureGuard Enterprise"). |
 | `SecureAgentWorker` | `worker/SecureAgentWorker.kt` | ✅ | Führt `runCycleOnce()` aus (einen echten Suchzyklus). |
 | Asset-Detail Menü (⋮) | `AssetDetailScreen` | ✅ | Echte Aktionen: Status setzen, Externe-Quellen erlauben/sperren, Asset löschen. |
 | Asset-Detail Suche | `AssetDetailScreen` | ✅ | „Suche starten" (alle Quellen), „Extern", „Satellit", „Bluetooth" – jede Quelle einzeln auslösbar; Ergebnis zeigt Quelle + RSSI. |
@@ -66,7 +73,9 @@
 - **Alarme**: liest echte ungelöste Alerts, „als erledigt markieren" persistiert
 - **Karte**: osmdroid rendert reale Marker aus DB, Klick → Detail
 - **Dashboard**: Statistiken kommen live aus der DB
-- **Agent-Schleife** (`AgentService`): läuft, adaptiert Intervalle – findet aber nichts, weil alle Quellen Stubs sind
+- **Agent-Schleife** (`AgentService`): läuft, adaptiert Intervalle; findet Assets über die
+  echten lokalen Kanäle (BLE, WiFi, GPS) bzw. über konfigurierte Backend-Endpunkte.
+  Ohne Demo-Modus und ohne erreichbare Quellen wird ehrlich „nicht gefunden" gemeldet.
 
 ---
 
@@ -88,15 +97,17 @@ Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs
 (Einstellungen → „Backend-Endpunkte") aktiviert; ohne URL geben sie sauber `null` zurück.
 
 ### ⏳ Noch offen / bewusst zurückgestellt
-- **Profil-Daten** („SecureGuard Admin" / „Muster GmbH") sind statische Platzhalter.
 - **Betriebsvereinbarung**: Als **Blaupause hinterlegt, aber bewusst nicht angebunden**
   (Pilot-Projekt). Keine Anzeige im App-, keine aktive Geltung.
+- **Firmware-Zugangsdaten**: `secureguard_esp32.ino` enthält Beispiel-WiFi/MQTT-Werte
+  (Template) – müssen pro Gateway konfiguriert werden.
 
 > **Wichtiger Hinweis zu Backend-Quellen:** Für echte Detektionen aus LoRa/Optik/Urban/Crowd
 > muss jeweils ein passender Endpunkt im Pilot laufen (LoRaWAN-Gateway/Proxy, YOLO-Server,
 > Open-Data-API, Find-My-Proxy) und unter „Backend-Endpunkte" konfiguriert werden.
 > **Vor Ort ohne Backend** sind **BLE, GPS, WiFi, Befehlsübertragung und Telemetrie** vollständig
-> ausführbar.
+> ausführbar. Der **Demo-Modus** (Einstellungen) schaltet alle Kanäle auf Simulation und lädt
+> 5 Beispiel-Assets – immer gekennzeichnet mit „(Demo)".
 
 ---
 
@@ -111,11 +122,11 @@ Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs
 | WiGle.net (BSSID→GPS) | `services/apis/WiGleApi.kt` | 🟡 | Key über `WIGLE_API_KEY`; ohne Key → null |
 | MacLookup.app (OUI) | `services/apis/MacLookupApi.kt` | ✅ | kostenlos, ohne Key |
 | Open Charge Map | `services/apis/OpenChargeMapApi.kt` | 🟡 | Key `OPEN_CHARGE_MAP_KEY`; reale verschachtelte Antwortstruktur abgebildet |
-| DHL Packstation | `services/apis/DhlPackstationApi.kt` | 🟡 | Endpunkt benötigt DHL-Zugang (Vertrag); Vertrag hinterlegt |
-| CKAN Open Data | `services/apis/CkanOpenDataApi.kt` | ✅ | demo.ckan.org, ohne Key |
+| DHL Packstation | `services/apis/DhlPackstationApi.kt` | 🟡 | **Echte Location-Finder-API** (`api.dhl.com/location-finder/v1/findLocations`, Header `DHL-API-Key`, Key über `DHL_API_KEY`); ohne Key → leere Liste |
+| CKAN Open Data | `services/apis/CkanOpenDataApi.kt` | ✅ | **echtes Portal** `www.govdata.de/ckan` (Standard, über `CKAN_BASE_URL` überschreibbar) – kein Demo-Server mehr |
 | Google Geolocation | `services/apis/GoogleGeolocationApi.kt` | 🟡 | Key `GOOGLE_API_KEY`; WLAN-APs als Body |
 | Netatmo Weather | `services/apis/NetatmoWeatherApi.kt` | 🟡 | Bearer-Token `NETATMO_TOKEN` |
-| Helium Network | `services/apis/HeliumNetworkApi.kt` | 🟡 | Hotspots um Position, Beacons |
+| Helium Network | `services/apis/HeliumNetworkApi.kt` | 🟡 | Basis konfigurierbar (`HELIUM_API_BASE_URL`, Standard Community-Mirror `helium-api.stakejoy.com`, da alte `api.helium.io` v1 abgeschaltet) |
 | Zentraler Manager | `services/ApiServiceManager.kt` | ✅ | Retrofit/OkHttp (Gson+Moshi), Logging, Fehlertoleranz, Detection-Flow, RxJava-Variante |
 
 ## 7. Echtzeit-Kanäle
@@ -202,7 +213,7 @@ Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs
 | `AuditService` / `AuditActionType` | `AuditLogService.log(action, details)` | bestehende Audit-Implementierung |
 | TempMail REST-Variante (freecustom.email) | nur MCP-Variante | einheitlicher Kanal; REST-Endpunkt wäre fiktiv |
 | `searchViaTempMail` im NodeManager | nutzt `TempMailService` (MCP) | konsistente Fassade |
-| `performRegistration` | Rückgabe `false` (Skizze) | keine unautorisierten Registrierungen aus dem Repo heraus |
+| `performRegistration` | **Echt implementiert**: HTTP-POST mit JSON-Payload (`email` + Registrierungsfelder), Erfolg = HTTP 2xx, Ergebnis im Audit-Log (`REGISTER_HTTP`/`REGISTER_HTTP_ERROR`) | keine unautorisierten Registrierungen aus dem Repo heraus – Aufrufer übergibt Ziel-URL + Daten bewusst |
 
 ---
 
@@ -241,3 +252,47 @@ Quellen (LoRa, Optik, Urban, Crowd) werden über **konfigurierbare Endpunkt-URLs
 Android-11-spezifische Regeln (Klartext, Scoped Storage, Hintergrund) sind
 berücksichtigt. Der 2D-Imager des CT45P arbeitet als HID-Keyboard; der
 ZXing-Kamera-Scan bleibt zusätzlich nutzbar.
+
+---
+
+# 🧹 Audit-Runde: Mock-/Demo-Teile ersetzt (2026-08)
+
+Alle in der Prüfung gefundenen Mock-/Demo-/Simulations-Teile wurden ergänzt bzw.
+hinter einen **expliziten Demo-Modus** gestellt. Überblick:
+
+## Neue Komponenten
+| Komponente | Datei | Zweck |
+|---|---|---|
+| Laufzeit-Einstellungen | `services/RuntimeSettings.kt` | `demoMode` (Standard AUS) + Endpunkt-URLs für LoRa/Optik/Urban/Crowd |
+| HTTP-Client für Remote-Kanäle | `services/RemoteEndpointClient.kt` | GET/POST-JSON, fehlertolerant (null statt Fake) |
+| Echte GATT-Verbindung | `services/BleCommandConnector.kt` | BLE-Read/Write mit den UUIDs der ESP32-Firmware (Write-with-Response) |
+| Demo-Daten-Verwaltung | `services/DemoDataManager.kt` | Explizites Laden/Entfernen der 5 Beispiel-Assets (kein Auto-Seed mehr) |
+
+## Ersetzte Simulationen
+| Vorher | Nachher |
+|---|---|
+| `DummyLoraClient` immer aktiv | `HttpLoraClient` (konfigurierbarer Endpunkt, JSON-Vertrag); Dummy nur im Demo-Modus |
+| `LoraService.sendCommand`: `Random > 0.5` | Echter Downlink `POST <url>/downlink` (Erfolg = HTTP 2xx) |
+| `OpticalService`: Zufallstreffer | `POST` an Inferenz-Endpunkt (`found:false` = nichts); Zufall nur im Demo-Modus |
+| `CrowdService`: Zufallstreffer | `GET <url>?mac=` am Find-My-Proxy; Zufall nur im Demo-Modus |
+| `UrbanService`: feste Fake-Knoten | `GET <url>?mac=` an Infrastruktur-API; Beispiel-Knoten nur im Demo-Modus |
+| `WifiService`: Scan-Ergebnis verworfen, immer simuliert | Echter BSSID-Abgleich mit gemessener RSSI; Simulation nur im Demo-Modus |
+| `BleService`: immer Ersatztreffer (`ble-sim`) | `null` ohne Treffer; Simulation nur im Demo-Modus |
+| `SatelliteService`: Zufallsposition ohne Fix | `null` ohne Fix; Schätzung nur im Demo-Modus |
+| `TelemetryService`: Telemetrie/Zustellung komplett simuliert | Echtes GATT-Read/-Write (`BleCommandConnector`); Simulation nur im Demo-Modus |
+| `SecureGuardApplication`: Auto-Demo-Seed | Entfernt – Demo-Daten nur explizit (Einstellungen) |
+| `DashboardViewModel`: Akku fest 87 % | Echter Akkustand (`BatteryManager`), „–" falls nicht auslesbar |
+| `AgentViewModel`: Fortschritt fest 85 % | Echter Fortschritt (Laufzeit/Gesamtdauer bzw. Zyklus), Agent stoppt nach Ablauf (`durationHours`) |
+| `NodeStatusViewModel`: Demo-MAC + Fixkoordinaten | Erstes echtes Asset aus der DB; ohne Asset Hinweistext |
+| `AgentService.performRegistration`: immer `false` | Echter HTTP-POST (JSON-Payload, Erfolg = 2xx, Audit-Log) |
+| CKAN `demo.ckan.org` | Echtes Portal `www.govdata.de/ckan` (via `CKAN_BASE_URL` überschreibbar) |
+| DHL fiktiver Vertrag | Echte Location-Finder-API (`api.dhl.com/location-finder/v1`), Key `DHL_API_KEY` |
+| Helium tote `api.helium.io` | Basis konfigurierbar (`HELIUM_API_BASE_URL`, Standard Community-Mirror) |
+| Backend: `asyncio.sleep(2)` „Demo-Verarbeitung" | Entfernt; Aktionen senden echten Status-Broadcast |
+| Backend-WS: nur Echo/Ack | Echter Broadcast von Detektionen/Alerts/Command-Status + MQTT-Ingestion (`secureguard/+/telemetry`, `secureguard/+/alert`) an alle Clients |
+| Profil statisch („Wache Mitte") | Editierbar + lokal persistiert |
+
+**Verbleibende, dokumentierte Demos/Blaupausen (bewusst):**
+- Demo-Modus der App (explizit zuschaltbar, alle Ergebnisse „(Demo)"-markiert)
+- Betriebsvereinbarung als Blaupause (nicht angebunden)
+- Firmware-Template mit Beispiel-Zugangsdaten (pro Gateway zu konfigurieren)

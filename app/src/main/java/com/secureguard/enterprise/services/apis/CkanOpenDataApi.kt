@@ -7,9 +7,10 @@ import retrofit2.http.Query
 /**
  * CKAN Open Data API – Smart-City-Datensätze.
  *
- * Basis-URL: `https://demo.ckan.org/`, Pfad `api/3/action/package_search`.
- * Kostenlos ohne Key; Antwort: `{ "success": true, "result": { "count": n,
- * "results": [...] } }`.
+ * Basis-URL: reales Open-Data-Portal `https://www.govdata.de/ckan/`
+ * (offizielles deutsches Datenportal, über `CKAN_BASE_URL` überschreibbar),
+ * Pfad `api/3/action/package_search`. Kostenlos ohne Key; Antwort:
+ * `{ "success": true, "result": { "count": n, "results": [...] } }`.
  */
 interface CkanOpenDataApi {
 

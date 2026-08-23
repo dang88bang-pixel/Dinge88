@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecureGuard Enterprise · Live-Dashboard</title>
+<style>
+  :root{
+    --bg:#0b1220;--bg2:#101a2e;--card:#152238;--card2:#1b2b45;--line:#243756;
+    --tx:#e8eefc;--tx2:#9fb1cc;--acc:#3fa9f5;--ok:#2ecc71;--warn:#f1c40f;--err:#e74c3c;--purple:#a78bfa;
+    --shadow:0 8px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:linear-gradient(160deg,var(--bg),var(--bg2));color:var(--tx);min-height:100vh}
+  header{display:flex;align-items:center;gap:16px;padding:16px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,18,32,.92);backdrop-filter:blur(8px);z-index:50;flex-wrap:wrap}
+  header h1{font-size:1.25rem;display:flex;align-items:center;gap:10px}
+  header h1 .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--acc),var(--purple));display:flex;align-items:center;justify-content:center;font-size:1.1rem}
+  .pills{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;font-size:.75rem;background:var(--card);border:1px solid var(--line);color:var(--tx2)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--err);box-shadow:0 0 8px var(--err)}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  main{max-width:1400px;margin:0 auto;padding:20px 24px;display:grid;gap:18px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
+  .stat .v{font-size:1.9rem;font-weight:700}
+  .stat .l{font-size:.78rem;color:var(--tx2);margin-top:2px;text-transform:uppercase;letter-spacing:.06em}
+  .stat.acc .v{color:var(--acc)}.stat.ok .v{color:var(--ok)}.stat.warn .v{color:var(--warn)}.stat.err .v{color:var(--err)}
+  .grid{display:grid;grid-template-columns:1.25fr .95fr;gap:18px}
+  @media(max-width:1000px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0}
+  .card h2{font-size:.95rem;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .card h2 .badge{margin-left:auto;font-size:.68rem;color:var(--tx2);background:var(--card2);border:1px solid var(--line);padding:2px 10px;border-radius:99px}
+  .card .body{padding:14px 16px;overflow:auto;flex:1}
+  table{width:100%;border-collapse:collapse;font-size:.82rem}
+  th{text-align:left;color:var(--tx2);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;padding:7px 8px;border-bottom:1px solid var(--line)}
+  td{padding:8px;border-bottom:1px solid rgba(36,55,86,.45);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.68rem;font-weight:600}
+  .tag.mqtt{background:rgba(63,169,245,.15);color:var(--acc)}
+  .tag.ble,.tag.urban,.tag.api,.tag.ws,.tag.websocket{background:rgba(46,204,113,.15);color:var(--ok)}
+  .tag.critical{background:rgba(231,76,60,.18);color:var(--err)}
+  .tag.warning{background:rgba(241,196,15,.16);color:var(--warn)}
+  .tag.info,.tag.ok{background:rgba(46,204,113,.14);color:var(--ok)}
+  .tag.sys{background:rgba(167,139,250,.16);color:var(--purple)}
+  button{font:inherit;cursor:pointer;border:none;border-radius:9px;padding:8px 14px;background:linear-gradient(135deg,var(--acc),#2f8fe0);color:#fff;font-weight:600;transition:.15s}
+  button:hover{filter:brightness(1.12)}
+  button.ghost{background:var(--card2);border:1px solid var(--line);color:var(--tx)}
+  button.mini{padding:4px 10px;font-size:.72rem}
+  button.danger{background:linear-gradient(135deg,var(--err),#c0392b)}
+  input,select{font:inherit;background:var(--bg2);border:1px solid var(--line);color:var(--tx);border-radius:9px;padding:8px 10px;width:100%}
+  input:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+  .row>*{flex:1;min-width:120px}
+  .row>button{flex:0 0 auto;min-width:120px}
+  label{font-size:.7rem;color:var(--tx2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
+  .feed{display:flex;flex-direction:column;gap:8px;font-size:.78rem}
+  .evt{display:flex;gap:10px;align-items:start;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;animation:slide .25s ease}
+  @keyframes slide{from{opacity:0;transform:translateY(-4px)}to{opacity:1}}
+  .evt .ico{font-size:1rem}
+  .evt .t{margin-left:auto;color:var(--tx2);font-size:.68rem;white-space:nowrap}
+  .evt .m{color:var(--tx2)}
+  .evt b{color:var(--tx)}
+  .ws-off #liveDot{background:var(--err)}
+  footer{max-width:1400px;margin:0 auto;padding:8px 24px 26px;color:var(--tx2);font-size:.72rem;display:flex;gap:14px;flex-wrap:wrap}
+  a{color:var(--acc);text-decoration:none}
+  .empty{color:var(--tx2);font-size:.8rem;text-align:center;padding:18px 0}
+  .mono{font-family:ui-monospace,Consolas,monospace;font-size:.76rem}
+  .cmdline{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(36,55,86,.4)}
+  .cmdline:last-child{border-bottom:none}
+  .state{font-size:.68rem;color:var(--tx2)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="logo">🛡️</span> SecureGuard Enterprise <span style="font-size:.7rem;color:var(--tx2);font-weight:400">Live-Dashboard</span></h1>
+  <div class="pills">
+    <span class="pill"><span class="dot on" id="dotApi"></span> Backend</span>
+    <span class="pill"><span class="dot" id="dotMqtt"></span> MQTT</span>
+    <span class="pill"><span class="dot" id="dotWs"></span> WebSocket</span>
+    <span class="pill"><span class="dot" id="dotWorker"></span> Gateway-Worker</span>
+    <span class="pill"><span class="dot on" id="dotRed"></span> <a href="http://localhost:1880" target="_blank" style="color:inherit">Node-RED</a></span>
+  </div>
+</header>
+
+<main>
+  <section class="stats">
+    <div class="card stat acc"><div class="v" id="sAssets">–</div><div class="l">Assets</div></div>
+    <div class="card stat ok"><div class="v" id="sDetections">–</div><div class="l">Detektionen</div></div>
+    <div class="card stat warn"><div class="v" id="sAlerts">–</div><div class="l">Offene Alerts</div></div>
+    <div class="card stat"><div class="v" id="sCommands">–</div><div class="l">Befehle gesamt</div></div>
+    <div class="card stat"><div class="v" id="sDelivered">–</div><div class="l">Zugestellt</div></div>
+    <div class="card stat ok"><div class="v" id="sUptime">–</div><div class="l">Uptime</div></div>
+  </section>
+
+  <div class="grid">
+    <div style="display:grid;gap:18px">
+      <div class="card">
+        <h2>📦 Assets <span class="badge" id="assetCount">0</span></h2>
+        <div class="body">
+          <table id="assetTable">
+            <thead><tr><th>Name</th><th>MAC</th><th>Status</th><th>Position</th><th>Letzte Sichtung</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="empty" id="assetEmpty" hidden>Keine Assets – unten registrieren oder Demo-Worker aktivieren</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📡 Detektionen (Historie) <span class="badge" id="detCount">0</span></h2>
+        <div class="body" style="max-height:300px">
+          <table id="detTable">
+            <thead><tr><th>Zeit</th><th>Asset</th><th>Quelle</th><th>Knoten</th><th>RSSI</th><th>Position</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>➕ Asset registrieren</h2>
+        <div class="body">
+          <form class="row" id="assetForm">
+            <div><label for="aName">Name</label><input id="aName" required placeholder="E-Scooter Wache Nord"></div>
+            <div><label for="aMac">MAC</label><input id="aMac" required class="mono" placeholder="AA:BB:CC:DD:EE:FF" pattern="([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}"></div>
+            <div><label for="aLat">Breite</label><input id="aLat" type="number" step="0.0001" value="51.2277"></div>
+            <div><label for="aLng">Länge</label><input id="aLng" type="number" step="0.0001" value="6.7735"></div>
+            <button type="submit">Registrieren</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:18px">
+      <div class="card">
+        <h2>⚡ Live-Ereignisse <span class="badge"><span id="evtCount">0</span> Ereignisse</span></h2>
+        <div class="body" style="max-height:340px"><div class="feed" id="feed"><div class="empty">Warte auf Live-Ereignisse (WebSocket)…</div></div></div>
+      </div>
+
+      <div class="card">
+        <h2>🚨 Befehl senden <span class="badge">WS → MQTT → Gateway</span></h2>
+        <div class="body">
+          <form class="row" id="cmdForm">
+            <div><label for="cMac">Asset (MAC)</label><select id="cMac"></select></div>
+            <div><label for="cAction">Aktion</label>
+              <select id="cAction">
+                <option value="ALARM">ALARM (Sirene/GPIO)</option>
+                <option value="LIGHT">LIGHT (Licht)</option>
+                <option value="PING">PING (Erreichbarkeit)</option>
+              </select>
+            </div>
+            <button type="submit" class="danger">Senden</button>
+          </form>
+          <p class="state" style="margin-top:8px" id="cmdState">Befehl geht per WebSocket an das Backend, von dort per MQTT an das Gateway – Bestätigung erscheint in den Live-Ereignissen.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔔 Alerts <span class="badge" id="alertCount">0</span></h2>
+        <div class="body" style="max-height:240px">
+          <table id="alertTable">
+            <thead><tr><th>Zeit</th><th>Typ</th><th>Meldung</th><th>Status</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="empty" id="alertEmpty" hidden>Keine offenen Alerts ✓</div>
+          <div style="margin-top:10px"><button class="ghost mini" id="clearResolved">Erledigte entfernen</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📜 Befehlshistorie <span class="badge" id="cmdHistCount">0</span></h2>
+        <div class="body" style="max-height:220px"><div id="cmdHistory"><div class="empty">Noch keine Befehle gesendet</div></div></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>🛡️ SecureGuard Enterprise</span>
+  <span>·</span><span>Backend <code>/api/*</code></span>
+  <span>·</span><span>WebSocket <code>/ws</code></span>
+  <span>·</span><span>MQTT <code>secureguard/+</code></span>
+  <span>·</span><a href="/docs" target="_blank">OpenAPI-Doku</a>
+  <span>·</span><span id="clock"></span>
+</footer>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const API = '';
+const fmtT = s => new Date(s).toLocaleTimeString('de-DE');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const startedAt = Date.now();
+
+/* ---------- REST ---------- */
+async function api(path, opts) {
+  try {
+    const r = await fetch(API + path, opts);
+    return await r.json();
+  } catch (e) { return null; }
+}
+
+async function loadStats() {
+  const s = await api('/api/stats');
+  if (s) { $('sAssets').textContent = s.assets; $('sDetections').textContent = s.detections;
+           $('sAlerts').textContent = s.alerts ?? 0; }
+}
+async function loadAssets() {
+  const a = await api('/api/assets') || [];
+  $('assetCount').textContent = a.length;
+  $('assetEmpty').hidden = a.length > 0;
+  $('assetTable').querySelector('tbody').innerHTML = a.map(x => `
+    <tr><td><b>${esc(x.name)}</b></td><td class="mono">${esc(x.mac)}</td>
+    <td><span class="tag ${x.status === 'ONLINE' ? 'info' : 'warning'}">${esc(x.status)}</span></td>
+    <td class="mono">${x.latitude ? (+x.latitude).toFixed(4) + ', ' + (+x.longitude).toFixed(4) : '–'}</td>
+    <td>${x.last_seen ? fmtT(x.last_seen) : '–'}</td>
+    <td><button class="mini ghost" onclick="sendCmd('${esc(x.mac)}','PING')">Ping</button></td></tr>`).join('');
+  const sel = $('cMac');
+  const prev = sel.value;
+  sel.innerHTML = a.map(x => `<option value="${esc(x.mac)}">${esc(x.short_name || x.name)} · ${esc(x.mac)}</option>`).join('');
+  if (a.some(x => x.mac === prev)) sel.value = prev;
+}
+async function loadDetections() {
+  const d = await api('/api/detections');
+  if (!Array.isArray(d)) return;
+  $('detCount').textContent = d.length;
+  $('detTable').querySelector('tbody').innerHTML = d.slice(0, 30).map(x => `
+    <tr><td>${fmtT(x.timestamp)}</td><td class="mono">${esc(x.asset_mac)}</td>
+    <td><span class="tag ${String(x.source_type).toLowerCase()}">${esc(x.source_type)}</span></td>
+    <td class="mono">${esc(x.node_id)}</td><td>${x.rssi}</td>
+    <td class="mono">${x.latitude ? (+x.latitude).toFixed(4) + ', ' + (+x.longitude).toFixed(4) : '–'}</td></tr>`).join('');
+}
+async function loadAlerts() {
+  const a = await api('/api/alerts') || [];
+  $('alertCount').textContent = a.filter(x => !x.resolved).length + ' offen';
+  const open = a.filter(x => !x.resolved);
+  $('alertEmpty').hidden = open.length > 0;
+  $('alertTable').querySelector('tbody').innerHTML = open.slice(0, 20).map(x => `
+    <tr><td>${fmtT(x.timestamp)}</td><td><span class="tag ${String(x.severity).toLowerCase()}">${esc(x.type)}</span></td>
+    <td>${esc(x.message)}</td><td><span class="tag warning">offen</span></td>
+    <td><button class="mini ghost" onclick="resolveAlert(${x.id})">✔ Erledigt</button></td></tr>`).join('');
+}
+async function loadCommands() {
+  const c = await api('/api/commands') || [];
+  const delivered = c.filter(x => x.status === 'delivered').length;
+  $('sCommands').textContent = c.length; $('sDelivered').textContent = delivered;
+  $('cmdHistCount').textContent = c.length;
+  $('cmdHistory').innerHTML = c.length ? c.slice(0, 15).map(x => `
+    <div class="cmdline"><span class="tag ${x.status === 'delivered' ? 'info' : 'err'}">${esc(x.status)}</span>
+    <b>${esc(x.command)}</b> <span class="mono" style="color:var(--tx2)">${esc(x.asset_id)}</span>
+    <span class="t">${fmtT(x.timestamp)}</span></div>`).join('') : '<div class="empty">Noch keine Befehle gesendet</div>';
+}
+
+async function resolveAlert(id) {
+  const r = await api(`/api/alerts/${id}/resolve`, { method: 'PATCH' });
+  if (r && r.status === 'ok') { event('✔️', `Alert #${id} als erledigt markiert`, 'sys'); loadAlerts(); loadStats(); }
+}
+$('clearResolved').onclick = async () => {
+  const r = await api('/api/alerts', { method: 'DELETE' });
+  event('🧹', `${r?.removed ?? 0} erledigte Alerts entfernt`, 'sys'); loadAlerts();
+};
+
+/* ---------- Formulare ---------- */
+$('assetForm').onsubmit = async e => {
+  e.preventDefault();
+  const body = {
+    id: 'ui-' + Date.now().toString(36), name: $('aName').value,
+    mac: $('aMac').value.toUpperCase(), short_name: $('aName').value.split(' ')[0],
+    status: 'ONLINE', latitude: +$('aLat').value || null, longitude: +$('aLng').value || null,
+  };
+  const r = await api('/api/assets', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  if (r && !r.detail) { event('📦', `Asset registriert: <b>${esc(body.name)}</b>`, 'sys'); e.target.reset(); loadAssets(); loadStats(); }
+  else event('⚠️', 'Asset-Registrierung fehlgeschlagen', 'sys');
+};
+
+async function sendCmd(mac, action) {
+  if (!ws || ws.readyState !== 1) { event('⚠️', 'WebSocket nicht verbunden – Befehl nicht gesendet', 'sys'); return; }
+  ws.send(JSON.stringify({ type: 'command', assetId: mac, action }));
+  $('cmdState').textContent = `⏳ ${action} an ${mac} gesendet – warte auf Bestätigung …`;
+  event('📤', `Befehl <b>${esc(action)}</b> → <span class="mono">${esc(mac)}</span> (via WS → MQTT)`, 'sys');
+}
+$('cmdForm').onsubmit = e => { e.preventDefault(); sendCmd($('cMac').value, $('cAction').value); };
+
+/* ---------- Live-Ereignisse (WebSocket) ---------- */
+let ws = null, evtN = 0, reconnect = null, lastWorker = 0;
+function event(ico, html, cls) {
+  const feed = $('feed');
+  if (evtN === 0) feed.innerHTML = '';
+  evtN++; $('evtCount').textContent = evtN;
+  const div = document.createElement('div');
+  div.className = 'evt';
+  div.innerHTML = `<span class="ico">${ico}</span><div><span class="tag ${cls}">${cls === 'sys' ? 'System' : 'Live'}</span> <span style="margin-left:6px">${html}</span></div><span class="t">${fmtT(new Date())}</span>`;
+  feed.prepend(div);
+  while (feed.children.length > 60) feed.lastChild.remove();
+}
+function connectWs() {
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  ws.onopen = () => { $('dotWs').classList.add('on'); event('🔌', 'WebSocket verbunden – Live-Stream aktiv', 'sys'); };
+  ws.onclose = () => { $('dotWs').classList.remove('on'); clearTimeout(reconnect); reconnect = setTimeout(connectWs, 2000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = ev => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    switch (m.type) {
+      case 'detection':
+        event('📡', `Detektion: <b>${esc(m.assetMac)}</b> via <span class="tag ${String(m.sourceType).toLowerCase()}">${esc(m.sourceType)}</span> · Knoten <b>${esc(m.nodeId)}</b> · RSSI ${m.rssi}`, String(m.sourceType).toLowerCase());
+        if (m.nodeId === 'gw-worker-01') { lastWorker = Date.now(); $('dotWorker').classList.add('on'); }
+        loadDetections(); loadStats(); break;
+      case 'alert':
+        event('🚨', `Alert <span class="tag ${String(m.severity).toLowerCase()}">${esc(m.severity)}</span>: ${esc(m.message)} (<span class="mono">${esc(m.assetId)}</span>)`, String(m.severity).toLowerCase());
+        loadAlerts(); loadStats(); break;
+      case 'alert_resolved': event('✔️', `Alert #${m.alertId} erledigt (von anderem Client)`, 'sys'); loadAlerts(); break;
+      case 'command_status':
+        event(m.status === 'delivered' ? '✅' : '❌', `Befehl <b>${esc(m.command)}</b> für <span class="mono">${esc(m.assetId)}</span>: <b>${esc(m.status)}</b>`, m.status === 'delivered' ? 'info' : 'critical');
+        loadCommands(); break;
+      case 'ack':
+        $('cmdState').textContent = m.delivered ? `✅ ${m.action} bestätigt (MQTT zugestellt an Gateway)` : `❌ ${m.action} konnte nicht zugestellt werden`;
+        event(m.delivered ? '📨' : '⚠️', `ACK <b>${esc(m.action)}</b> → ${m.delivered ? 'zugestellt' : 'fehlgeschlagen'}`, m.delivered ? 'info' : 'critical');
+        loadCommands(); break;
+      default: event('💬', `Nachricht: <span class="mono">${esc(ev.data).slice(0, 120)}</span>`, 'sys');
+    }
+  };
+}
+
+/* ---------- Health-Polling ---------- */
+async function pollHealth() {
+  const h = await api('/api/health');
+  $('dotApi').classList.toggle('on', !!h);
+  $('dotMqtt').classList.toggle('on', !!(h && h.mqtt));
+  $('dotRed').classList.toggle('on', true);
+  // Worker-Guard: 3 Zyklen (à 10 s) ohne Telemetrie → als inaktiv markieren
+  if (lastWorker && Date.now() - lastWorker > 35000) $('dotWorker').classList.remove('on');
+  const up = Math.floor((Date.now() - startedAt) / 1000);
+  $('sUptime').textContent = up < 60 ? up + ' s' : Math.floor(up / 60) + ' m ' + (up % 60) + ' s';
+}
+
+/* ---------- Start ---------- */
+function boot() {
+  connectWs();
+  loadStats(); loadAssets(); loadDetections(); loadAlerts(); loadCommands();
+  setInterval(pollHealth, 5000); setInterval(loadStats, 15000);
+  setInterval(() => $('clock').textContent = new Date().toLocaleString('de-DE'), 1000);
+  pollHealth();
+}
+boot();
+</script>
+</body>
+</html>

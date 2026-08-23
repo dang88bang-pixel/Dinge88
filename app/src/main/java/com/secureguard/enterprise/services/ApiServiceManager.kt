@@ -1,5 +1,6 @@
 package com.secureguard.enterprise.services
 
+import com.secureguard.enterprise.BuildConfig
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import com.secureguard.enterprise.services.apis.ChargingStation
@@ -96,11 +97,13 @@ class ApiServiceManager @Inject constructor() {
     }
 
     private val dhlApi: DhlPackstationApi by lazy {
-        retrofitBuilder("https://api.dhl.de/").build().create(DhlPackstationApi::class.java)
+        retrofitBuilder("https://api.dhl.com/", moshi = true)
+            .build()
+            .create(DhlPackstationApi::class.java)
     }
 
     private val ckanApi: CkanOpenDataApi by lazy {
-        retrofitBuilder("https://demo.ckan.org/").build().create(CkanOpenDataApi::class.java)
+        retrofitBuilder(ckanBaseUrl).build().create(CkanOpenDataApi::class.java)
     }
 
     private val googleGeolocationApi: GoogleGeolocationApi by lazy {
@@ -112,7 +115,7 @@ class ApiServiceManager @Inject constructor() {
     }
 
     private val heliumApi: HeliumNetworkApi by lazy {
-        retrofitBuilder("https://api.helium.io/", moshi = true)
+        retrofitBuilder(heliumBaseUrl, moshi = true)
             .build()
             .create(HeliumNetworkApi::class.java)
     }
@@ -124,6 +127,21 @@ class ApiServiceManager @Inject constructor() {
             .build()
             .create(OpenChargeMapRxApi::class.java)
     }
+
+    /**
+     * CKAN-Basis: reales Open-Data-Portal (govdata.de), über `CKAN_BASE_URL`
+     * überschreibbar – kein Demo-Server mehr.
+     */
+    private val ckanBaseUrl: String
+        get() = BuildConfig.CKAN_BASE_URL.ifBlank { "https://www.govdata.de/ckan/" }
+
+    /**
+     * Helium-Basis: die alte api.helium.io v1 ist abgeschaltet; konfigurierbar
+     * über `HELIUM_API_BASE_URL` (z. B. ein Community-Mirror oder eigener
+     * Proxy, Standard: helium-api.stakejoy.com).
+     */
+    private val heliumBaseUrl: String
+        get() = BuildConfig.HELIUM_API_BASE_URL.ifBlank { "https://helium-api.stakejoy.com/" }
 
     // ============ DETECTION-FLOW ============
     private val _detections = MutableSharedFlow<Detection>(extraBufferCapacity = 100)
@@ -184,10 +202,16 @@ class ApiServiceManager @Inject constructor() {
             .onErrorReturn { emptyList() }
     }
 
-    /** DHL: Paketstationen um eine Position. */
+    /**
+     * DHL: Paketstationen um eine Position (echte Location-Finder-API).
+     * Ohne konfigurierten `DHL_API_KEY` wird eine leere Liste zurückgegeben.
+     */
     suspend fun searchViaDHL(lat: Double, lon: Double): List<Packstation> {
+        val key = BuildConfig.DHL_API_KEY
+        if (key.isBlank()) return emptyList()
         return try {
-            dhlApi.getPackstations(lat, lon)
+            dhlApi.getPackstations(lat = lat, lng = lon, apiKey = key)
+                .locations.map { Packstation.from(it) }
         } catch (e: Exception) {
             emptyList()
         }

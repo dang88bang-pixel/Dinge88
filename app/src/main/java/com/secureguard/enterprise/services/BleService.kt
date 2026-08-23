@@ -27,12 +27,15 @@ import kotlin.random.Random
 /**
  * Active + passive Bluetooth Low Energy scanning. For an explicit asset search
  * a short (2 s) filtered scan is run; a real hit for the asset's MAC is
- * preferred. If BLE is unavailable or nothing is seen, a simulated result is
- * returned so the demo / agent pipeline stays functional.
+ * preferred. If BLE is unavailable or nothing is seen, `null` is returned –
+ * a simulated hit is **only** produced when the explicit demo mode is enabled
+ * ([RuntimeSettings.demoMode]), so the pipeline stays demonstrable without
+ * faking production data.
  */
 @Singleton
 class BleService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val runtimeSettings: RuntimeSettings
 ) : DetectionCapable() {
 
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
@@ -58,17 +61,19 @@ class BleService @Inject constructor(
 
         if (hit != null) return hit
 
-        // Fallback / demo result.
+        // Kein echter Treffer: nur im expliziten Demo-Modus simulieren.
+        if (!runtimeSettings.demoMode) return null
         delay(150)
         val rssi = -35 - Random.nextInt(0, 45)
         return Detection(
             assetMac = asset.mac,
             sourceType = DetectionSource.BLE,
-            nodeId = "ble-sim",
+            nodeId = "ble-sim (Demo)",
             rssi = rssi,
             latitude = asset.latitude ?: 52.5200,
             longitude = asset.longitude ?: 13.4050,
             accuracyMeters = 5f,
+            message = "Demo-Modus (simuliert)",
             timestamp = Date()
         ).also { emit(it) }
     }
