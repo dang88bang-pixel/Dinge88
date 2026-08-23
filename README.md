@@ -93,7 +93,7 @@ Wrapper nötig):
 
 1. Code pushen oder Pull Request öffnen.
 2. Der Workflow `.github/workflows/build-release.yml` lädt JDK 17, das
-   Android-SDK (API 35) und Gradle 8.9 und führt `assembleDebug` plus
+   Android-SDK (API 34) und Gradle 8.9 und führt `assembleDebug` plus
    `assembleRelease` aus.
 3. Die Debug-APK steht als Artefakt **secureguard-pro-debug**, die
    Release-APK als **secureguard-pro** zur Verfügung.
@@ -108,7 +108,7 @@ gradle wrapper --gradle-version 8.9
 
 ## ⚙️ Konfiguration
 
-- **minSdk:** 26 (Android 8) · **targetSdk/compileSdk:** 35
+- **minSdk:** 26 (Android 8) · **targetSdk/compileSdk:** 34
 - **Sprache:** Kotlin 2.0.21, Jetpack Compose (BOM 2024.12)
 - **Build:** AGP 8.7.3 · Gradle 8.9 · JDK 17
 - **DI:** Hilt 2.52 · **DB:** Room 2.6.1
@@ -130,7 +130,7 @@ Das Projekt ist für das **Honeywell CT45P XON** ausgelegt, das werkseitig mit
 | **USB-Host** | Serielle Anbindung (FTDI/CP210x) via `UsbSerialService` |
 | **Benachrichtigungen** | `POST_NOTIFICATIONS` nur ab API 33 angefordert – auf Android 11 ohne Einschränkung |
 
-Das Gerät läuft mit `targetSdk 35`, ohne dass Android-11-spezifische
+Das Gerät läuft mit `targetSdk 34`, ohne dass Android-11-spezifische
 Einschränkungen greifen (Klartext-Netzwerk, Scoped Storage, Hintergrund-
 Dienste sind berücksichtigt).
 
