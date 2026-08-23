@@ -72,7 +72,9 @@ class AgentService @Inject constructor(
     private val nfcService: NfcService,
     private val usbSerialService: UsbSerialService,
     private val alertSoundManager: AlertSoundManager,
-    private val errorHandler: com.secureguard.enterprise.util.ErrorHandler
+    private val errorHandler: com.secureguard.enterprise.util.ErrorHandler,
+    private val dsnrService: DsnrService,
+    private val alcClientService: AlcClientService
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -379,7 +381,8 @@ class AgentService @Inject constructor(
     }
 
     private suspend fun persist(detection: Detection) {
-        database.detectionDao().insert(detection)
+        val filtered = dsnrService.filterDetection(detection)
+        database.detectionDao().insert(filtered)
     }
 
     private suspend fun applyDetectionToAsset(asset: Asset, detection: Detection) {
@@ -516,6 +519,16 @@ class AgentService @Inject constructor(
         )
 
         var delivered = false
+
+        // Send ALC Control Frame
+        runCatching {
+            val alcPayload = JSONObject().apply {
+                put("assetId", asset.id)
+                put("action", action)
+                put("mac", asset.mac)
+            }
+            alcClientService.sendControlFrame(action, alcPayload)
+        }
 
         // 1. MQTT
         mqttService.sendCommand(asset.mac, action)

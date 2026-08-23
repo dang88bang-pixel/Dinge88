@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -114,6 +115,37 @@ fun SettingsScreen(
                             viewModel::setLearning)
                         HorizontalDivider()
                         SwitchRow("Dunkelmodus", state.darkMode, viewModel::setDarkMode)
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("📱 Samsung & DSNR / ALC Status",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Samsung Gerätemodus: ${if (com.secureguard.enterprise.config.SamsungConfig.isSamsungDevice()) "Aktiv (Samsung)" else "Standard-Hersteller"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Android 14 API 34+: ${if (com.secureguard.enterprise.config.SamsungConfig.isAndroid14OrHigher()) "Ja (API 34+)" else "Nein (API < 34)"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "DSNR Signal-Filter: Aktiv (Noise Floor: ${com.secureguard.enterprise.config.SamsungConfig.DSNR_DEFAULT_NOISE_FLOOR_DBM} dBm)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "ALC Client: v${com.secureguard.enterprise.config.SamsungConfig.ALC_CLIENT_VERSION} (Keepalive 15s)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
