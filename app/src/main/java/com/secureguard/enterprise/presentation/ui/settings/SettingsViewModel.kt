@@ -2,6 +2,8 @@ package com.secureguard.enterprise.presentation.ui.settings
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
+import com.secureguard.enterprise.services.AgentService
+import com.secureguard.enterprise.services.AgentSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,12 +18,15 @@ data class SettingsUiState(
     val offlineOnly: Boolean = true,
     val learningMode: Boolean = true,
     val darkMode: Boolean = false,
-    val consentGiven: Boolean = true
+    val consentGiven: Boolean = true,
+    val userName: String = "Admin",
+    val organization: String = "SecureGuard"
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val agentService: AgentService
 ) : ViewModel() {
 
     private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
@@ -35,7 +40,9 @@ class SettingsViewModel @Inject constructor(
         offlineOnly = prefs.getBoolean(KEY_OFFLINE, true),
         learningMode = prefs.getBoolean(KEY_LEARNING, true),
         darkMode = prefs.getBoolean(KEY_DARK, false),
-        consentGiven = prefs.getBoolean(KEY_CONSENT, true)
+        consentGiven = prefs.getBoolean(KEY_CONSENT, true),
+        userName = prefs.getString(KEY_USERNAME, "Admin") ?: "Admin",
+        organization = prefs.getString(KEY_ORG, "SecureGuard") ?: "SecureGuard"
     )
 
     private fun save(transform: (SettingsUiState) -> SettingsUiState) {
@@ -48,7 +55,23 @@ class SettingsViewModel @Inject constructor(
                 .putBoolean(KEY_LEARNING, next.learningMode)
                 .putBoolean(KEY_DARK, next.darkMode)
                 .putBoolean(KEY_CONSENT, next.consentGiven)
+                .putString(KEY_USERNAME, next.userName)
+                .putString(KEY_ORG, next.organization)
                 .apply()
+
+            // Restart agent with new settings if running
+            if (agentService.agentStatus.value.running) {
+                agentService.stop()
+                agentService.start(
+                    AgentSettings(
+                        interval = agentService.agentStatus.value.settings.interval,
+                        dynamicPriority = agentService.agentStatus.value.settings.dynamicPriority,
+                        learningMode = next.learningMode,
+                        offlineOnly = next.offlineOnly,
+                        externalSources = next.externalCrowdAllowed
+                    )
+                )
+            }
             next
         }
     }
@@ -59,6 +82,8 @@ class SettingsViewModel @Inject constructor(
     fun setLearning(value: Boolean) = save { it.copy(learningMode = value) }
     fun setDarkMode(value: Boolean) = save { it.copy(darkMode = value) }
     fun setConsent(value: Boolean) = save { it.copy(consentGiven = value) }
+    fun setUserName(value: String) = save { it.copy(userName = value) }
+    fun setOrganization(value: String) = save { it.copy(organization = value) }
 
     companion object {
         private const val KEY_NOTIFICATIONS = "notifications"
@@ -67,5 +92,7 @@ class SettingsViewModel @Inject constructor(
         private const val KEY_LEARNING = "learning_mode"
         private const val KEY_DARK = "dark_mode"
         private const val KEY_CONSENT = "gdpr_consent"
+        private const val KEY_USERNAME = "user_name"
+        private const val KEY_ORG = "organization"
     }
 }

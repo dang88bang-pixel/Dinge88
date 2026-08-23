@@ -17,18 +17,17 @@ import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.random.Random
 
 /**
- * Active + passive Bluetooth Low Energy scanning. For an explicit asset search
- * a short (2 s) filtered scan is run; a real hit for the asset's MAC is
- * preferred. If BLE is unavailable or nothing is seen, a simulated result is
- * returned so the demo / agent pipeline stays functional.
+ * Active + passive Bluetooth Low Energy scanning.
+ *
+ * For an explicit asset search a short (2 s) filtered scan is run; a real
+ * hit for the asset's MAC returns a Detection. If BLE is unavailable,
+ * no permission is granted, or the asset is not found, null is returned.
  */
 @Singleton
 class BleService @Inject constructor(
@@ -52,25 +51,8 @@ class BleService @Inject constructor(
 
     @SuppressLint("MissingPermission")
     suspend fun searchAsset(asset: Asset): Detection? {
-        val hit = if (hasScanPermission() && bluetoothAdapter != null) {
-            runHardwareScan(asset)
-        } else null
-
-        if (hit != null) return hit
-
-        // Fallback / demo result.
-        delay(150)
-        val rssi = -35 - Random.nextInt(0, 45)
-        return Detection(
-            assetMac = asset.mac,
-            sourceType = DetectionSource.BLE,
-            nodeId = "ble-sim",
-            rssi = rssi,
-            latitude = asset.latitude ?: 52.5200,
-            longitude = asset.longitude ?: 13.4050,
-            accuracyMeters = 5f,
-            timestamp = Date()
-        ).also { emit(it) }
+        if (!hasScanPermission() || bluetoothAdapter == null) return null
+        return runHardwareScan(asset)
     }
 
     @SuppressLint("MissingPermission")

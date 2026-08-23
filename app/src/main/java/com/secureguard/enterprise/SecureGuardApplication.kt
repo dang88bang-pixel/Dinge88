@@ -45,7 +45,9 @@ class SecureGuardApplication : Application(), Configuration.Provider {
             "Gerät: ${CT45PConfig.deviceSummary()} · CT45P: ${CT45PConfig.isCT45P()} · " +
                 "BLE braucht Standort (Android 11): ${CT45PConfig.needsLocationForBle}"
         )
-        seedDemoDataIfEmpty()
+        if (com.secureguard.enterprise.BuildConfig.DEBUG) {
+            seedDemoDataIfEmpty()
+        }
         scheduleAgentWorker()
     }
 

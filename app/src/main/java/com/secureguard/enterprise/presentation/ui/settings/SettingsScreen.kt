@@ -68,8 +68,8 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(8.dp))
-                        Text("Benutzer: Wache Mitte", style = MaterialTheme.typography.bodyMedium)
-                        Text("Organisation: SecureGuard Enterprise",
+                        Text("Benutzer: ${state.userName}", style = MaterialTheme.typography.bodyMedium)
+                        Text("Organisation: ${state.organization}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

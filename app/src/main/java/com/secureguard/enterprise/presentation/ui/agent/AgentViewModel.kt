@@ -1,20 +1,19 @@
 package com.secureguard.enterprise.presentation.ui.agent
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.abs
 
 data class AgentUiState(
     val agentRunning: Boolean = false,
@@ -31,8 +30,11 @@ data class AgentUiState(
 
 @HiltViewModel
 class AgentViewModel @Inject constructor(
-    private val agentService: AgentService
+    private val agentService: AgentService,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
+
+    private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
 
     private val config = MutableStateFlow(
         AgentUiState(
@@ -46,10 +48,16 @@ class AgentViewModel @Inject constructor(
         agentService.agentStatus,
         config
     ) { status, cfg ->
+        val progress = if (status.running && status.startedAt != null) {
+            val intervalMs = status.settings.interval.coerceAtLeast(5) * 1000L
+            val elapsed = System.currentTimeMillis() - (status.lastRunAt ?: status.startedAt!!)
+            (elapsed.toFloat() / intervalMs * 100f).coerceIn(0f, 100f)
+        } else 0f
+
         cfg.copy(
             agentRunning = status.running,
             runtime = formatUptime(status.uptimeMillis),
-            progress = if (status.running) 85f else 0f
+            progress = progress
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AgentUiState())
 
@@ -81,8 +89,8 @@ class AgentViewModel @Inject constructor(
             interval = state.interval.coerceAtLeast(5),
             dynamicPriority = state.dynamicPriority,
             learningMode = state.learningMode,
-            offlineOnly = true,
-            externalSources = false
+            offlineOnly = prefs.getBoolean("offline_only", true),
+            externalSources = prefs.getBoolean("external_crowd", false)
         )
         agentService.start(settings)
     }

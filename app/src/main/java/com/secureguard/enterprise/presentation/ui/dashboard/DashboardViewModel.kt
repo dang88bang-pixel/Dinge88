@@ -1,5 +1,6 @@
 package com.secureguard.enterprise.presentation.ui.dashboard
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.AssetStatus
@@ -7,6 +8,7 @@ import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,26 +29,25 @@ data class DashboardUiState(
     val activeSearches: Int = 0,
     val alertCount: Int = 0,
     val agentRunning: Boolean = false,
-    val batteryLevel: Int = 87,
+    val batteryLevel: Int = 0,
     val lastSyncTime: String = "--:--"
 )
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
-    private val agentService: AgentService
+    private val agentService: AgentService,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    private val battery = MutableStateFlow(87)
     private val lastSync = MutableStateFlow("--:--")
 
     val uiState: StateFlow<DashboardUiState> = combine(
         repository.getWhitelistedAssets(),
         repository.getUnacknowledgedAlertCount(),
         agentService.agentStatus,
-        battery,
         lastSync
-    ) { assets, alertCount, agentStatus, batteryLevel, sync ->
+    ) { assets, alertCount, agentStatus, sync ->
         DashboardUiState(
             totalAssets = assets.size,
             onlineAssets = assets.count { it.status == AssetStatus.ONLINE },
@@ -55,7 +56,6 @@ class DashboardViewModel @Inject constructor(
             activeSearches = assets.count { it.status == AssetStatus.SEARCHING },
             alertCount = alertCount,
             agentRunning = agentStatus.running,
-            batteryLevel = batteryLevel,
             lastSyncTime = sync
         )
     }.stateIn(
@@ -65,6 +65,12 @@ class DashboardViewModel @Inject constructor(
     )
 
     val assets = repository.getWhitelistedAssets()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val detections = repository.getAllDetections()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val alerts = repository.getAlerts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val agentRunning: StateFlow<Boolean> = agentService.agentStatus

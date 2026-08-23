@@ -4,6 +4,8 @@
 #  - Asset-Verwaltung, Detektionen, Alerts, Befehls-Queue
 #  - MQTT-Publish an den Broker (Befehle an Gateways/ESP32)
 #  - WebSocket-Endpunkt für Echtzeit-Updates an die App
+#  - MQTT → WebSocket Bridge (Telemetrie/Alerts forwarding)
+#  - Crowd-Source Endpoints (anonyme Sichtungen)
 #
 # Start:
 #   pip install -r requirements.txt
@@ -12,19 +14,26 @@
 
 import asyncio
 import json
+import logging
 import os
 import sqlite3
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("secureguard")
+
 try:
     import paho.mqtt.client as mqtt
-except ImportError:  # pragma: no cover
+except ImportError:
     mqtt = None
 
 DB_PATH = os.environ.get("DATABASE_PATH", "secureguard.db")
@@ -39,6 +48,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Active WebSocket connections for broadcasting
+active_websockets: Set[WebSocket] = set()
+
 
 # ============ MODELLE ============
 
@@ -127,6 +140,16 @@ def init_db() -> None:
             status TEXT,
             timestamp TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS crowd_sightings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mac TEXT,
+            reporter_id TEXT,
+            rssi INTEGER,
+            latitude REAL,
+            longitude REAL,
+            timestamp TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_crowd_mac ON crowd_sightings(mac);
         """
     )
     conn.commit()
@@ -135,13 +158,14 @@ def init_db() -> None:
 
 init_db()
 
+
 # ============ MQTT (optional) ============
 
 _mqtt_client = None
 
 
 def get_mqtt_client():
-    """Liefert einen (lazy) MQTT-Client; None, wenn paho fehlt."""
+    """Returns a lazy MQTT client; None if paho is not available."""
     global _mqtt_client
     if mqtt is None:
         return None
@@ -165,6 +189,65 @@ def publish_command(asset_mac: str, command: str) -> bool:
         return True
     except Exception:
         return False
+
+
+# ============ MQTT → WEBSOCKET BRIDGE ============
+
+def start_mqtt_subscriber():
+    """Subscribes to all telemetry/alert/status topics and forwards to WebSockets."""
+    client = get_mqtt_client()
+    if client is None:
+        logger.warning("MQTT nicht verfügbar – WebSocket-Forwarding deaktiviert")
+        return
+
+    def on_message(mqtt_client, userdata, msg):
+        """MQTT message received – format and broadcast to all WebSocket clients."""
+        topic = msg.topic
+        payload = msg.payload.decode("utf-8", errors="replace")
+
+        if "/telemetry" in topic:
+            try:
+                data = json.loads(payload) if payload.startswith("{") else payload
+            except json.JSONDecodeError:
+                data = payload
+            ws_msg = json.dumps({"type": "telemetry", "topic": topic, "data": data})
+        elif "/alert" in topic:
+            try:
+                data = json.loads(payload) if payload.startswith("{") else payload
+            except json.JSONDecodeError:
+                data = payload
+            ws_msg = json.dumps({"type": "alert", "topic": topic, "data": data})
+        elif "/status" in topic:
+            ws_msg = json.dumps({"type": "system_status", "topic": topic, "data": payload})
+        else:
+            ws_msg = json.dumps({"type": "unknown", "topic": topic, "data": payload})
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.run_coroutine_threadsafe(
+                    broadcast_websocket(ws_msg), loop
+                )
+        except RuntimeError:
+            pass
+
+    client.subscribe("secureguard/+/telemetry")
+    client.subscribe("secureguard/+/alert")
+    client.subscribe("secureguard/+/status")
+    client.subscribe("secureguard/broadcast")
+    client.on_message = on_message
+    logger.info("MQTT-Subscriber gestartet – Topics abonniert")
+
+
+async def broadcast_websocket(message: str):
+    """Sends a message to all connected WebSocket clients."""
+    disconnected = set()
+    for ws in active_websockets:
+        try:
+            await ws.send_text(message)
+        except Exception:
+            disconnected.add(ws)
+    active_websockets.difference_update(disconnected)
 
 
 # ============ API-ENDPUNKTE ============
@@ -255,7 +338,7 @@ async def list_alerts(unresolved_only: bool = False):
 
 @app.post("/api/actions/execute")
 async def execute_action(action: Action, background_tasks: BackgroundTasks):
-    """Queued Aktion: wird asynchron über MQTT an das Gateway/Asset geschickt."""
+    """Queues an action: sent asynchronously via MQTT to the gateway/asset."""
     conn = get_db()
     conn.execute(
         "INSERT INTO commands (asset_id, command, status, timestamp) VALUES (?, ?, ?, ?)",
@@ -288,7 +371,7 @@ async def stats():
 
 
 async def process_action(action: Action) -> None:
-    """Führt die Aktion aus: MQTT-Befehl an das Asset (MAC-Lookup) senden."""
+    """Executes the action: sends MQTT command to the asset."""
     conn = get_db()
     row = conn.execute("SELECT mac FROM assets WHERE id = ?", (action.asset_id,)).fetchone()
     conn.close()
@@ -305,9 +388,52 @@ async def process_action(action: Action) -> None:
     conn.commit()
     conn.close()
 
-    # Simulierte Verarbeitungszeit für Demo-Setups
-    await asyncio.sleep(2)
-    print(f"Aktion {action.action_type} für {action.asset_id} ausgeführt (mqtt={ok})")
+    logger.info(
+        "Aktion %s für %s (mac=%s) → %s",
+        action.action_type, action.asset_id, mac,
+        "delivered" if ok else "failed"
+    )
+
+
+# ============ CROWD SOURCE ============
+
+@app.post("/api/crowd/report")
+async def report_crowd_sighting(sighting: dict):
+    """Reports an anonymous crowd sighting (MAC + position + RSSI)."""
+    mac = sighting.get("mac", "").upper()
+    if not mac:
+        return {"status": "error", "message": "mac required"}
+
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO crowd_sightings (mac, reporter_id, rssi, latitude, longitude, timestamp) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            mac,
+            sighting.get("reporter_id", "anonymous"),
+            sighting.get("rssi", 0),
+            sighting.get("latitude"),
+            sighting.get("longitude"),
+            datetime.now(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+
+@app.get("/api/crowd/search")
+async def search_crowd_sightings(mac: str, hours: int = 24):
+    """Returns recent crowd sightings for a MAC address."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM crowd_sightings WHERE mac = ? "
+        "AND timestamp > datetime('now', ? || ' hours') "
+        "ORDER BY timestamp DESC LIMIT 10",
+        (mac.upper(), -hours),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 # ============ WEBSOCKET ============
@@ -315,6 +441,8 @@ async def process_action(action: Action) -> None:
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    active_websockets.add(websocket)
+    logger.info("WebSocket verbunden (%d aktiv)", len(active_websockets))
     try:
         while True:
             data = await websocket.receive_text()
@@ -323,18 +451,33 @@ async def websocket_endpoint(websocket: WebSocket):
                 if msg.get("type") == "command":
                     asset_id = msg.get("assetId", "")
                     action = msg.get("action", "")
+                    ok = publish_command(asset_id, action)
                     await websocket.send_text(
-                        json.dumps({"type": "ack", "assetId": asset_id, "action": action})
+                        json.dumps({
+                            "type": "ack",
+                            "assetId": asset_id,
+                            "action": action,
+                            "delivered": ok
+                        })
                     )
                 else:
                     await websocket.send_text(json.dumps({"type": "echo", "data": msg}))
             except json.JSONDecodeError:
                 await websocket.send_text(json.dumps({"type": "error", "message": "invalid json"}))
     except Exception as exc:
-        print(f"WebSocket-Fehler: {exc}")
+        logger.debug("WebSocket getrennt: %s", exc)
+    finally:
+        active_websockets.discard(websocket)
+        logger.info("WebSocket entfernt (%d aktiv)", len(active_websockets))
 
 
-# ============ START ============
+# ============ STARTUP ============
+
+@app.on_event("startup")
+async def startup_event():
+    start_mqtt_subscriber()
+    logger.info("SecureGuard Backend gestartet")
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
