@@ -26,6 +26,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -68,10 +70,21 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(8.dp))
-                        Text("Benutzer: Wache Mitte", style = MaterialTheme.typography.bodyMedium)
-                        Text("Organisation: SecureGuard Enterprise",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.userName,
+                            onValueChange = viewModel::setUserName,
+                            label = { Text("Benutzer") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.organization,
+                            onValueChange = viewModel::setOrganization,
+                            label = { Text("Organisation") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
@@ -156,6 +169,119 @@ fun SettingsScreen(
                                 .padding(vertical = 6.dp)
                                 .clickable { navController.navigate(Routes.TEMP_MAIL) }
                         )
+                        HorizontalDivider()
+                        Text(
+                            "Security & Integrity Center",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.SECURITY) }
+                        )
+                        HorizontalDivider()
+                        Text(
+                            "ESP32 Gateway Konfiguration",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.ESP32_CONFIG) }
+                        )
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+                        Text("🤖 Vordergrund-Dienst", style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.Button(
+                                onClick = { viewModel.startForegroundService() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Starten") }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.stopForegroundService() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Stoppen") }
+                        }
+                        Text(
+                            "Hält den Agent aktiv, auch wenn die App im Hintergrund ist.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("💾 Daten & Export",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.Button(
+                                onClick = { viewModel.createBackup() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Backup") }
+                            androidx.compose.material3.Button(
+                                onClick = { viewModel.exportCsv() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("CSV") }
+                            androidx.compose.material3.Button(
+                                onClick = { viewModel.exportPdf() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("PDF") }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.exportDetectionsCsv() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Detekt. CSV") }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.exportEncryptedCsv() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("CSV 🔒") }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.restoreBackup() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Restore") }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "${viewModel.listBackups()} Backups verfügbar",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Offline-Karten: ${viewModel.getOfflineMapUrl()}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+
+            // Status message
+            state.statusMessage?.let { msg ->
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (msg.startsWith("✅")) Color(0x1A4CAF50) else Color(0x1AF44336)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(msg, style = MaterialTheme.typography.bodyMedium)
+                            androidx.compose.material3.TextButton(onClick = { viewModel.clearStatus() }) {
+                                Text("✕")
+                            }
+                        }
                     }
                 }
             }

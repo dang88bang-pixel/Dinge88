@@ -5,7 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.presentation.ui.common.ActionType
-import com.secureguard.enterprise.services.TelemetryService
+import com.secureguard.enterprise.security.Permission
+import com.secureguard.enterprise.security.Role
+import com.secureguard.enterprise.security.RoleManager
+import com.secureguard.enterprise.security.User
+import com.secureguard.enterprise.services.AgentService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,7 +26,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ActionsViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
-    private val telemetryService: TelemetryService
+    private val agentService: AgentService
 ) : ViewModel() {
 
     private val assetsFlow = repository.getWhitelistedAssets()
@@ -55,8 +59,16 @@ class ActionsViewModel @Inject constructor(
     fun executeAction(actionType: ActionType) {
         viewModelScope.launch {
             val asset = selectedAsset.value ?: return@launch
+
+            // RBAC permission check
+            val user = User(id = "local", name = "Admin", role = Role.ADMIN)
+            if (!RoleManager.hasPermission(user, Permission.EXECUTE_ACTIONS)) {
+                _commandLog.value = _commandLog.value + "⛔ Keine Berechtigung für Aktionen"
+                return@launch
+            }
+
             _isExecuting.value = true
-            val success = telemetryService.sendCommand(asset.mac, actionType.wireCommand)
+            val success = agentService.sendAction(asset, actionType.wireCommand)
             val ts = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
             val mark = if (success) "✓" else "✗"
             _commandLog.value = _commandLog.value +

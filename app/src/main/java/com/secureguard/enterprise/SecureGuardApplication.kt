@@ -30,6 +30,7 @@ class SecureGuardApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var database: SecureGuardDatabase
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var backupManager: com.secureguard.enterprise.services.BackupManager
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -40,12 +41,16 @@ class SecureGuardApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Apply pending database restore if staged
+        backupManager.applyPendingRestoreIfPresent()
         Log.i(
             TAG,
             "Gerät: ${CT45PConfig.deviceSummary()} · CT45P: ${CT45PConfig.isCT45P()} · " +
                 "BLE braucht Standort (Android 11): ${CT45PConfig.needsLocationForBle}"
         )
-        seedDemoDataIfEmpty()
+        if (com.secureguard.enterprise.BuildConfig.DEBUG) {
+            seedDemoDataIfEmpty()
+        }
         scheduleAgentWorker()
     }
 

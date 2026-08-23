@@ -20,6 +20,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.secureguard.enterprise.data.model.Asset
@@ -50,6 +52,8 @@ fun AssetCard(
             containerColor = statusColor.copy(alpha = 0.06f)
         )
     ) {
+        val a11yStatus = com.secureguard.enterprise.util.AccessibilityHelper
+            .contentDescriptionForStatus(asset.status.name)
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -61,6 +65,7 @@ fun AssetCard(
                         modifier = Modifier
                             .size(12.dp)
                             .background(statusColor, CircleShape)
+                            .semantics { contentDescription = a11yStatus }
                     )
                     Spacer(modifier = Modifier.size(8.dp))
                     Text(

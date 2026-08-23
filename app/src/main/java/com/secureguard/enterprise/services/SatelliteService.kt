@@ -13,22 +13,19 @@ import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.Date
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.random.Random
 
 /**
- * Satellite / GNSS fallback channel. Used when all terrestrial channels fail,
- * e.g. for assets in remote areas.
+ * Satellite / GNSS fallback channel.
  *
- * Seit der API-Integration wird die echte GPS-Position des Geräts über
- * [FusedLocationProviderClient] (Google Play Services) ermittelt – das Gerät
- * selbst dient als Referenzpunkt. Ohne Standortberechtigung oder GPS-Fix
- * wird wie gehabt ein grober Platzhalter-Wert simuliert.
+ * Uses the device's real GPS position via FusedLocationProviderClient
+ * (Google Play Services). When no GPS fix is available, falls back to
+ * the asset's last known position from the database. Returns null when
+ * neither a GPS fix nor a last known position is available.
  */
 @Singleton
 class SatelliteService @Inject constructor(
@@ -55,19 +52,22 @@ class SatelliteService @Inject constructor(
             ).also { emit(it) }
         }
 
-        // Kein Fix verfügbar – grobe Schätzung (letzte bekannte Position).
-        delay(500)
-        if (Random.nextFloat() > 0.4f) return null
-        return Detection(
-            assetMac = asset.mac,
-            sourceType = DetectionSource.SATELLITE,
-            nodeId = "sat-fix",
-            rssi = -100,
-            latitude = asset.latitude ?: (52.5200 + Random.nextDouble(-0.08, 0.08)),
-            longitude = asset.longitude ?: (13.4050 + Random.nextDouble(-0.08, 0.08)),
-            accuracyMeters = 150f,
-            timestamp = Date()
-        ).also { emit(it) }
+        // No GPS fix: use the asset's last known position as a coarse fallback
+        if (asset.latitude != null && asset.longitude != null) {
+            return Detection(
+                assetMac = asset.mac,
+                sourceType = DetectionSource.SATELLITE,
+                nodeId = "last-known",
+                rssi = -100,
+                latitude = asset.latitude,
+                longitude = asset.longitude,
+                accuracyMeters = 500f,
+                message = "Letzte bekannte Position (kein GPS-Fix)",
+                timestamp = Date()
+            ).also { emit(it) }
+        }
+
+        return null
     }
 
     /** Echte GPS-Position über Google Play Services (falls berechtigt). */

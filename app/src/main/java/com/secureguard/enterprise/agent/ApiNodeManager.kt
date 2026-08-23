@@ -85,63 +85,63 @@ class ApiNodeManager @Inject constructor(
             name = "WiGle.net",
             type = NodeType.API,
             handler = { ctx -> searchViaWiGle(ctx) },
-            priority = 80,
-            rateLimit = RateLimit(requestsPerMinute = 10),
-            timeoutMs = 15_000
+            priority = DefaultNodeConfigs.WIGLE.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.WIGLE.rateLimitPerMinute),
+            timeoutMs = DefaultNodeConfigs.WIGLE.timeoutMs
         )
         registerNode(
             id = "maclookup",
             name = "MacLookup.app",
             type = NodeType.API,
             handler = { ctx -> searchViaMacLookup(ctx) },
-            priority = 60,
-            rateLimit = RateLimit(requestsPerMinute = 30),
-            timeoutMs = 5_000
+            priority = DefaultNodeConfigs.MACLOOKUP.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.MACLOOKUP.rateLimitPerMinute),
+            timeoutMs = DefaultNodeConfigs.MACLOOKUP.timeoutMs
         )
         registerNode(
             id = "openchargemap",
             name = "Open Charge Map",
             type = NodeType.API,
             handler = { ctx -> searchViaOpenChargeMap(ctx) },
-            priority = 40,
-            rateLimit = RateLimit(requestsPerMinute = 5),
-            timeoutMs = 10_000
+            priority = DefaultNodeConfigs.OPEN_CHARGE_MAP.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.OPEN_CHARGE_MAP.rateLimitPerMinute),
+            timeoutMs = DefaultNodeConfigs.OPEN_CHARGE_MAP.timeoutMs
         )
         registerNode(
             id = "dhl",
             name = "DHL Packstationen",
             type = NodeType.API,
             handler = { ctx -> searchViaDHL(ctx) },
-            priority = 50,
-            rateLimit = RateLimit(requestsPerMinute = 10),
-            timeoutMs = 8_000
+            priority = DefaultNodeConfigs.DHL.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.DHL.rateLimitPerMinute),
+            timeoutMs = DefaultNodeConfigs.DHL.timeoutMs
         )
         registerNode(
             id = "ckan",
             name = "CKAN Open Data",
             type = NodeType.API,
             handler = { ctx -> searchViaCKAN(ctx) },
-            priority = 30,
-            rateLimit = RateLimit(requestsPerMinute = 20),
-            timeoutMs = 10_000
+            priority = DefaultNodeConfigs.CKAN.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.CKAN.rateLimitPerMinute),
+            timeoutMs = DefaultNodeConfigs.CKAN.timeoutMs
         )
         registerNode(
             id = "googlegeo",
             name = "Google Geolocation",
             type = NodeType.API,
             handler = { ctx -> searchViaGoogleGeo(ctx) },
-            priority = 90,
-            rateLimit = RateLimit(requestsPerMinute = 50),
-            timeoutMs = 5_000,
-            requiresAuth = true
+            priority = DefaultNodeConfigs.GOOGLE_GEO.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.GOOGLE_GEO.rateLimitPerMinute),
+            timeoutMs = DefaultNodeConfigs.GOOGLE_GEO.timeoutMs,
+            requiresAuth = DefaultNodeConfigs.GOOGLE_GEO.requiresAuth
         )
         registerNode(
             id = "netatmo",
             name = "Netatmo Weather",
             type = NodeType.API,
             handler = { ctx -> searchViaNetatmo(ctx) },
-            priority = 20,
-            rateLimit = RateLimit(requestsPerMinute = 10),
+            priority = DefaultNodeConfigs.NETATMO.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.NETATMO.rateLimitPerMinute),
             timeoutMs = 8_000,
             requiresAuth = true
         )
@@ -150,8 +150,8 @@ class ApiNodeManager @Inject constructor(
             name = "Helium Network",
             type = NodeType.API,
             handler = { ctx -> searchViaHelium(ctx) },
-            priority = 70,
-            rateLimit = RateLimit(requestsPerMinute = 15),
+            priority = DefaultNodeConfigs.HELIUM.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.HELIUM.rateLimitPerMinute),
             timeoutMs = 10_000
         )
         registerNode(
@@ -159,8 +159,8 @@ class ApiNodeManager @Inject constructor(
             name = "MQTT Broker",
             type = NodeType.MQTT,
             handler = { ctx -> searchViaMQTT(ctx) },
-            priority = 85,
-            rateLimit = RateLimit(requestsPerMinute = 100),
+            priority = DefaultNodeConfigs.MQTT.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.MQTT.rateLimitPerMinute),
             timeoutMs = 3_000
         )
         registerNode(
@@ -168,8 +168,8 @@ class ApiNodeManager @Inject constructor(
             name = "WebSocket",
             type = NodeType.WEBSOCKET,
             handler = { ctx -> searchViaWebSocket(ctx) },
-            priority = 75,
-            rateLimit = RateLimit(requestsPerMinute = 100),
+            priority = DefaultNodeConfigs.WEBSOCKET.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.WEBSOCKET.rateLimitPerMinute),
             timeoutMs = 5_000
         )
         registerNode(
@@ -177,8 +177,8 @@ class ApiNodeManager @Inject constructor(
             name = "TempMail",
             type = NodeType.API,
             handler = { ctx -> searchViaTempMail(ctx) },
-            priority = 25,
-            rateLimit = RateLimit(requestsPerMinute = 5),
+            priority = DefaultNodeConfigs.TEMPMAIL.priority,
+            rateLimit = RateLimit(requestsPerMinute = DefaultNodeConfigs.TEMPMAIL.rateLimitPerMinute),
             timeoutMs = 45_000
         )
     }

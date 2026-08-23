@@ -4,18 +4,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.agent.ApiNodeManager
 import com.secureguard.enterprise.agent.NodeStatus
+import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class NodeStatusViewModel @Inject constructor(
-    private val apiNodeManager: ApiNodeManager
+    private val apiNodeManager: ApiNodeManager,
+    private val repository: SecureGuardRepository,
+    private val loraService: com.secureguard.enterprise.services.LoraService
 ) : ViewModel() {
 
     val nodeStatus: StateFlow<Map<String, NodeStatus>> =
@@ -45,13 +49,25 @@ class NodeStatusViewModel @Inject constructor(
         }
     }
 
-    /** Führt eine komplette Abfrage über alle Knoten aus (Test-Suche). */
+    private val _gatewayCount = MutableStateFlow(0)
+    val gatewayCount: StateFlow<Int> = _gatewayCount.asStateFlow()
+
+    fun refreshLoRaGateways() {
+        viewModelScope.launch {
+            val gateways = loraService.refreshGateways()
+            _gatewayCount.value = gateways.size
+        }
+    }
+
+    /** Runs a full query across all nodes using the first asset from the database. */
     fun runFullQuery() {
         viewModelScope.launch {
+            val assets = repository.getAllAssets().first()
+            val testAsset = assets.firstOrNull() ?: return@launch
             apiNodeManager.queryAllNodes(
-                mac = "AA:BB:CC:DD:EE:01",
-                latitude = 52.52,
-                longitude = 13.40
+                mac = testAsset.mac,
+                latitude = testAsset.latitude,
+                longitude = testAsset.longitude
             )
             refresh()
         }
