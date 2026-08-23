@@ -30,24 +30,28 @@ data class DashboardUiState(
     val alertCount: Int = 0,
     val agentRunning: Boolean = false,
     val batteryLevel: Int = 0,
-    val lastSyncTime: String = "--:--"
+    val lastSyncTime: String = "--:--",
+    val detectionCount: Int = 0
 )
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
     private val agentService: AgentService,
+    private val databaseCleanup: com.secureguard.enterprise.services.DatabaseCleanup,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val lastSync = MutableStateFlow("--:--")
+    private val _detectionCount = MutableStateFlow(0)
 
     val uiState: StateFlow<DashboardUiState> = combine(
         repository.getWhitelistedAssets(),
         repository.getUnacknowledgedAlertCount(),
         agentService.agentStatus,
-        lastSync
-    ) { assets, alertCount, agentStatus, sync ->
+        lastSync,
+        _detectionCount
+    ) { assets, alertCount, agentStatus, sync, detCount ->
         DashboardUiState(
             totalAssets = assets.size,
             onlineAssets = assets.count { it.status == AssetStatus.ONLINE },
@@ -56,7 +60,8 @@ class DashboardViewModel @Inject constructor(
             activeSearches = assets.count { it.status == AssetStatus.SEARCHING },
             alertCount = alertCount,
             agentRunning = agentStatus.running,
-            lastSyncTime = sync
+            lastSyncTime = sync,
+            detectionCount = detCount
         )
     }.stateIn(
         scope = viewModelScope,
@@ -79,6 +84,9 @@ class DashboardViewModel @Inject constructor(
 
     init {
         startAgent()
+        viewModelScope.launch {
+            _detectionCount.value = databaseCleanup.detectionCount()
+        }
     }
 
     fun refresh() {

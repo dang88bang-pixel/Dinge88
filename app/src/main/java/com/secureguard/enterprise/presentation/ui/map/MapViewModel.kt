@@ -61,7 +61,8 @@ class MapViewModel @Inject constructor(
     private val _isOffline = MutableStateFlow(false)
     val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
 
-    fun toggleOfflineMode() {
+    fun toggleOfflineMode(mapView: org.osmdroid.views.MapView? = null) {
         _isOffline.value = !_isOffline.value
+        mapView?.let { offlineMapService.setOfflineMode(it, _isOffline.value) }
     }
 }

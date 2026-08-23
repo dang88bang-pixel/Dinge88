@@ -83,6 +83,21 @@ class AgentViewModel @Inject constructor(
         if (agentService.agentStatus.value.running) agentService.stop() else saveSettings()
     }
 
+    private val _registerStatus = MutableStateFlow<String?>(null)
+    val registerStatus: StateFlow<String?> = _registerStatus.asStateFlow()
+
+    fun autoRegisterService(serviceName: String, url: String) {
+        viewModelScope.launch {
+            _registerStatus.value = "Registriere bei $serviceName..."
+            val result = agentService.autoRegisterExternalService(serviceName, url, emptyMap())
+            _registerStatus.value = if (result.success) {
+                "✅ Registriert: ${result.email} (OTP: ${result.otp})"
+            } else {
+                "❌ ${result.error}"
+            }
+        }
+    }
+
     fun saveSettings() {
         val state = config.value
         val settings = AgentSettings(

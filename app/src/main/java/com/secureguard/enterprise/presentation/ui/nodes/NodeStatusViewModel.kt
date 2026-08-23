@@ -18,7 +18,8 @@ import javax.inject.Inject
 @HiltViewModel
 class NodeStatusViewModel @Inject constructor(
     private val apiNodeManager: ApiNodeManager,
-    private val repository: SecureGuardRepository
+    private val repository: SecureGuardRepository,
+    private val loraService: com.secureguard.enterprise.services.LoraService
 ) : ViewModel() {
 
     val nodeStatus: StateFlow<Map<String, NodeStatus>> =
@@ -45,6 +46,16 @@ class NodeStatusViewModel @Inject constructor(
                 java.util.Locale.getDefault()
             ).format(java.util.Date())
             _isLoading.value = false
+        }
+    }
+
+    private val _gatewayCount = MutableStateFlow(0)
+    val gatewayCount: StateFlow<Int> = _gatewayCount.asStateFlow()
+
+    fun refreshLoRaGateways() {
+        viewModelScope.launch {
+            val gateways = loraService.refreshGateways()
+            _gatewayCount.value = gateways.size
         }
     }
 

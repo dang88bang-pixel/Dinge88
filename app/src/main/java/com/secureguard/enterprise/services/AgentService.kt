@@ -228,25 +228,42 @@ class AgentService @Inject constructor(
         runCatching { readUsbSerial() }
             .onFailure { errorHandler.handleError(it, "UsbSerial") }
 
-        // Use LearningEngine predictions to inform search strategy
-        if (settings.learningMode && snapshot.isNotEmpty()) {
-            val prediction = learningEngine.predictNextLocation()
-            if (prediction != null) {
-                auditLogService.log(
-                    action = "PREDICTION",
-                    details = "Naechster Standort: ${"%.4f".format(prediction.first)}, ${"%.4f".format(prediction.second)}"
-                )
-            }
-            snapshot.forEach { asset ->
-                val probability = learningEngine.getSuccessProbability(asset.id)
-                if (probability < 0.2f) {
+            // Use LearningEngine predictions to inform search strategy
+            if (settings.learningMode && snapshot.isNotEmpty()) {
+                val prediction = learningEngine.predictNextLocation()
+                if (prediction != null) {
                     auditLogService.log(
-                        action = "LOW_PROBABILITY",
-                        details = "${asset.shortName}: Erfolgswahrscheinlichkeit ${"%.0f".format(probability * 100)}%"
+                        action = "PREDICTION",
+                        details = "Naechster Standort: ${"%.4f".format(prediction.first)}, ${"%.4f".format(prediction.second)}"
                     )
                 }
+                // Periodic pattern analysis every 10 cycles
+                if (cycleCount.get() % 10 == 0L) {
+                    val patterns = learningEngine.analyzePatterns(emptyList())
+                    if (patterns.isNotEmpty()) {
+                        auditLogService.log(
+                            action = "PATTERNS",
+                            details = "${patterns.size} Muster erkannt"
+                        )
+                    }
+                }
+                // Check if external sources should be used based on confidence
+                if (learningEngine.shouldUseExternalSources() && !settings.externalSources) {
+                    auditLogService.log(
+                        action = "SUGGEST_EXTERNAL",
+                        details = "LearningEngine empfiehlt externe Quellen (niedrige Konfidenz)"
+                    )
+                }
+                snapshot.forEach { asset ->
+                    val probability = learningEngine.getSuccessProbability(asset.id)
+                    if (probability < 0.2f) {
+                        auditLogService.log(
+                            action = "LOW_PROBABILITY",
+                            details = "${asset.shortName}: Erfolgswahrscheinlichkeit ${"%.0f".format(probability * 100)}%"
+                        )
+                    }
+                }
             }
-        }
 
         // Flush offline queue when MQTT is connected
         if (mqttService.isConnected) {
@@ -515,11 +532,15 @@ class AgentService @Inject constructor(
 
         // 4. Offline fallback: persist action when nothing was delivered.
         if (!delivered) {
-            offlineQueue.enqueue(
-                actionType = action,
-                assetMac = asset.mac,
-                payload = mapOf("assetId" to asset.id, "action" to action)
-            )
+            val payload = mapOf("assetId" to asset.id, "action" to action)
+            val jsonPayload = com.google.gson.Gson().toJson(payload)
+            if (offlineQueue.isValidPayload(jsonPayload)) {
+                offlineQueue.enqueue(
+                    actionType = action,
+                    assetMac = asset.mac,
+                    payload = payload
+                )
+            }
         }
         return delivered
     }

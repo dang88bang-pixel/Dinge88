@@ -61,6 +61,8 @@ fun SecurityScreen(
     val auditEntries by viewModel.auditEntries.collectAsState()
     val pinConfigured by viewModel.pinConfigured.collectAsState()
     val authState by viewModel.authState.collectAsState()
+    val encryptionResult by viewModel.encryptionTestResult.collectAsState()
+    val gpsLocation by viewModel.gpsLocation.collectAsState()
     var newPin by remember { mutableStateOf("") }
     var pinMessage by remember { mutableStateOf<String?>(null) }
 
@@ -181,6 +183,31 @@ fun SecurityScreen(
                         RoleRow("MANAGER", "Assets + Aktionen", listOf("VIEW", "EDIT", "EXECUTE", "LOGS"))
                         RoleRow("OPERATOR", "Eigene Assets", listOf("VIEW", "EXECUTE"))
                         RoleRow("VIEWER", "Nur Lesen", listOf("VIEW"))
+                    }
+                }
+            }
+
+            // Hardware Diagnostics
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Hardware-Diagnose", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        StatusRow("NFC verfügbar", viewModel.nfcAvailable)
+                        StatusRow("Verschlüsselung", true)
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { viewModel.testEncryption() }) { Text("AES Test") }
+                            Button(onClick = { viewModel.fetchGpsLocation() }) { Text("GPS") }
+                        }
+                        encryptionResult?.let {
+                            Spacer(Modifier.height(4.dp))
+                            Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                        }
+                        gpsLocation?.let {
+                            Spacer(Modifier.height(4.dp))
+                            Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                        }
                     }
                 }
             }

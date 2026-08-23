@@ -121,7 +121,7 @@ fun DashboardScreen(
         ) {
             StatCard(
                 modifier = Modifier.weight(1f),
-                value = detections.size.toString(),
+                value = uiState.detectionCount.toString(),
                 label = "Detektionen",
                 icon = Icons.Default.Search,
                 color = Color(0xFF6A1B9A)

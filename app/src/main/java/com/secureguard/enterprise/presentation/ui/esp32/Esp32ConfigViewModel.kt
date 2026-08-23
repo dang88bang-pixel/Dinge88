@@ -17,7 +17,8 @@ import javax.inject.Inject
 class Esp32ConfigViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
     private val agentService: AgentService,
-    private val auditLogService: AuditLogService
+    private val auditLogService: AuditLogService,
+    private val usbSerialService: com.secureguard.enterprise.services.UsbSerialService
 ) : ViewModel() {
 
     val assets = repository.getWhitelistedAssets()
@@ -25,6 +26,20 @@ class Esp32ConfigViewModel @Inject constructor(
 
     private val _lastCommand = MutableStateFlow<String?>(null)
     val lastCommand: StateFlow<String?> = _lastCommand.asStateFlow()
+
+    private val _usbDevices = MutableStateFlow<String?>(null)
+    val usbDevices: StateFlow<String?> = _usbDevices.asStateFlow()
+
+    fun scanUsbDevices() {
+        val drivers = usbSerialService.availableDrivers()
+        _usbDevices.value = if (drivers.isEmpty()) {
+            "Keine USB-Serial-Adapter gefunden"
+        } else {
+            drivers.joinToString("\n") { d ->
+                "${d.device.deviceName} (VID:${d.device.vendorId} PID:${d.device.productId}, ${d.ports.size} Ports)"
+            }
+        }
+    }
 
     fun sendConfig(targetMac: String, configJson: String) {
         viewModelScope.launch {

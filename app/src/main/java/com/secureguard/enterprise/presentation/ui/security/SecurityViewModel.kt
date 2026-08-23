@@ -15,7 +15,10 @@ import javax.inject.Inject
 @HiltViewModel
 class SecurityViewModel @Inject constructor(
     private val authManager: AuthManager,
-    private val auditLogService: AuditLogService
+    private val auditLogService: AuditLogService,
+    private val encryptionService: com.secureguard.enterprise.services.EncryptionService,
+    private val satelliteService: com.secureguard.enterprise.services.SatelliteService,
+    private val nfcService: com.secureguard.enterprise.services.NfcService
 ) : ViewModel() {
 
     private val _auditEntries = MutableStateFlow<List<AuditLog>>(emptyList())
@@ -62,4 +65,34 @@ class SecurityViewModel @Inject constructor(
             _auditEntries.value = emptyList()
         }
     }
+
+    // Encryption test
+    private val _encryptionTestResult = MutableStateFlow<String?>(null)
+    val encryptionTestResult: StateFlow<String?> = _encryptionTestResult.asStateFlow()
+
+    fun testEncryption() {
+        val testData = "SecureGuard Test ${System.currentTimeMillis()}"
+        val encrypted = encryptionService.encrypt(testData.toByteArray())
+        val decrypted = encryptionService.decrypt(encrypted.data, encrypted.iv)
+        val match = String(decrypted) == testData
+        _encryptionTestResult.value = if (match) "✅ AES/GCM Roundtrip OK" else "❌ Entschlüsselung fehlgeschlagen"
+    }
+
+    // GPS location
+    private val _gpsLocation = MutableStateFlow<String?>(null)
+    val gpsLocation: StateFlow<String?> = _gpsLocation.asStateFlow()
+
+    fun fetchGpsLocation() {
+        viewModelScope.launch {
+            val location = satelliteService.currentLocation()
+            _gpsLocation.value = if (location != null) {
+                "📍 ${"%.5f".format(location.latitude)}, ${"%.5f".format(location.longitude)} (±${"%.0f".format(location.accuracy)}m)"
+            } else {
+                "❌ Kein GPS-Fix verfügbar"
+            }
+        }
+    }
+
+    // NFC status
+    val nfcAvailable: Boolean = nfcService.isAvailable()
 }

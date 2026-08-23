@@ -163,6 +163,11 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun getOfflineMapUrl(): String {
+        val offlineMapService = com.secureguard.enterprise.services.OfflineMapService()
+        return offlineMapService.downloadRegionUrl()
+    }
+
     fun restoreBackup() {
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             val backups = backupManager.listBackups()
