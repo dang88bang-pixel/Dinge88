@@ -1,6 +1,8 @@
 package com.secureguard.enterprise.presentation.ui.settings
 
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -9,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
+import com.secureguard.enterprise.presentation.ui.common.requiredPermissions
 
 data class SettingsUiState(
     val notificationsEnabled: Boolean = true,
@@ -16,7 +19,10 @@ data class SettingsUiState(
     val offlineOnly: Boolean = true,
     val learningMode: Boolean = true,
     val darkMode: Boolean = false,
-    val consentGiven: Boolean = true
+    val consentGiven: Boolean = true,
+    // Permission completeness status (100% functionality check)
+    val permissionsGranted: Boolean = true,
+    val missingPermissions: List<String> = emptyList()
 )
 
 @HiltViewModel
@@ -26,8 +32,19 @@ class SettingsViewModel @Inject constructor(
 
     private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
 
-    private val _uiState = MutableStateFlow(load())
+    private val _uiState = MutableStateFlow(loadWithPermissions())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    private fun loadWithPermissions(): SettingsUiState {
+        val base = load()
+        val missing = requiredPermissions().filter {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+        }
+        return base.copy(
+            permissionsGranted = missing.isEmpty(),
+            missingPermissions = missing
+        )
+    }
 
     private fun load() = SettingsUiState(
         notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),

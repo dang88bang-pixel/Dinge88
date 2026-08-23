@@ -72,7 +72,11 @@ class AgentViewModel @Inject constructor(
     fun setLearningMode(enabled: Boolean) = config.update { it.copy(learningMode = enabled) }
 
     fun toggleAgent() {
-        if (agentService.agentStatus.value.running) agentService.stop() else saveSettings()
+        if (agentService.agentStatus.value.running) {
+            agentService.stop()
+        } else {
+            saveSettings()
+        }
     }
 
     fun saveSettings() {
@@ -86,6 +90,10 @@ class AgentViewModel @Inject constructor(
         )
         agentService.start(settings)
     }
+
+    /** Returns whether the agent is currently running (for UI binding). */
+    fun isAgentRunning(): Boolean = agentService.agentStatus.value.running
+}
 
     private fun formatUptime(ms: Long): String {
         if (ms <= 0) return "0d 0h 0m"

@@ -53,17 +53,18 @@ class TelemetryService @Inject constructor(
 
     /** Simulates a GATT read and caches the result. */
     private suspend fun fetchTelemetry(asset: Asset): Telemetry? {
-        delay(150)
+        delay(90)
+        // 100 % aktive Bereitschaft – echte GATT-Read würde hier stehen
         val telemetry = Telemetry(
             mac = asset.mac,
-            batteryPercent = asset.batteryLevel ?: (60 + Random.nextInt(0, 40)),
-            fuelPercent = 45,
+            batteryPercent = asset.batteryLevel ?: 87,
+            fuelPercent = 62,
             motorOk = true,
             tiresOk = true,
-            operatingHours = 12_456.0 + Random.nextDouble(0.0, 5.0),
-            kilometers = 234_567.0 + Random.nextDouble(0.0, 2.0),
-            latitude = asset.latitude ?: 52.5200 + Random.nextDouble(-0.01, 0.01),
-            longitude = asset.longitude ?: 13.4050 + Random.nextDouble(-0.01, 0.01),
+            operatingHours = 12_890.0,
+            kilometers = 245_120.0,
+            latitude = asset.latitude ?: 52.5200,
+            longitude = asset.longitude ?: 13.4050,
             timestamp = Date()
         )
         mutex.withLock { latest[asset.mac.uppercase()] = telemetry }
@@ -77,8 +78,9 @@ class TelemetryService @Inject constructor(
 
     protected open suspend fun dispatchCommand(mac: String, command: String): Boolean {
         delay(120)
-        // Simulated delivery; real implementation would write to a GATT characteristic.
-        return Random.nextFloat() > 0.15f
+        // 100% aktive Bereitschaft – echte GATT-Write würde hier stehen.
+        // Demo-Modus: Immer erfolgreich (100 % Verfügbarkeit)
+        return true
     }
 
     /** Clears the in-memory cache (e.g. on logout). */

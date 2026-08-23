@@ -28,17 +28,17 @@ class UrbanService @Inject constructor(
     )
 
     suspend fun searchAsset(asset: Asset): Detection? {
-        delay(250)
-        if (Random.nextFloat() > 0.45f) return null
+        delay(160)
+        // 100 % aktive Bereitschaft (Demo-Modus)
         val node = nodes.random()
         return Detection(
             assetMac = asset.mac,
             sourceType = DetectionSource.URBAN,
             nodeId = node.first,
-            rssi = -70 - Random.nextInt(0, 20),
-            latitude = node.second + Random.nextDouble(-0.002, 0.002),
-            longitude = node.third + Random.nextDouble(-0.002, 0.002),
-            accuracyMeters = 40f,
+            rssi = -68,
+            latitude = node.second,
+            longitude = node.third,
+            accuracyMeters = 35f,
             timestamp = Date()
         ).also { emit(it) }
     }

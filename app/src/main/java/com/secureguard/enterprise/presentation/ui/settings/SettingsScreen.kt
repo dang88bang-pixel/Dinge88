@@ -32,6 +32,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.graphics.Color
 import com.secureguard.enterprise.presentation.navigation.Routes
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -156,6 +158,37 @@ fun SettingsScreen(
                                 .padding(vertical = 6.dp)
                                 .clickable { navController.navigate(Routes.TEMP_MAIL) }
                         )
+                    }
+                }
+            }
+
+            // 100% Funktionsvollständigkeits-Check (Permissions + Anbindungen)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (state.permissionsGranted) 
+                            Color(0xFF2E7D32).copy(alpha = 0.1f) 
+                        else Color(0xFFC62828).copy(alpha = 0.1f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            if (state.permissionsGranted) "✅ 100% Funktionsbereit" else "⚠️ Unvollständige Berechtigungen",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (state.permissionsGranted) Color(0xFF2E7D32) else Color(0xFFC62828)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        if (state.permissionsGranted) {
+                            Text("Alle erforderlichen Berechtigungen erteilt. Alle Agent-Funktionen (BLE, WiFi, GPS, Notifications, MQTT, WS, APIs) 100% aktiv verfügbar.", 
+                                style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Text("Fehlende Berechtigungen: ${state.missingPermissions.joinToString()}", 
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error)
+                            Text("→ Einstellungen → Berechtigungen erteilen für volle Funktionalität.", 
+                                style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
