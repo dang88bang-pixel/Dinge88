@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
@@ -61,6 +63,7 @@ fun MapScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val lastUpdate by viewModel.lastUpdate.collectAsState()
     val zoom by viewModel.zoom.collectAsState()
+    val isOffline by viewModel.isOffline.collectAsState()
 
     Configuration.getInstance().userAgentValue = "SecureGuardEnterprise"
 
@@ -82,6 +85,12 @@ fun MapScreen(
                     }
                     IconButton(onClick = { viewModel.zoomOut() }) {
                         Icon(Icons.Default.ZoomOut, contentDescription = "Verkleinern")
+                    }
+                    IconButton(onClick = { viewModel.toggleOfflineMode() }) {
+                        Icon(
+                            if (isOffline) Icons.Default.CloudOff else Icons.Default.CloudQueue,
+                            contentDescription = "Offline-Modus"
+                        )
                     }
                 }
             )
@@ -136,6 +145,7 @@ fun MapScreen(
                             )
                         )
                     }
+                    view.setUseDataConnection(!isOffline)
                     view.invalidate()
                 },
                 modifier = Modifier.fillMaxSize()

@@ -151,6 +151,12 @@ fun SecurityScreen(
                             if (pinConfigured) {
                                 Button(
                                     onClick = {
+                                        viewModel.lockApp()
+                                        pinMessage = "App gesperrt"
+                                    }
+                                ) { Text("Sperren") }
+                                Button(
+                                    onClick = {
                                         viewModel.disablePin()
                                         pinMessage = "PIN entfernt"
                                     }

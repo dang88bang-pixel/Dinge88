@@ -231,6 +231,21 @@ fun SettingsScreen(
                             ) { Text("PDF") }
                         }
                         Spacer(Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.exportDetectionsCsv() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Detekt. CSV") }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.exportEncryptedCsv() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("CSV 🔒") }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.restoreBackup() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Restore") }
+                        }
+                        Spacer(Modifier.height(4.dp))
                         Text(
                             "${viewModel.listBackups()} Backups verfügbar",
                             style = MaterialTheme.typography.bodySmall,

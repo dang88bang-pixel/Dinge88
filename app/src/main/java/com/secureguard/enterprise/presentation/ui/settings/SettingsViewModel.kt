@@ -122,7 +122,6 @@ class SettingsViewModel @Inject constructor(
     fun exportPdf() {
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             val result = runCatching {
-                val assets = exportService.exportAssetsCsv().readText()
                 exportService.exportPdfReport(emptyList(), emptyList())
             }
             _uiState.update {
@@ -132,6 +131,54 @@ class SettingsViewModel @Inject constructor(
                         onFailure = { e -> "❌ PDF-Export fehlgeschlagen: ${e.message}" }
                     )
                 )
+            }
+        }
+    }
+
+    fun exportDetectionsCsv() {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val result = runCatching { exportService.exportDetectionsCsv() }
+            _uiState.update {
+                it.copy(
+                    statusMessage = result.fold(
+                        onSuccess = { file -> "✅ Detektionen exportiert: ${file.name}" },
+                        onFailure = { e -> "❌ Export fehlgeschlagen: ${e.message}" }
+                    )
+                )
+            }
+        }
+    }
+
+    fun exportEncryptedCsv() {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val result = runCatching { exportService.exportAssetsCsvEncrypted() }
+            _uiState.update {
+                it.copy(
+                    statusMessage = result.fold(
+                        onSuccess = { file -> "✅ Verschlüsselt exportiert: ${file.name}" },
+                        onFailure = { e -> "❌ Export fehlgeschlagen: ${e.message}" }
+                    )
+                )
+            }
+        }
+    }
+
+    fun restoreBackup() {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val backups = backupManager.listBackups()
+            val latest = backups.firstOrNull()
+            if (latest != null) {
+                val result = runCatching { backupManager.stageRestore(latest) }
+                _uiState.update {
+                    it.copy(
+                        statusMessage = result.fold(
+                            onSuccess = { ok -> if (ok) "✅ Restore vorbereitet: ${latest.name} (App neu starten)" else "❌ Restore fehlgeschlagen" },
+                            onFailure = { e -> "❌ Restore: ${e.message}" }
+                        )
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(statusMessage = "⚠️ Keine Backups vorhanden") }
             }
         }
     }

@@ -49,6 +49,13 @@ class SecurityViewModel @Inject constructor(
         }
     }
 
+    fun lockApp() {
+        authManager.lock()
+        viewModelScope.launch {
+            auditLogService.log("APP_LOCK", "App manuell gesperrt über Security-Center")
+        }
+    }
+
     fun clearAuditLog() {
         viewModelScope.launch {
             auditLogService.log("AUDIT_CLEAR", "Audit-Log geleert")

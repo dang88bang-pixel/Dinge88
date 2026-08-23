@@ -228,6 +228,26 @@ class AgentService @Inject constructor(
         runCatching { readUsbSerial() }
             .onFailure { errorHandler.handleError(it, "UsbSerial") }
 
+        // Use LearningEngine predictions to inform search strategy
+        if (settings.learningMode && snapshot.isNotEmpty()) {
+            val prediction = learningEngine.predictNextLocation()
+            if (prediction != null) {
+                auditLogService.log(
+                    action = "PREDICTION",
+                    details = "Naechster Standort: ${"%.4f".format(prediction.first)}, ${"%.4f".format(prediction.second)}"
+                )
+            }
+            snapshot.forEach { asset ->
+                val probability = learningEngine.getSuccessProbability(asset.id)
+                if (probability < 0.2f) {
+                    auditLogService.log(
+                        action = "LOW_PROBABILITY",
+                        details = "${asset.shortName}: Erfolgswahrscheinlichkeit ${"%.0f".format(probability * 100)}%"
+                    )
+                }
+            }
+        }
+
         // Flush offline queue when MQTT is connected
         if (mqttService.isConnected) {
             val flushed = flushOfflineQueue()
