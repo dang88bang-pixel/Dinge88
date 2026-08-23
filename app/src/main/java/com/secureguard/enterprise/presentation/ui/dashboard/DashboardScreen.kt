@@ -17,7 +17,9 @@ import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -70,6 +72,12 @@ fun DashboardScreen(
                 style = MaterialTheme.typography.bodyMedium
             )
             Row {
+                IconButton(onClick = { navController.navigate(Routes.TERMINAL) }) {
+                    Icon(Icons.Default.Terminal, contentDescription = "Terminal")
+                }
+                IconButton(onClick = { navController.navigate(Routes.SENSOR_FUSION) }) {
+                    Icon(Icons.Default.Explore, contentDescription = "Sensor-Fusion")
+                }
                 IconButton(onClick = { navController.navigate(Routes.AGENT_CONFIG) }) {
                     Icon(Icons.Default.SmartToy, contentDescription = "Agent-Konfiguration")
                 }

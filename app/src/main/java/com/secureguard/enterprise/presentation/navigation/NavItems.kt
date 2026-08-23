@@ -36,5 +36,7 @@ object Routes {
     const val ASSET_DETAIL = "asset_detail/{assetId}"
     const val NODE_STATUS = "node_status"
     const val TEMP_MAIL = "temp_mail"
+    const val TERMINAL = "terminal"
+    const val SENSOR_FUSION = "sensor_fusion"
     fun assetDetail(id: String) = "asset_detail/$id"
 }

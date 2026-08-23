@@ -31,6 +31,8 @@ import com.secureguard.enterprise.presentation.ui.map.MapScreen
 import com.secureguard.enterprise.presentation.ui.nodes.NodeStatusScreen
 import com.secureguard.enterprise.presentation.ui.settings.SettingsScreen
 import com.secureguard.enterprise.presentation.ui.tempmail.TempMailScreen
+import com.secureguard.enterprise.presentation.ui.terminal.TerminalScreen
+import com.secureguard.enterprise.presentation.ui.sensorfusion.SensorFusionScreen
 
 private const val ANIM_MS = 250
 
@@ -107,6 +109,12 @@ fun SecureGuardApp() {
             }
             composable(Routes.TEMP_MAIL) {
                 TempMailScreen(navController = navController)
+            }
+            composable(Routes.TERMINAL) {
+                TerminalScreen(navController = navController)
+            }
+            composable(Routes.SENSOR_FUSION) {
+                SensorFusionScreen(navController = navController)
             }
             composable(
                 route = Routes.ASSET_DETAIL,
