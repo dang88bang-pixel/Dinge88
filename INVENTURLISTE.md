@@ -107,3 +107,28 @@
 
 ---
 *Verifikation: `backend/e2e_test.py` + `verify_chains.py` (K1–K7, 19/19 grün) · Code-Audit: keine ungeschützten Simulationen.*
+
+---
+
+## 8. Service-Worker & Bereitstellungs-Tools (Stand 2026-08-23, 2. Erweiterung)
+
+| Komponente | Datei | Funktion | Status |
+|---|---|---|---|
+| **Gateway-Worker** | `tools/gateway_worker.py` | Echter Dienst-Akteur am Broker (Firmware-Vertrag): registriert Asset per REST, sendet zyklisch Telemetrie (RSSI/Akku/Position), führt ALARM/LIGHT/PING-Befehle aus, sendet LOW_BATTERY-Alerts | ✅ live aktiv |
+| **Ein-Befehl-Stack** | `tools/start-stack.sh` | Stellt hintereinander bereit: Broker → Backend → Gateway-Worker → Node-RED (idempotent, mit Statusprüfung) | ✅ |
+| **Broker (Sandbox)** | `tools/broker.js` | aedes-MQTT-Broker (1883 TCP / 9001 WS), Mosquitto-äquivalent | ✅ live aktiv |
+| **Ketten-Verifikation** | `tools/verify_chains.py` | K1–K7 (19 Checks) | ✅ 19/19 |
+| **Netzwerk-Matrix** | `tools/verify_network.py` | Alle Dienste + 6 Anbindungen (14 Checks) | ✅ 14/14 |
+| **E2E-Test** | `tools/e2e_test.py` | MQTT→Ingestion→WS→Command→DB | ✅ |
+
+### Live-Anbindungsmatrix (zuletzt 14/14 grün)
+```
+Gateway-Worker ──MQTT──▶ Broker ◀──MQTT── Backend (FastAPI, :8000)
+     ▲                     │                    │  ▲
+     └──── Commands ───────┘              REST  │  ├──▶ SQLite (DB)
+  (ALARM/LIGHT/PING)                  (Assets,  │  │
+                                       Detections,▼
+Node-RED (:1880) ──MQTT──▶ Broker    Alerts, …)  WebSocket
+                                                      │
+                                            Broadcast an alle Clients
+```
