@@ -9,13 +9,15 @@ package com.secureguard.enterprise.services
  *                     produced hits are queried first
  * @param offlineOnly never query external / internet channels
  * @param externalSources allow Apple/Google-style crowdsource lookups
+ * @param durationHours planned runtime in hours; 0 = unbegrenzt
  */
 data class AgentSettings(
     val interval: Int = 30,
     val dynamicPriority: Boolean = true,
     val learningMode: Boolean = true,
     val offlineOnly: Boolean = true,
-    val externalSources: Boolean = false
+    val externalSources: Boolean = false,
+    val durationHours: Int = 0
 )
 
 /** Live status of the agent, collected by the UI. */

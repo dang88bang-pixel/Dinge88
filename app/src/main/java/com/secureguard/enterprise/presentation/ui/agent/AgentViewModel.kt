@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,16 +43,62 @@ class AgentViewModel @Inject constructor(
         )
     )
 
+    /** Ticker (1 s), damit Laufzeit/Fortschritt live mitlaufen. */
+    private val ticker = MutableStateFlow(0L)
+
+    init {
+        viewModelScope.launch {
+            while (true) {
+                ticker.value = System.currentTimeMillis()
+                delay(1_000)
+            }
+        }
+    }
+
     val uiState: StateFlow<AgentUiState> = combine(
         agentService.agentStatus,
-        config
-    ) { status, cfg ->
+        config,
+        ticker
+    ) { status, cfg, now ->
+        val durationHours = durationHoursFor(cfg)
         cfg.copy(
             agentRunning = status.running,
             runtime = formatUptime(status.uptimeMillis),
-            progress = if (status.running) 85f else 0f
+            progress = realProgress(status, durationHours, now)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AgentUiState())
+
+    /**
+     * Echter Fortschritt:
+     * - mit geplanter Gesamtdauer: verstrichene / geplante Laufzeit (0..1),
+     * - unbegrenzt: Fortschritt innerhalb des aktuellen Abfragezyklus'
+     *   (letzte Ausführung → nächste geplante Ausführung).
+     */
+    private fun realProgress(
+        status: com.secureguard.enterprise.services.AgentStatus,
+        durationHours: Int,
+        now: Long
+    ): Float {
+        if (!status.running) return 0f
+        if (durationHours > 0) {
+            val totalMs = durationHours * 3_600_000L
+            return (status.uptimeMillis.toFloat() / totalMs).coerceIn(0f, 1f)
+        }
+        val last = status.lastRunAt ?: return 0f
+        val next = status.nextRunAt ?: return 0f
+        if (next <= last) return 0f
+        return ((now - last).toFloat() / (next - last)).coerceIn(0f, 1f)
+    }
+
+    /** Gesamtdauer in Stunden (0 = unbegrenzt) aus der UI-Konfiguration. */
+    private fun durationHoursFor(cfg: AgentUiState): Int = when (cfg.duration) {
+        "1h" -> 1
+        "6h" -> 6
+        "24h" -> 24
+        "1w" -> 168
+        "custom" -> cfg.customDays * 24
+        else -> 0
+    }
 
     fun setDuration(duration: String) = config.update { it.copy(duration = duration) }
     fun setCustomDays(days: Int) = config.update { it.copy(customDays = days) }
@@ -82,7 +129,8 @@ class AgentViewModel @Inject constructor(
             dynamicPriority = state.dynamicPriority,
             learningMode = state.learningMode,
             offlineOnly = true,
-            externalSources = false
+            externalSources = false,
+            durationHours = durationHoursFor(state)
         )
         agentService.start(settings)
     }

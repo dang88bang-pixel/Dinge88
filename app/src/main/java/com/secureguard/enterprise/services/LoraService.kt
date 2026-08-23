@@ -1,39 +1,60 @@
 package com.secureguard.enterprise.services
 
 import android.content.Context
+import com.google.gson.JsonArray
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.random.Random
 
 /**
- * Generic LoRa / LoRaWAN service — replaces the former Meshtastic dependency.
+ * Generic LoRa / LoRaWAN service.
  *
- * No vendor-specific LoRa library is bundled. This class defines the contract
- * ([searchAsset], [sendCommand], [gateways]) and ships with a [DummyLoraClient]
- * so the app is fully functional out of the box. A real backend (Helium,
- * The Things Network, a private gateway fleet, ...) can be plugged in by
- * replacing [loraClient] without touching any other layer.
+ * Produktivbetrieb: Über die Einstellungen („Backend-Endpunkte") wird ein
+ * echter LoRaWAN-Backend-Endpunkt konfiguriert (z. B. ein TTN/TTI-Proxy oder
+ * das eigene Gateway-Fleet-Backend). [HttpLoraClient] fragt diesen per
+ * `GET <url>` ab und erwartet ein JSON der Form
+ *
+ * `{"gateways":[{"id":"gw-1","rssi":-48,"latitude":52.52,"longitude":13.40,
+ *   "seenMacs":["AA:BB:CC:DD:EE:01"]}]}`
+ * (alternativ ein reines JSON-Array der Gateways).
+ *
+ * Befehle werden per `POST <url>/downlink` mit
+ * `{"mac":"...","command":"..."}` gesendet (HTTP 2xx = zugestellt).
+ *
+ * Nur im expliziten Demo-Modus ([RuntimeSettings.demoMode]) liefert der
+ * [DummyLoraClient] simulierte Gateways. Ohne Endpunkt und ohne Demo-Modus
+ * gibt der Kanal ehrlich `null` zurück.
  */
 @Singleton
 class LoraService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val runtimeSettings: RuntimeSettings,
+    private val httpClient: RemoteEndpointClient
 ) : DetectionCapable() {
 
-    private val loraClient: LoraClient = DummyLoraClient()
+    private val loraClient: LoraClient
+        get() = if (runtimeSettings.demoMode) {
+            DummyLoraClient
+        } else {
+            HttpLoraClient(runtimeSettings.loraEndpoint, runtimeSettings.loraApiKey, httpClient)
+        }
 
-    /** Last known gateways (simulated for the placeholder client). */
+    /** Letztbekannte Gateways (real abgeholt oder – nur im Demo-Modus – simuliert). */
     @Volatile
     var gateways: List<Gateway> = emptyList()
         private set
 
     suspend fun searchAsset(asset: Asset): Detection? {
-        val currentGateways = loraClient.getGateways()
-        gateways = currentGateways
+        val currentGateways = refreshGateways()
         for (gw in currentGateways) {
             if (gw.seenMacs.any { it.equals(asset.mac, ignoreCase = true) }) {
                 val detection = Detection(
@@ -44,6 +65,7 @@ class LoraService @Inject constructor(
                     latitude = gw.latitude,
                     longitude = gw.longitude,
                     accuracyMeters = 25f,
+                    message = if (runtimeSettings.demoMode) "Demo-Modus (simuliert)" else null,
                     timestamp = Date()
                 )
                 emit(detection)
@@ -54,18 +76,32 @@ class LoraService @Inject constructor(
     }
 
     /**
-     * Sends a command to an asset reachable via LoRa. The placeholder client
-     * simulates a successful delivery when at least one gateway is in range.
+     * Sendet einen Befehl an ein LoRa-Asset:
+     * 1. echter Downlink über den konfigurierten Endpunkt (HTTP 2xx),
+     * 2. im Demo-Modus simulierte Zustellung (Gateway in Reichweite),
+     * 3. ohne Endpunkt/Demo: `false` (nicht zustellbar).
      */
     suspend fun sendCommand(mac: String, command: String): Boolean {
-        val inRange = loraClient.getGateways().any { gw ->
-            gw.seenMacs.any { it.equals(mac, ignoreCase = true) }
+        val endpoint = runtimeSettings.loraEndpoint
+        if (endpoint.isBlank()) {
+            if (!runtimeSettings.demoMode) return false
+            return DummyLoraClient.getGateways().any { gw ->
+                gw.seenMacs.any { it.equals(mac, ignoreCase = true) }
+            }
         }
-        return inRange || Random.nextFloat() > 0.5f
+        val body = JsonObject().apply {
+            addProperty("mac", mac)
+            addProperty("command", command)
+        }
+        return httpClient.postExpectOk(
+            url = endpoint.trimEnd('/') + "/downlink",
+            body = body,
+            apiKey = runtimeSettings.loraApiKey
+        )
     }
 
     suspend fun refreshGateways(): List<Gateway> {
-        gateways = loraClient.getGateways()
+        gateways = withContext(Dispatchers.IO) { loraClient.getGateways() }
         return gateways
     }
 }
@@ -85,11 +121,48 @@ interface LoraClient {
 }
 
 /**
- * Placeholder client used until a real LoRaWAN network server is integrated.
- * It fabricates a handful of gateways around Berlin so the UI and the agent
- * have data to work with.
+ * Echter LoRaWAN-Backend-Client: lädt die Gateways vom konfigurierten
+ * Endpunkt (JSON). Bei fehlender URL oder Fehlern: leere Liste.
  */
-internal class DummyLoraClient : LoraClient {
+internal class HttpLoraClient(
+    private val endpoint: String,
+    private val apiKey: String,
+    private val client: RemoteEndpointClient
+) : LoraClient {
+
+    override suspend fun getGateways(): List<Gateway> {
+        if (endpoint.isBlank()) return emptyList()
+        val json: JsonElement = client.getJson(endpoint, apiKey) ?: return emptyList()
+        val array: JsonArray = when {
+            json.isJsonArray -> json.asJsonArray
+            json.isJsonObject && json.asJsonObject.has("gateways") &&
+                json.asJsonObject.get("gateways").isJsonArray ->
+                json.asJsonObject.getAsJsonArray("gateways")
+            else -> return emptyList()
+        }
+        return array.mapNotNull { element ->
+            val obj = element as? JsonObject ?: return@mapNotNull null
+            val macs = obj.getAsJsonArray("seenMacs")?.mapNotNull { m ->
+                runCatching { m.asString }.getOrNull()
+            } ?: emptyList()
+            Gateway(
+                id = obj.get("id")?.asString ?: return@mapNotNull null,
+                rssi = obj.get("rssi")?.asInt ?: -100,
+                latitude = obj.get("latitude")?.asDouble
+                    ?: obj.get("lat")?.asDouble ?: return@mapNotNull null,
+                longitude = obj.get("longitude")?.asDouble
+                    ?: obj.get("lng")?.asDouble ?: return@mapNotNull null,
+                seenMacs = macs
+            )
+        }
+    }
+}
+
+/**
+ * Simulierter Client – **nur im expliziten Demo-Modus** aktiv
+ * ([RuntimeSettings.demoMode]). Fabriciert Gateways um Berlin.
+ */
+internal object DummyLoraClient : LoraClient {
 
     private val pool = listOf(
         Gateway("gw-berlin-mitte", -48, 52.5200, 13.4050, listOf("AA:BB:CC:DD:EE:01")),
@@ -99,7 +172,7 @@ internal class DummyLoraClient : LoraClient {
     )
 
     override suspend fun getGateways(): List<Gateway> {
-        // Simulate network jitter.
+        // Simulierter Netzwerk-Jitter (nur Demo-Modus).
         return pool.filter { Random.nextFloat() > 0.25f }
             .map { it.copy(rssi = it.rssi + Random.nextInt(-6, 6)) }
     }

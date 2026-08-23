@@ -59,6 +59,12 @@ android {
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
         buildConfigField("String", "WEBSOCKET_URL", "\"${apiKey("WEBSOCKET_URL")}\"")
         buildConfigField("String", "MCP_SERVER_URL", "\"${apiKey("MCP_SERVER_URL")}\"")
+        // DHL Location Finder (developer.dhl.com) – ohne Key liefert der
+        // Manager eine leere Liste.
+        buildConfigField("String", "DHL_API_KEY", "\"${apiKey("DHL_API_KEY")}\"")
+        // Basis-URLs für Portale/Mirrors (leer = eingebauter Standard).
+        buildConfigField("String", "CKAN_BASE_URL", "\"${apiKey("CKAN_BASE_URL")}\"")
+        buildConfigField("String", "HELIUM_API_BASE_URL", "\"${apiKey("HELIUM_API_BASE_URL")}\"")
     }
 
     val releaseSigning = signingConfigs.create("release") {

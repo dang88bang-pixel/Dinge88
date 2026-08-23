@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import List, Optional
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, BackgroundTasks
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -140,6 +140,65 @@ init_db()
 _mqtt_client = None
 
 
+def on_mqtt_message(client, userdata, msg):
+    """Echte Ingestion: MQTT-Telemetrie/Alerts → DB + WebSocket-Broadcast."""
+    try:
+        payload = json.loads(msg.payload.decode("utf-8", errors="replace"))
+    except Exception:
+        payload = {"raw": msg.payload.decode("utf-8", errors="replace")}
+
+    topic_parts = msg.topic.split("/")
+    asset_mac = topic_parts[1] if len(topic_parts) > 1 else "unknown"
+    kind = topic_parts[2] if len(topic_parts) > 2 else "telemetry"
+
+    conn = get_db()
+    try:
+        if kind == "alert":
+            conn.execute(
+                "INSERT INTO alerts (asset_id, type, severity, message, timestamp, resolved) "
+                "VALUES (?, ?, ?, ?, ?, 0)",
+                (
+                    payload.get("assetId", asset_mac),
+                    payload.get("type", "SECURITY"),
+                    payload.get("severity", "WARNING"),
+                    payload.get("message", str(payload)),
+                    datetime.now(),
+                ),
+            )
+            conn.commit()
+            broadcast({"type": "alert", "assetId": payload.get("assetId", asset_mac),
+                       "message": payload.get("message", str(payload))})
+        else:
+            conn.execute(
+                "INSERT INTO detections "
+                "(asset_mac, source_type, node_id, rssi, latitude, longitude, timestamp) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    payload.get("mac", asset_mac),
+                    "MQTT",
+                    payload.get("nodeId", msg.topic),
+                    int(payload.get("rssi", 0)),
+                    payload.get("lat") or payload.get("latitude"),
+                    payload.get("lng") or payload.get("longitude"),
+                    datetime.now(),
+                ),
+            )
+            conn.commit()
+            broadcast({
+                "type": "detection",
+                "assetMac": payload.get("mac", asset_mac),
+                "sourceType": "MQTT",
+                "nodeId": payload.get("nodeId", msg.topic),
+                "rssi": int(payload.get("rssi", 0)),
+                "latitude": payload.get("lat") or payload.get("latitude"),
+                "longitude": payload.get("lng") or payload.get("longitude"),
+            })
+    except Exception as exc:
+        print(f"MQTT-Ingestion-Fehler: {exc}")
+    finally:
+        conn.close()
+
+
 def get_mqtt_client():
     """Liefert einen (lazy) MQTT-Client; None, wenn paho fehlt."""
     global _mqtt_client
@@ -149,6 +208,10 @@ def get_mqtt_client():
         try:
             host, _, port = MQTT_BROKER.partition(":")
             _mqtt_client = mqtt.Client(client_id="secureguard-backend")
+            _mqtt_client.on_message = on_mqtt_message
+            _mqtt_client.on_connect = lambda c, u, f, rc: (
+                c.subscribe([("secureguard/+/telemetry", 1), ("secureguard/+/alert", 2)])
+            )
             _mqtt_client.connect(host, int(port or 1883), 60)
             _mqtt_client.loop_start()
         except Exception:
@@ -167,12 +230,53 @@ def publish_command(asset_mac: str, command: str) -> bool:
         return False
 
 
-# ============ API-ENDPUNKTE ============
+# ============ WEBSOCKET-CONNECTION-MANAGER ============
+
+class ConnectionManager:
+    """Hält alle verbundenen WebSocket-Clients und broadcastet echte Events."""
+
+    def __init__(self):
+        self.active: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active:
+            self.active.remove(websocket)
+
+    async def send(self, websocket: WebSocket, message: dict):
+        try:
+            await websocket.send_text(json.dumps(message))
+        except Exception:
+            self.disconnect(websocket)
+
+    async def broadcast_async(self, message: dict):
+        for ws in list(self.active):
+            await self.send(ws, message)
+
+    def broadcast(self, message: dict):
+        """Fire-and-forget-Broadcast (auch aus Sync-Kontext wie MQTT-Callbacks)."""
+        if not self.active:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.broadcast_async(message))
+        except RuntimeError:
+            pass  # kein laufender Loop (z. B. beim Startup) – nichts zu senden
+
+
+manager = ConnectionManager()
+
 
 @app.get("/api/health")
 async def health():
+    get_mqtt_client()  # MQTT-Verbindung (inkl. Subscription) früh hochfahren
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
+
+# ============ API-ENDPUNKTE ============
 
 @app.get("/api/assets")
 async def get_assets():
@@ -214,6 +318,15 @@ async def add_detection(detection: Detection):
     )
     conn.commit()
     conn.close()
+    await manager.broadcast_async({
+        "type": "detection",
+        "assetMac": detection.asset_mac,
+        "sourceType": detection.source_type,
+        "nodeId": detection.node_id,
+        "rssi": detection.rssi,
+        "latitude": detection.latitude,
+        "longitude": detection.longitude,
+    })
     return {"status": "ok"}
 
 
@@ -238,6 +351,12 @@ async def add_alert(alert: Alert):
     )
     conn.commit()
     conn.close()
+    await manager.broadcast_async({
+        "type": "alert",
+        "assetId": alert.asset_id,
+        "severity": alert.severity,
+        "message": alert.message,
+    })
     return {"status": "ok"}
 
 
@@ -305,8 +424,12 @@ async def process_action(action: Action) -> None:
     conn.commit()
     conn.close()
 
-    # Simulierte Verarbeitungszeit für Demo-Setups
-    await asyncio.sleep(2)
+    await manager.broadcast_async({
+        "type": "command_status",
+        "assetId": action.asset_id,
+        "command": action.action_type,
+        "status": "delivered" if ok else "failed",
+    })
     print(f"Aktion {action.action_type} für {action.asset_id} ausgeführt (mqtt={ok})")
 
 
@@ -314,7 +437,10 @@ async def process_action(action: Action) -> None:
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
+    """Echtzeit-Kanal: Clients erhalten echte Broadcasts (Detektionen, Alerts,
+    Command-Status). Eingehende `command`-Nachrichten werden quittiert (ack)
+    und zusätzlich als MQTT-Befehl veröffentlicht."""
+    await manager.connect(websocket)
     try:
         while True:
             data = await websocket.receive_text()
@@ -323,15 +449,24 @@ async def websocket_endpoint(websocket: WebSocket):
                 if msg.get("type") == "command":
                     asset_id = msg.get("assetId", "")
                     action = msg.get("action", "")
+                    ok = publish_command(asset_id, action)
                     await websocket.send_text(
-                        json.dumps({"type": "ack", "assetId": asset_id, "action": action})
+                        json.dumps({
+                            "type": "ack",
+                            "assetId": asset_id,
+                            "action": action,
+                            "delivered": ok,
+                        })
                     )
                 else:
                     await websocket.send_text(json.dumps({"type": "echo", "data": msg}))
             except json.JSONDecodeError:
                 await websocket.send_text(json.dumps({"type": "error", "message": "invalid json"}))
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
     except Exception as exc:
         print(f"WebSocket-Fehler: {exc}")
+        manager.disconnect(websocket)
 
 
 # ============ START ============

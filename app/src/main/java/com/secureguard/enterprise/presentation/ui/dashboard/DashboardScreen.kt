@@ -139,7 +139,7 @@ fun DashboardScreen(
                         )
                     }
                     Text("📶 ${uiState.onlineAssets}/${uiState.totalAssets}")
-                    Text("🔋 ${uiState.batteryLevel}%")
+                    Text(uiState.batteryLevel?.let { "🔋 $it%" } ?: "🔋 –")
                     Text("⏱ ${uiState.lastSyncTime}")
                 }
             }

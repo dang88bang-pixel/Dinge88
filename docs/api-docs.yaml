@@ -116,7 +116,15 @@ paths:
   /ws:
     get:
       summary: WebSocket-Endpunkt für Echtzeit-Updates
-      description: Nachrichten vom Typ {"type":"command","assetId":"...","action":"..."}
+      description: |
+        Server-Push (Broadcast an alle Clients):
+          {"type":"detection","assetMac":"...","sourceType":"...","nodeId":"...","rssi":-45,"latitude":...,"longitude":...}
+          {"type":"alert","assetId":"...","severity":"...","message":"..."}
+          {"type":"command_status","assetId":"...","command":"...","status":"delivered|failed"}
+        Client-Nachrichten vom Typ {"type":"command","assetId":"...","action":"..."}
+        werden per MQTT veröffentlicht und mit {"type":"ack","delivered":true|false} quittiert.
+        Detektionen/Alerts aus MQTT-Topics (secureguard/+/telemetry, secureguard/+/alert)
+        werden ebenfalls ingestiert und gebroadcastet.
 
 components:
   schemas:

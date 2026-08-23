@@ -22,17 +22,18 @@ import javax.inject.Singleton
 import kotlin.random.Random
 
 /**
- * Satellite / GNSS fallback channel. Used when all terrestrial channels fail,
- * e.g. for assets in remote areas.
+ * Satellite / GNSS channel. Liefert die **echte** GPS-Position des Geräts über
+ * [FusedLocationProviderClient] (Google Play Services) als Referenzpunkt
+ * (z. B. „Asset zuletzt in meiner Nähe gesehen").
  *
- * Seit der API-Integration wird die echte GPS-Position des Geräts über
- * [FusedLocationProviderClient] (Google Play Services) ermittelt – das Gerät
- * selbst dient als Referenzpunkt. Ohne Standortberechtigung oder GPS-Fix
- * wird wie gehabt ein grober Platzhalter-Wert simuliert.
+ * Ohne Standortberechtigung oder GPS-Fix gibt der Kanal ehrlich `null`
+ * zurück; eine simulierte Schätzposition liefert er ausschließlich im
+ * expliziten Demo-Modus ([RuntimeSettings.demoMode]).
  */
 @Singleton
 class SatelliteService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val runtimeSettings: RuntimeSettings
 ) : DetectionCapable() {
 
     private val fusedLocationClient: FusedLocationProviderClient by lazy {
@@ -55,17 +56,20 @@ class SatelliteService @Inject constructor(
             ).also { emit(it) }
         }
 
-        // Kein Fix verfügbar – grobe Schätzung (letzte bekannte Position).
+        // Kein Fix verfügbar: nur im Demo-Modus eine grobe Schätzung liefern,
+        // ansonsten ehrlich "nicht gefunden" zurückmelden.
+        if (!runtimeSettings.demoMode) return null
         delay(500)
         if (Random.nextFloat() > 0.4f) return null
         return Detection(
             assetMac = asset.mac,
             sourceType = DetectionSource.SATELLITE,
-            nodeId = "sat-fix",
+            nodeId = "sat-fix (Demo)",
             rssi = -100,
             latitude = asset.latitude ?: (52.5200 + Random.nextDouble(-0.08, 0.08)),
             longitude = asset.longitude ?: (13.4050 + Random.nextDouble(-0.08, 0.08)),
             accuracyMeters = 150f,
+            message = "Demo-Modus (simuliert)",
             timestamp = Date()
         ).also { emit(it) }
     }

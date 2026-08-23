@@ -20,7 +20,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.Date
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -145,6 +151,20 @@ class AgentService @Inject constructor(
                 "Zyklus ${cycleCount.get()} · ${result.assetsChecked} Assets geprüft · " +
                     "${result.detections} Treffer"
             )
+
+            // Geplante Gesamtablaufzeit erreicht → Agent sauber beenden.
+            if (settings.durationHours > 0 &&
+                _agentStatus.value.uptimeMillis >= settings.durationHours * 3_600_000L
+            ) {
+                _agentStatus.value = _agentStatus.value.copy(running = false, nextRunAt = null)
+                scope.launch {
+                    auditLogService.log(
+                        action = "AGENT_DURATION_REACHED",
+                        details = "Geplante Laufzeit (${settings.durationHours} h) erreicht – Agent gestoppt"
+                    )
+                }
+                return
+            }
 
             val elapsed = System.currentTimeMillis() - cycleStart
             delay((intervalMs - elapsed).coerceAtLeast(0L))
@@ -491,19 +511,51 @@ class AgentService @Inject constructor(
         }
     }
 
-    /** Führt die Registrierung durch (hier als HTTP-POST-Skizze). */
+    /**
+     * Führt die Registrierung durch: echter HTTP-POST mit JSON-Payload
+     * (alle Registrierungsfelder + `email`) an [url]. Erfolg = HTTP 2xx.
+     * Fehler/Timeout werden ins Audit-Log geschrieben.
+     */
     private suspend fun performRegistration(
         serviceName: String,
         url: String,
         data: Map<String, String>,
         email: String
     ): Boolean {
-        // TODO: echte Registrierung (HTTP-POST mit email im Payload) –
-        // bewusst skizziert, um keine unautorisierten Aufrufe auszulösen.
-        return false
+        val payload = com.google.gson.JsonObject().apply {
+            addProperty("email", email)
+            data.forEach { (key, value) -> addProperty(key, value) }
+        }
+        val body = com.google.gson.Gson().toJson(payload)
+            .toRequestBody("application/json; charset=utf-8".toMediaType())
+
+        val outcome: Pair<Boolean, String> = withContext(Dispatchers.IO) {
+            try {
+                registrationHttpClient.newCall(
+                    Request.Builder().url(url).post(body).build()
+                ).execute().use { response ->
+                    response.isSuccessful to "${response.code} ${response.message}"
+                }
+            } catch (e: Exception) {
+                false to (e.message ?: "Netzwerkfehler")
+            }
+        }
+        auditLogService.log(
+            action = if (outcome.first) "REGISTER_HTTP" else "REGISTER_HTTP_ERROR",
+            details = "$serviceName → ${outcome.second}"
+        )
+        return outcome.first
     }
 
     companion object {
         private const val STALE_MS = 5 * 60 * 1000L // 5 minutes
+
+        /** Eigener Client für Registrierungs-POSTs (kurze Timeouts). */
+        private val registrationHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
+                .build()
+        }
     }
 }

@@ -22,6 +22,17 @@ GOOGLE_API_KEY=
 # Helium Network (LoRaWAN-Hotspots)
 HELIUM_API_KEY=
 
+# Helium-API-Basis (die alte api.helium.io v1 ist abgeschaltet; Standard ist
+# der Community-Mirror https://helium-api.stakejoy.com – hier überschreibbar)
+HELIUM_API_BASE_URL=
+
+# DHL Location Finder (Paketstationen) – Key aus developer.dhl.com
+# (OAuth2-Client-Credentials). Ohne Key: Feature deaktiviert.
+DHL_API_KEY=
+
+# CKAN Open Data – Basis-URL (Standard: https://www.govdata.de/ckan/)
+CKAN_BASE_URL=
+
 # MQTT-Broker (optional; Standard: tcp://10.0.2.2:1883 für Emulator)
 MQTT_BROKER_URL=
 

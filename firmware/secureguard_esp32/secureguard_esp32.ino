@@ -24,6 +24,9 @@
 #include <PubSubClient.h>
 
 // ============ KONFIGURATION ============
+// HINWEIS: ssid/password/mqtt_server sind TEMPLATE-Werte und müssen pro
+// Gateway angepasst werden (kein Demo-Betrieb). Alternativ per NVS/Env
+// überschreiben, wenn die Firmware in eine Build-Pipeline eingebunden ist.
 #define LORA_SS 5
 #define LORA_RST 14
 #define LORA_DIO0 2
