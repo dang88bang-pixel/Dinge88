@@ -16,8 +16,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,6 +59,25 @@ fun DashboardScreen(
             "🛡️ SecureGuard Dashboard",
             style = MaterialTheme.typography.headlineSmall
         )
+
+        // Navigation zu Settings + Agent-Konfiguration
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                if (uiState.agentRunning) "🟢 Agent aktiv" else "🔴 Agent inaktiv",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Row {
+                IconButton(onClick = { navController.navigate(Routes.AGENT_CONFIG) }) {
+                    Icon(Icons.Default.SmartToy, contentDescription = "Agent-Konfiguration")
+                }
+                IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
+                    Icon(Icons.Default.Settings, contentDescription = "Einstellungen")
+                }
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
