@@ -113,10 +113,46 @@ paths:
         '200':
           description: Zähler
 
+  /api/crowd/report:
+    post:
+      summary: Anonyme Crowd-Sichtung melden
+      tags: [Crowd]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrowdSighting'
+      responses:
+        '200':
+          description: Sichtung gespeichert
+
+  /api/crowd/search:
+    get:
+      summary: Crowd-Sichtungen für eine MAC abrufen
+      tags: [Crowd]
+      parameters:
+        - name: mac
+          in: query
+          required: true
+          schema:
+            type: string
+            example: 'AA:BB:CC:DD:EE:01'
+        - name: hours
+          in: query
+          schema:
+            type: integer
+            default: 24
+      responses:
+        '200':
+          description: Liste der Sichtungen
+
   /ws:
     get:
       summary: WebSocket-Endpunkt für Echtzeit-Updates
-      description: Nachrichten vom Typ {"type":"command","assetId":"...","action":"..."}
+      description: |
+        Nachrichten vom Typ {"type":"command","assetId":"...","action":"..."}.
+        Der Server forwarded auch MQTT-Telemetrie/Alerts an alle verbundenen Clients.
 
 components:
   schemas:
@@ -166,3 +202,12 @@ components:
         parameters:
           type: object
           additionalProperties: true
+    CrowdSighting:
+      type: object
+      required: [mac]
+      properties:
+        mac: { type: string, example: 'AA:BB:CC:DD:EE:01' }
+        reporter_id: { type: string, example: 'device-123' }
+        rssi: { type: integer, example: -65 }
+        latitude: { type: number, format: double, example: 52.52 }
+        longitude: { type: number, format: double, example: 13.40 }

@@ -2,6 +2,7 @@ package com.secureguard.enterprise.presentation.ui.settings
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
+import com.secureguard.enterprise.services.AgentForegroundService
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -136,6 +137,20 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun listBackups(): Int = backupManager.listBackups().size
+
+    fun startForegroundService() {
+        val intent = android.content.Intent(context, AgentForegroundService::class.java)
+        intent.action = AgentForegroundService.ACTION_START
+        androidx.core.content.ContextCompat.startForegroundService(context, intent)
+        _uiState.update { it.copy(statusMessage = "✅ Agent als Vordergrund-Dienst gestartet") }
+    }
+
+    fun stopForegroundService() {
+        val intent = android.content.Intent(context, AgentForegroundService::class.java)
+        intent.action = AgentForegroundService.ACTION_STOP
+        context.startService(intent)
+        _uiState.update { it.copy(statusMessage = "⏹ Vordergrund-Dienst gestoppt") }
+    }
 
     companion object {
         private const val KEY_NOTIFICATIONS = "notifications"

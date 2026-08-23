@@ -168,6 +168,25 @@ fun SettingsScreen(
                                 .padding(vertical = 6.dp)
                                 .clickable { navController.navigate(Routes.TEMP_MAIL) }
                         )
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+                        Text("🤖 Vordergrund-Dienst", style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.Button(
+                                onClick = { viewModel.startForegroundService() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Starten") }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.stopForegroundService() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Stoppen") }
+                        }
+                        Text(
+                            "Hält den Agent aktiv, auch wenn die App im Hintergrund ist.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
