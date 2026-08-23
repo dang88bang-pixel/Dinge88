@@ -80,7 +80,14 @@ class SecureGuardRepositoryImpl(
     override suspend fun resolveAsset(idOrMac: String): Asset? =
         assetDao.getByIdOrMac(idOrMac)
 
-    override suspend fun upsertAsset(asset: Asset) = assetDao.upsert(asset)
+    override suspend fun upsertAsset(asset: Asset) {
+        val existing = assetDao.getById(asset.id)
+        if (existing != null) {
+            assetDao.update(asset.copy(updatedAt = java.util.Date()))
+        } else {
+            assetDao.upsert(asset)
+        }
+    }
 
     override suspend fun updateAssetStatus(
         mac: String,
@@ -104,7 +111,13 @@ class SecureGuardRepositoryImpl(
         }
     }
 
-    override suspend fun deleteAsset(id: String) = assetDao.deleteById(id)
+    override suspend fun deleteAsset(id: String) {
+        val asset = assetDao.getById(id)
+        if (asset != null) {
+            detectionDao.deleteForAsset(asset.mac)
+        }
+        assetDao.deleteById(id)
+    }
 
     override fun getDetections(mac: String): Flow<List<Detection>> =
         detectionDao.observeForAsset(mac)

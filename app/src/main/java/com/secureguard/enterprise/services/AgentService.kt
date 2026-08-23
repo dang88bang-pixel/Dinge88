@@ -196,6 +196,32 @@ class AgentService @Inject constructor(
                     sourceType = result.detection?.sourceType?.name ?: "UNKNOWN"
                 )
             )
+
+            // Check for low battery alert
+            if (asset.batteryLevel != null && asset.batteryLevel <= 15) {
+                database.alertDao().insert(
+                    Alert(
+                        assetId = asset.id,
+                        type = AlertType.LOW_BATTERY,
+                        severity = AlertSeverity.WARNING,
+                        message = "Batterie niedrig: ${asset.batteryLevel}% (${asset.shortName})",
+                        timestamp = Date()
+                    )
+                )
+            }
+
+            // Check for maintenance alert
+            if (asset.maintenanceDue) {
+                database.alertDao().insert(
+                    Alert(
+                        assetId = asset.id,
+                        type = AlertType.MAINTENANCE,
+                        severity = AlertSeverity.INFO,
+                        message = "Wartung fällig: ${asset.shortName}",
+                        timestamp = Date()
+                    )
+                )
+            }
         }
 
         // Check USB serial for asset detections
@@ -244,6 +270,23 @@ class AgentService @Inject constructor(
 
         val best = results.filterNotNull().minByOrNull { it.rssi }
         if (best != null) {
+            // Geofence check: alert if asset found >5km from last known position
+            if (asset.latitude != null && asset.longitude != null &&
+                best.latitude != null && best.longitude != null
+            ) {
+                val distKm = haversineKm(asset.latitude, asset.longitude, best.latitude, best.longitude)
+                if (distKm > GEOFENCE_RADIUS_KM) {
+                    database.alertDao().insert(
+                        Alert(
+                            assetId = asset.id,
+                            type = AlertType.GEOFENCE,
+                            severity = AlertSeverity.WARNING,
+                            message = "Geofence: ${asset.shortName} ${"%.1f".format(distKm)}km entfernt",
+                            timestamp = Date()
+                        )
+                    )
+                }
+            }
             applyDetectionToAsset(asset, best)
             SearchResult(found = true, detection = best, accuracy = best.rssi)
         } else {
@@ -389,9 +432,9 @@ class AgentService @Inject constructor(
                     database.alertDao().insert(
                         Alert(
                             assetId = mac.uppercase(),
-                            type = AlertType.SECURITY,
+                            type = AlertType.CRITICAL,
                             severity = AlertSeverity.CRITICAL,
-                            message = event.data["message"] as? String ?: "WebSocket-Alert",
+                            message = event.data["message"] as? String ?: "Kritischer WebSocket-Alert",
                             timestamp = Date()
                         )
                     )
@@ -622,5 +665,17 @@ class AgentService @Inject constructor(
 
     companion object {
         private const val STALE_MS = 5 * 60 * 1000L // 5 minutes
+        private const val GEOFENCE_RADIUS_KM = 5.0
+
+        /** Haversine formula: distance in km between two lat/lon points. */
+        private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+            val r = 6371.0 // Earth radius in km
+            val dLat = Math.toRadians(lat2 - lat1)
+            val dLon = Math.toRadians(lon2 - lon1)
+            val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
+                kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+                kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
+            return r * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+        }
     }
 }
