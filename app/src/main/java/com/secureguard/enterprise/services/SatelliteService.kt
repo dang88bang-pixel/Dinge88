@@ -13,22 +13,20 @@ import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.Date
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.random.Random
 
 /**
  * Satellite / GNSS fallback channel. Used when all terrestrial channels fail,
  * e.g. for assets in remote areas.
  *
- * Seit der API-Integration wird die echte GPS-Position des Geräts über
- * [FusedLocationProviderClient] (Google Play Services) ermittelt – das Gerät
- * selbst dient als Referenzpunkt. Ohne Standortberechtigung oder GPS-Fix
- * wird wie gehabt ein grober Platzhalter-Wert simuliert.
+ * Die echte GPS-Position des Geräts wird über [FusedLocationProviderClient]
+ * (Google Play Services) ermittelt – das Gerät selbst dient als Referenzpunkt.
+ * Ohne Standortberechtigung oder ohne GPS-Fix wird `null` geliefert — kein
+ * simulierter Schätzwert.
  */
 @Singleton
 class SatelliteService @Inject constructor(
@@ -40,32 +38,16 @@ class SatelliteService @Inject constructor(
     }
 
     suspend fun searchAsset(asset: Asset): Detection? {
-        val location = currentLocation()
-        if (location != null) {
-            return Detection(
-                assetMac = asset.mac,
-                sourceType = DetectionSource.SATELLITE,
-                nodeId = "gps-fix",
-                rssi = -100,
-                latitude = location.latitude,
-                longitude = location.longitude,
-                accuracyMeters = location.accuracy.coerceAtLeast(1f),
-                message = "GPS-Position (${location.provider ?: "gnss"})",
-                timestamp = Date()
-            ).also { emit(it) }
-        }
-
-        // Kein Fix verfügbar – grobe Schätzung (letzte bekannte Position).
-        delay(500)
-        if (Random.nextFloat() > 0.4f) return null
+        val location = currentLocation() ?: return null
         return Detection(
             assetMac = asset.mac,
             sourceType = DetectionSource.SATELLITE,
-            nodeId = "sat-fix",
+            nodeId = "gps-fix",
             rssi = -100,
-            latitude = asset.latitude ?: (52.5200 + Random.nextDouble(-0.08, 0.08)),
-            longitude = asset.longitude ?: (13.4050 + Random.nextDouble(-0.08, 0.08)),
-            accuracyMeters = 150f,
+            latitude = location.latitude,
+            longitude = location.longitude,
+            accuracyMeters = location.accuracy.coerceAtLeast(1f),
+            message = "GPS-Position (${location.provider ?: "gnss"})",
             timestamp = Date()
         ).also { emit(it) }
     }

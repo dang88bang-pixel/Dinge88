@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -34,8 +33,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.items
+import androidx.paging.LoadState
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.components.AssetCard
 import com.secureguard.enterprise.presentation.navigation.Routes
@@ -47,10 +51,31 @@ fun AssetListScreen(
     navController: NavController,
     viewModel: AssetListViewModel = hiltViewModel()
 ) {
-    val filteredAssets by viewModel.filteredAssets.collectAsState()
     val searchQuery by viewModel.currentQuery.collectAsState()
     val selectedStatus by viewModel.currentStatus.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
+
+    // Echte DB-Paginierung: Seite für Seite aus Room (Paging 3).
+    val pagingItems: LazyPagingItems<com.secureguard.enterprise.data.model.Asset> =
+        viewModel.pagedAssets.collectAsLazyPagingItems()
+
+    // QR-Scan-Kette schließen: Der Scanner (aus dieser Liste gestartet) legt
+    // die gescannte MAC im savedStateHandle dieser Liste ab – hier wird sie
+    // entnommen und an das Hinzufügen-Formular weitergereicht.
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        navController.currentBackStackEntry
+            ?.savedStateHandle
+            ?.getStateFlow<String?>("scanned_mac", null)
+            ?.collect { scanned ->
+                if (!scanned.isNullOrBlank()) {
+                    navController.currentBackStackEntry
+                        ?.savedStateHandle?.remove<String>("scanned_mac")
+                    navController.navigate(Routes.ADD_ASSET)
+                    navController.currentBackStackEntry
+                        ?.savedStateHandle?.set("scanned_mac", scanned)
+                }
+            }
+    }
 
     val tabs = listOf("Alle", "Online", "Offline", "Wartung")
     val selectedTabIndex = when (selectedStatus) {
@@ -126,7 +151,20 @@ fun AssetListScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                if (filteredAssets.isEmpty()) {
+                if (pagingItems.loadState.refresh is LoadState.Loading &&
+                    pagingItems.itemCount == 0
+                ) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                } else if (pagingItems.itemCount == 0) {
                     item {
                         Box(
                             modifier = Modifier
@@ -156,11 +194,23 @@ fun AssetListScreen(
                         }
                     }
                 } else {
-                    items(filteredAssets, key = { it.id }) { asset ->
+                    items(pagingItems, key = { it.id }) { asset ->
                         AssetCard(
                             asset = asset,
                             onClick = { navController.navigate(Routes.assetDetail(asset.id)) }
                         )
+                    }
+                    if (pagingItems.loadState.append is LoadState.Loading) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
                     }
                 }
             }

@@ -52,6 +52,7 @@ fun NodeStatusScreen(
     val nodeStatus by viewModel.nodeStatus.collectAsState()
     val isQuerying by viewModel.isQuerying.collectAsState()
     val lastRefresh by viewModel.lastRefresh.collectAsState()
+    val lastQueryInfo by viewModel.lastQueryInfo.collectAsState()
 
     Scaffold(
         topBar = {
@@ -86,6 +87,14 @@ fun NodeStatusScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
+            if (lastQueryInfo.isNotEmpty()) {
+                Text(
+                    text = lastQueryInfo,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp)

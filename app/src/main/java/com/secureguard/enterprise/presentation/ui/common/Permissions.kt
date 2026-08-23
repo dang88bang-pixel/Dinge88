@@ -9,7 +9,7 @@ import androidx.core.content.ContextCompat
 /**
  * Returns the set of runtime permissions that SecureGuard needs for its
  * detection and notification channels. The set adapts to the Android version:
- *  - Android 13+ uses POST_NOTIFICATIONS
+ *  - Android 13+ uses POST_NOTIFICATIONS and NEARBY_WIFI_DEVICES
  *  - Android 12+ uses the runtime BLUETOOTH_SCAN / BLUETOOTH_CONNECT permissions
  *    instead of location for BLE scanning
  */
@@ -21,6 +21,7 @@ fun requiredPermissions(): Array<String> {
     )
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         perms += Manifest.permission.POST_NOTIFICATIONS
+        perms += Manifest.permission.NEARBY_WIFI_DEVICES
     }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         perms += Manifest.permission.BLUETOOTH_SCAN

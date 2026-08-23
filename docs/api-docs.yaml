@@ -40,13 +40,23 @@ paths:
 
   /api/detections:
     get:
-      summary: Detektionen auflisten
+      summary: Detektionen auflisten (filterbar nach MAC und Quelle)
       parameters:
         - name: limit
           in: query
           schema:
             type: integer
             default: 100
+        - name: mac
+          in: query
+          description: Filter nach Asset-MAC (Großschreibung, z. B. AA:BB:CC:DD:EE:01)
+          schema:
+            type: string
+        - name: source_type
+          in: query
+          description: Filter nach Quelle (z. B. LORA für die LoRaWAN-Suche der App)
+          schema:
+            type: string
       responses:
         '200':
           description: Liste der Detektionen

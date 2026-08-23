@@ -10,7 +10,6 @@
 #   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 # Oder: docker compose up --build
 
-import asyncio
 import json
 import os
 import sqlite3
@@ -207,9 +206,9 @@ async def add_detection(detection: Detection):
         "(asset_mac, source_type, node_id, rssi, latitude, longitude, timestamp) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (
-            detection.asset_mac, detection.source_type, detection.node_id,
-            detection.rssi, detection.latitude, detection.longitude,
-            detection.timestamp or datetime.now(),
+            detection.asset_mac.upper(), detection.source_type.upper(),
+            detection.node_id, detection.rssi, detection.latitude,
+            detection.longitude, detection.timestamp or datetime.now(),
         ),
     )
     conn.commit()
@@ -218,11 +217,25 @@ async def add_detection(detection: Detection):
 
 
 @app.get("/api/detections")
-async def list_detections(limit: int = 100):
+async def list_detections(
+    limit: int = 100,
+    mac: Optional[str] = None,
+    source_type: Optional[str] = None,
+):
+    """Detektionen (neueste zuerst); filterbar nach MAC und Quelle
+    (z. B. `source_type=LORA` für die LoRaWAN-Suche der App)."""
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM detections ORDER BY timestamp DESC LIMIT ?", (limit,)
-    ).fetchall()
+    query = "SELECT * FROM detections WHERE 1=1"
+    params: list = []
+    if mac:
+        query += " AND asset_mac = ?"
+        params.append(mac.upper())
+    if source_type:
+        query += " AND source_type = ?"
+        params.append(source_type.upper())
+    query += " ORDER BY timestamp DESC LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(query, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -298,15 +311,14 @@ async def process_action(action: Action) -> None:
 
     conn = get_db()
     conn.execute(
-        "UPDATE commands SET status = ? WHERE asset_id = ? AND command = ? "
-        "ORDER BY timestamp DESC LIMIT 1",
+        "UPDATE commands SET status = ? WHERE id = (SELECT id FROM commands "
+        "WHERE asset_id = ? AND command = ? AND status = 'queued' "
+        "ORDER BY timestamp DESC LIMIT 1)",
         ("delivered" if ok else "failed", action.asset_id, action.action_type),
     )
     conn.commit()
     conn.close()
 
-    # Simulierte Verarbeitungszeit für Demo-Setups
-    await asyncio.sleep(2)
     print(f"Aktion {action.action_type} für {action.asset_id} ausgeführt (mqtt={ok})")
 
 

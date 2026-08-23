@@ -1,20 +1,30 @@
 # SecureGuard Enterprise - Backend-Konfiguration
 # Kopiere diese Datei zu local.properties und fülle die Werte aus GitHub Secrets
+# Leere Werte sind erlaubt: der zugehörige Kanal bleibt dann ehrlich inaktiv
+# (keine Treffer, keine Simulation).
 
 # API-Keys (aus GitHub Secrets)
-WIGLE_API_KEY=your_wigle_key_here
-OPEN_CHARGE_MAP_KEY=your_ocm_key_here
-NETATMO_TOKEN=your_netatmo_token_here
-GOOGLE_API_KEY=your_google_key_here
-HELIUM_API_KEY=your_helium_key_here
+WIGLE_API_KEY=
+OPEN_CHARGE_MAP_KEY=
+NETATMO_TOKEN=
+GOOGLE_API_KEY=
+HELIUM_API_KEY=
 
-# Backend-Endpunkte (für Pilot)
-MQTT_BROKER_URL=mqtt://broker.example.com:1883
-WEBSOCKET_URL=ws://api.example.com:8000/ws
-MCP_SERVER_URL=http://api.example.com:8000
+# Echtzeit-Kanäle
+MQTT_BROKER_URL=tcp://10.0.2.2:1883
+WEBSOCKET_URL=ws://10.0.2.2:8000/ws
 
-# LoRa/Optik/Urban/Crowd-Endpunkte
-LORA_GATEWAY_URL=http://lora-gateway.example.com:8080
-YOLO_SERVER_URL=http://yolo-inference.example.com:5000
-OPEN_DATA_API_URL=https://demo.ckan.org/api/3
-FIND_MY_PROXY_URL=https://find-my-proxy.example.com
+# MCP-Server für temporäre E-Mails (leer = Funktion deaktiviert)
+MCP_SERVER_URL=
+
+# Pilot-Endpunkte (ohne URL liefert der Kanal "nicht gefunden")
+# LoRaWAN-Backend: FastAPI-Backend aus backend/main.py (speichert LoRa-Uplinks)
+LORA_BACKEND_URL=http://10.0.2.2:8000
+# YOLO-Inferenzserver für optische Erkennung (POST /detect)
+YOLO_SERVER_URL=
+# Smart-City-/Partner-Endpunkt für Urban-Sichtungen (POST /sightings)
+URBAN_SIGHTINGS_URL=
+# Find-My-Proxy für Crowd-Suche (POST /locate, nur Hashes)
+FIND_MY_PROXY_URL=
+# Eigene CKAN-Instanz für Open-Data (z. B. des Stadtträgers)
+OPEN_DATA_URL=

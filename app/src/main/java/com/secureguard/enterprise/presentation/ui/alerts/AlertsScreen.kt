@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -56,6 +57,9 @@ fun AlertsScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.stopAlertSound() }) {
+                        Icon(Icons.Default.VolumeOff, contentDescription = "Alarmton stoppen")
+                    }
                     IconButton(onClick = { viewModel.acknowledgeAll() }) {
                         Icon(Icons.Default.DoneAll, contentDescription = "Alle bestätigen")
                     }

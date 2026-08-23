@@ -43,7 +43,12 @@ interface SecureGuardRepository {
     suspend fun insertDetection(detection: Detection): Long
 
     /** Paginierte Asset-Liste für Lazy Loading (Paging 3). */
-    suspend fun getAssetsPaginated(offset: Int, limit: Int, filter: String?): List<Asset>
+    suspend fun getAssetsPaginated(
+        offset: Int,
+        limit: Int,
+        filter: String?,
+        status: AssetStatus? = null
+    ): List<Asset>
 
     /** Datenbereinigung: alte Detektionen/Alarme entfernen (Retention). */
     suspend fun deleteDetectionsOlderThan(cutoff: Long): Int
@@ -120,8 +125,9 @@ class SecureGuardRepositoryImpl(
     override suspend fun getAssetsPaginated(
         offset: Int,
         limit: Int,
-        filter: String?
-    ): List<Asset> = assetDao.getPage(offset, limit, filter)
+        filter: String?,
+        status: AssetStatus?
+    ): List<Asset> = assetDao.getPage(offset, limit, filter, status)
 
     override suspend fun deleteDetectionsOlderThan(cutoff: Long): Int =
         detectionDao.deleteOlderThan(cutoff)

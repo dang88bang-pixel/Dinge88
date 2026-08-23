@@ -9,17 +9,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.abs
 
 data class AgentUiState(
     val agentRunning: Boolean = false,
     val runtime: String = "0d 0h 0m",
-    val progress: Float = 0f,
+    /** 0..100 – echter Anteil der konfigurierten Gesamtdauer; -1 = unbegrenzt. */
+    val progress: Float = -1f,
     val duration: String = "unlimited",
     val customDays: Int = 0,
     val interval: Int = 30,
@@ -46,10 +44,19 @@ class AgentViewModel @Inject constructor(
         agentService.agentStatus,
         config
     ) { status, cfg ->
+        val durationHours = parseDurationHours(cfg.duration, cfg.customDays)
+        val progress = if (!status.running) {
+            0f
+        } else if (durationHours == null) {
+            -1f // unbegrenzt – kein Prozentwert, keine Fake-Anzeige
+        } else {
+            val total = durationHours * 3_600_000f
+            (status.uptimeMillis / total * 100f).coerceIn(0f, 100f)
+        }
         cfg.copy(
             agentRunning = status.running,
             runtime = formatUptime(status.uptimeMillis),
-            progress = if (status.running) 85f else 0f
+            progress = progress
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AgentUiState())
 
@@ -82,9 +89,19 @@ class AgentViewModel @Inject constructor(
             dynamicPriority = state.dynamicPriority,
             learningMode = state.learningMode,
             offlineOnly = true,
-            externalSources = false
+            externalSources = false,
+            durationHours = parseDurationHours(state.duration, state.customDays)
         )
         agentService.start(settings)
+    }
+
+    private fun parseDurationHours(duration: String, customDays: Int): Long? = when (duration) {
+        "1h" -> 1L
+        "6h" -> 6L
+        "24h" -> 24L
+        "1w" -> 7L * 24L
+        "custom" -> if (customDays > 0) customDays * 24L else null
+        else -> null // "unlimited"
     }
 
     private fun formatUptime(ms: Long): String {

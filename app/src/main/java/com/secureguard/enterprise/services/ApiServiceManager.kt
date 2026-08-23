@@ -46,7 +46,9 @@ import javax.inject.Singleton
  * [detections] als [DetectionSource.API]-Flow emittiert.
  */
 @Singleton
-class ApiServiceManager @Inject constructor() {
+class ApiServiceManager @Inject constructor(
+    private val cacheManager: com.secureguard.enterprise.util.CacheManager
+) {
 
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -99,8 +101,13 @@ class ApiServiceManager @Inject constructor() {
         retrofitBuilder("https://api.dhl.de/").build().create(DhlPackstationApi::class.java)
     }
 
-    private val ckanApi: CkanOpenDataApi by lazy {
-        retrofitBuilder("https://demo.ckan.org/").build().create(CkanOpenDataApi::class.java)
+    private val ckanApi: CkanOpenDataApi? by lazy {
+        // Eigene CKAN-Instanz (z. B. des Smart-City-Partners) über OPEN_DATA_URL;
+        // ohne Konfiguration bleibt der Kanal inaktiv (keine Demo-Instanz).
+        if (com.secureguard.enterprise.BuildConfig.OPEN_DATA_URL.isBlank()) null
+        else retrofitBuilder(
+            com.secureguard.enterprise.BuildConfig.OPEN_DATA_URL.trimEnd('/') + "/"
+        ).build().create(CkanOpenDataApi::class.java)
     }
 
     private val googleGeolocationApi: GoogleGeolocationApi by lazy {
@@ -131,30 +138,44 @@ class ApiServiceManager @Inject constructor() {
 
     // ============ API-ABFRAGEN ============
 
-    /** WiGle.net: BSSID → GPS. Liefert eine [Detection] (Source API) oder null. */
+    /** Wrapper für zwischengespeicherte WiGle-Lookups (auch „kein Treffer"). */
+    private data class CachedWiGleLookup(val detection: Detection?)
+
+    /** WiGle.net: BSSID → GPS. Liefert eine [Detection] (Source API) oder null.
+     *  Ergebnisse (inkl. „kein Treffer") werden 5 Minuten im CacheManager
+     *  gehalten, um das WiGle-Rate-Limit zu schonen. */
     suspend fun searchViaWiGle(bssid: String): Detection? {
         if (com.secureguard.enterprise.BuildConfig.WIGLE_API_KEY.isBlank()) return null
-        return try {
+
+        val cacheKey = "wigle:${bssid.uppercase()}"
+        cacheManager.get<CachedWiGleLookup>(cacheKey)?.let { return it.detection }
+
+        val lookup = try {
             val response = wigleApi.searchBssid(bssid)
             val result = response.results.firstOrNull()
             if (result != null && result.trilat != null && result.trilong != null) {
-                val detection = Detection(
-                    assetMac = bssid,
-                    sourceType = DetectionSource.API,
-                    nodeId = result.bssid,
-                    rssi = 0,
-                    latitude = result.trilat,
-                    longitude = result.trilong,
-                    accuracyMeters = 100f,
-                    message = "WiGle-Treffer: ${result.ssid ?: "unbekannt"}",
-                    timestamp = Date()
+                CachedWiGleLookup(
+                    Detection(
+                        assetMac = bssid,
+                        sourceType = DetectionSource.API,
+                        nodeId = result.bssid,
+                        rssi = 0,
+                        latitude = result.trilat,
+                        longitude = result.trilong,
+                        accuracyMeters = 100f,
+                        message = "WiGle-Treffer: ${result.ssid ?: "unbekannt"}",
+                        timestamp = Date()
+                    ).also { _detections.tryEmit(it) }
                 )
-                _detections.tryEmit(detection)
-                detection
-            } else null
+            } else {
+                CachedWiGleLookup(null)
+            }
         } catch (e: Exception) {
-            null
+            // Server-/Netzfehler nicht cachen – nächster Zyklus darf es erneut versuchen.
+            return null
         }
+        cacheManager.put(cacheKey, lookup)
+        return lookup.detection
     }
 
     /** MacLookup.app: MAC → Hersteller (OUI-Auflösung). */
@@ -193,10 +214,11 @@ class ApiServiceManager @Inject constructor() {
         }
     }
 
-    /** CKAN: Open-Data-Datensätze durchsuchen (Smart City). */
+    /** CKAN: Open-Data-Datensätze durchsuchen (Smart City). Benötigt OPEN_DATA_URL. */
     suspend fun searchViaCKAN(query: String): List<CkanDataset> {
+        val api = ckanApi ?: return emptyList()
         return try {
-            ckanApi.searchDatasets(query).result.results
+            api.searchDatasets(query).result.results
         } catch (e: Exception) {
             emptyList()
         }

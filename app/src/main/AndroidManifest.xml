@@ -19,10 +19,16 @@
     <!-- WiFi & network based detection -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <!-- API 33+: Scan-Ergebnisse erfordern NEARBY_WIFI_DEVICES -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+        tools:targetApi="33" />
 
-    <!-- Location -->
+    <!-- Location: Vordergrund + Hintergrund (Agent-Worker scannt auch bei
+         ausgeschaltetem Screen; Hintergrund-Ortung ist für den Tracking-Zweck
+         Kernfunktion und wird nur für Whitelist-Assets genutzt) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <!-- Camera for optical detection / QR scan -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -34,11 +40,20 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Foreground service for the self-learning agent -->
+    <!-- Foreground service for the self-learning agent.
+         API 34+: jeder FGS-Typ braucht eine eigene Berechtigung.
+         dataSync        – Suchzyklen/Datenpersistenz
+         location        – GPS-/WiFi-Ortung im Vordergrunddienst
+         connectedDevice – BLE-GATT-Verbindungen zu Assets -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Zuverlässiger 15-Min-Takt trotz Doze (Anfrage erfolgt über
+         ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS in den Einstellungen) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Hardware features (optional, so non-BLE devices can still install) -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
@@ -75,7 +90,19 @@
             android:name=".services.AgentForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync|location|connectedDevice" />
+
+        <!-- Neustart-Receiver: plant Worker neu und nimmt den Agenten wieder
+             auf, wenn er vor dem Reboot lief (Flag aus SharedPreferences). -->
+        <receiver
+            android:name=".receiver.BootCompletedReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- WorkManager wird on-demand über HiltWorkerFactory initialisiert
              (SecureGuardApplication implements Configuration.Provider) –

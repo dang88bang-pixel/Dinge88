@@ -70,9 +70,15 @@ interface AssetDao {
                shortName LIKE '%' || :filter || '%' OR
                name LIKE '%' || :filter || '%' OR
                mac LIKE '%' || :filter || '%')
+          AND (:status IS NULL OR status = :status)
         ORDER BY shortName COLLATE NOCASE ASC
         LIMIT :limit OFFSET :offset
         """
     )
-    suspend fun getPage(offset: Int, limit: Int, filter: String?): List<Asset>
+    suspend fun getPage(
+        offset: Int,
+        limit: Int,
+        filter: String?,
+        status: AssetStatus? = null
+    ): List<Asset>
 }

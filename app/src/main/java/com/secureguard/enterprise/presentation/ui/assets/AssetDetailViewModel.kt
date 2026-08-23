@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Date
 import javax.inject.Inject
 
 enum class SearchChannel { ALL, BLE, LORA, WIFI, OPTICAL, URBAN, CROWD, SATELLITE }
@@ -43,7 +44,8 @@ class AssetDetailViewModel @Inject constructor(
     private val urbanService: UrbanService,
     private val crowdService: CrowdService,
     private val satelliteService: SatelliteService,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val authManager: com.secureguard.enterprise.services.AuthManager
 ) : ViewModel() {
 
     private val _assetState = MutableStateFlow<Asset?>(null)
@@ -63,6 +65,10 @@ class AssetDetailViewModel @Inject constructor(
 
     private val _telemetry = MutableStateFlow<Telemetry?>(null)
     val telemetry: StateFlow<Telemetry?> = _telemetry.asStateFlow()
+
+    /** true, sobald das Asset gelöscht wurde (Screen navigiert zurück). */
+    private val _assetDeleted = MutableStateFlow(false)
+    val assetDeleted: StateFlow<Boolean> = _assetDeleted.asStateFlow()
 
     private var loadedMac: String? = null
 
@@ -180,5 +186,65 @@ class AssetDetailViewModel @Inject constructor(
 
     fun clearActionResult() {
         _actionResult.value = null
+    }
+
+    // ============ ASSET-VERWALTUNG (RBAC-geprüft) ============
+
+    /** Löscht das Asset (erfordert Rolle mit DELETE_ASSETS-Recht). */
+    fun deleteAsset() {
+        viewModelScope.launch {
+            val asset = _assetState.value ?: return@launch
+            if (!authManager.hasPermission(
+                    com.secureguard.enterprise.security.Permission.DELETE_ASSETS
+                )
+            ) {
+                _actionResult.value = ActionResult(
+                    false,
+                    "Keine Berechtigung zum Löschen (Rolle ${authManager.currentUser.value.role.name})"
+                )
+                return@launch
+            }
+            repository.deleteAsset(asset.id)
+            _assetDeleted.value = true
+        }
+    }
+
+    /** Externe Suchquellen (Crowd/API) für dieses Asset freigeben/sperren. */
+    fun setExternalAllowed(allowed: Boolean) {
+        viewModelScope.launch {
+            val asset = _assetState.value ?: return@launch
+            repository.upsertAsset(
+                asset.copy(externalAllowed = allowed, updatedAt = Date())
+            )
+            _assetState.value = repository.resolveAsset(asset.id)
+        }
+    }
+
+    /** Wartungsstatus setzen (nimmt das Asset aus der Status-Neubewertung). */
+    fun setMaintenance(due: Boolean) {
+        viewModelScope.launch {
+            val asset = _assetState.value ?: return@launch
+            repository.upsertAsset(
+                asset.copy(
+                    maintenanceDue = due,
+                    status = if (due) AssetStatus.MAINTENANCE else AssetStatus.UNKNOWN,
+                    updatedAt = Date()
+                )
+            )
+            _assetState.value = repository.resolveAsset(asset.id)
+        }
+    }
+
+    /** Suchen-Status zurücksetzen (Asset wieder normal überwachen). */
+    fun resetSearchStatus() {
+        viewModelScope.launch {
+            val asset = _assetState.value ?: return@launch
+            repository.updateAssetStatus(
+                mac = asset.mac,
+                status = AssetStatus.UNKNOWN,
+                timestamp = System.currentTimeMillis()
+            )
+            _assetState.value = repository.resolveAsset(asset.id)
+        }
     }
 }

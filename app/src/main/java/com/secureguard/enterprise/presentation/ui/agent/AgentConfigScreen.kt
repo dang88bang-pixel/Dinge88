@@ -115,12 +115,21 @@ private fun StatusCard(uiState: AgentUiState) {
                 Text("⏱ Laufzeit: ${uiState.runtime}", style = MaterialTheme.typography.bodySmall)
             }
             Spacer(Modifier.height(8.dp))
-            Text("📊 Gesamtdauer: ${uiState.progress.toInt()}%",
-                style = MaterialTheme.typography.bodySmall)
-            LinearProgressIndicator(
-                progress = { uiState.progress / 100f },
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (uiState.progress >= 0f) {
+                Text(
+                    "📊 Gesamtdauer: ${uiState.progress.toInt()}% (Laufzeit ${uiState.runtime})",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                LinearProgressIndicator(
+                    progress = { uiState.progress / 100f },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                Text(
+                    "📊 Gesamtdauer: unbegrenzt (Laufzeit ${uiState.runtime})",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }

@@ -93,13 +93,27 @@ fun MapScreen(
                 .padding(paddingValues)
         ) {
             val context = LocalContext.current
+            // Startzentrum aus echten Daten: erster positionierter Asset-
+            // Schwerpunkt; ohne Positionen neutrale Weltansicht (kein fester
+            // Demo-Ort). Sobald Assets mit Position vorliegen, animiert die
+            // Update-Logik auf den Schwerpunkt.
+            val located = assets.filter { it.latitude != null && it.longitude != null }
+            val initialZoom = if (located.isNotEmpty()) 15.0 else 3.0
+            val initialCenter = if (located.isNotEmpty()) {
+                GeoPoint(
+                    located.map { it.latitude!! }.average(),
+                    located.map { it.longitude!! }.average()
+                )
+            } else {
+                GeoPoint(0.0, 0.0)
+            }
             val mapView = remember {
                 MapView(context).apply {
                     setTileSource(TileSourceFactory.MAPNIK)
                     setBuiltInZoomControls(false)
                     setMultiTouchControls(true)
-                    controller.setZoom(15.0)
-                    controller.setCenter(GeoPoint(52.52, 13.40))
+                    controller.setZoom(initialZoom)
+                    controller.setCenter(initialCenter)
                 }
             }
 

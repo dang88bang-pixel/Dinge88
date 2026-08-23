@@ -26,9 +26,28 @@ class NotificationService @Inject constructor(
     private val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
+    private val settingsPrefs =
+        context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
+
     init {
         createChannels()
     }
+
+    /** Einstellung „Push-Benachrichtigungen“ (aus der Settings-UI). */
+    private fun notificationsEnabledByUser(): Boolean =
+        settingsPrefs.getBoolean("notifications", true)
+
+    /** POST_NOTIFICATIONS-Berechtigung (Android 13+) prüfen. */
+    private fun hasNotificationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < 33) return true
+        return androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.POST_NOTIFICATIONS
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun canSendNotifications(): Boolean =
+        notificationsEnabledByUser() && hasNotificationPermission()
 
     private fun createChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -64,6 +83,7 @@ class NotificationService @Inject constructor(
 
     /** Benachrichtigung nach einem abgeschlossenen Worker-Zyklus. */
     fun sendAgentCycleNotification(content: String) {
+        if (!canSendNotifications()) return
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
@@ -87,12 +107,14 @@ class NotificationService @Inject constructor(
     }
 
     fun sendActionNotification(asset: Asset, actionType: Any, success: Boolean) {
+        if (!canSendNotifications()) return
         val title = if (success) "Aktion ausgeführt" else "Aktion fehlgeschlagen"
         val body = "${actionType::class.simpleName ?: "Aktion"} · ${asset.shortName}"
         notify(System.currentTimeMillis().toInt(), title, body, CHANNEL_ALERTS)
     }
 
     fun sendAlertNotification(title: String, body: String) {
+        if (!canSendNotifications()) return
         notify(System.currentTimeMillis().toInt(), title, body, CHANNEL_ALERTS)
     }
 

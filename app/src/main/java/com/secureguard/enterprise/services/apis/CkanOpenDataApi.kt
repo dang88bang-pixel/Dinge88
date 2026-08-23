@@ -7,9 +7,11 @@ import retrofit2.http.Query
 /**
  * CKAN Open Data API – Smart-City-Datensätze.
  *
- * Basis-URL: `https://demo.ckan.org/`, Pfad `api/3/action/package_search`.
- * Kostenlos ohne Key; Antwort: `{ "success": true, "result": { "count": n,
- * "results": [...] } }`.
+ * Basis-URL: konfigurierbar über `OPEN_DATA_URL` (gradle.properties /
+ * local.properties) – z. B. die CKAN-Instanz des Smart-City-Partners.
+ * Pfad `api/3/action/package_search`; Antwort: `{ "success": true,
+ * "result": { "count": n, "results": [...] } }`. Ohne konfigurierte Instanz
+ * bleibt der Kanal inaktiv.
  */
 interface CkanOpenDataApi {
 
