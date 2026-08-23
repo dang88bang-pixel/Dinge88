@@ -8,6 +8,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.secureguard.enterprise.config.CT45PConfig
+import com.secureguard.enterprise.config.SamsungConfig
 import com.secureguard.enterprise.data.local.SecureGuardDatabase
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
@@ -31,6 +32,7 @@ class SecureGuardApplication : Application(), Configuration.Provider {
     @Inject lateinit var database: SecureGuardDatabase
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var backupManager: com.secureguard.enterprise.services.BackupManager
+    @Inject lateinit var alcClientService: com.secureguard.enterprise.services.AlcClientService
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -48,6 +50,13 @@ class SecureGuardApplication : Application(), Configuration.Provider {
             "Gerät: ${CT45PConfig.deviceSummary()} · CT45P: ${CT45PConfig.isCT45P()} · " +
                 "BLE braucht Standort (Android 11): ${CT45PConfig.needsLocationForBle}"
         )
+        Log.i(
+            TAG,
+            "Samsung / Android 14 Status: ${SamsungConfig.deviceSummary(this)}"
+        )
+        // ALC Client für Android 14 session verbinden
+        alcClientService.connectClient()
+
         if (com.secureguard.enterprise.BuildConfig.DEBUG) {
             seedDemoDataIfEmpty()
         }

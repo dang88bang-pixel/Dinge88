@@ -38,6 +38,7 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 - [Build & CI](#-build--ci)
 - [Konfiguration](#️-konfiguration)
 - [Honeywell CT45P XON](#-honeywell-ct45p-xon)
+- [Samsung Android 14 (DSNR / ALC Client)](#-samsung-android-14-dsnr--alc-client)
 - [Installation](#-installation)
 - [Datenschutz](#️-datenschutz)
 
@@ -804,6 +805,18 @@ MCP_SERVER_URL=http://api.example.com:8000
 | **NFC** | NDEF + Tech-Filter (`nfc_tech_filter.xml`) |
 | **Benachrichtigungen** | `POST_NOTIFICATIONS` nur ab API 33 |
 | **Boot-Restart** | `BootReceiver` → WorkManager reschedule |
+
+---
+
+## 📱 Samsung Android 14 (DSNR / ALC Client)
+
+| Bereich | Umsetzung |
+|---------|-----------|
+| **Android 14 (API 34/35)** | `SamsungConfig.kt` erkennt Samsung-Geräte + One UI 6.0/6.1 |
+| **DSNR Filter** | `DsnrService.kt` – Dynamic Signal-to-Noise Ratio Filter (Gleitender Mittelwert, Noise Floor `-95dBm`, Gain-Korrektur) |
+| **ALC Client** | `AlcClientService.kt` – Application Layer Control Protocol (v2.4.0-ALC, Keepalive 15s, Frame Compression) |
+| **Samsung Knox / Akkuschonung** | `FOREGROUND_SERVICE_DATA_SYNC`, `FOREGROUND_SERVICE_CONNECTED_DEVICE`, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` |
+| **Echtzeit-Telemetrie** | DSNR/ALC gekoppelt an Foreground-Service für unterbrechungsfreie Hintergrund-Scans |
 
 ---
 
