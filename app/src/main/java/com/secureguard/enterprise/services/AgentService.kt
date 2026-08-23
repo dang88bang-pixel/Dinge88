@@ -69,7 +69,8 @@ class AgentService @Inject constructor(
     private val offlineQueue: OfflineQueue,
     private val tempMailService: TempMailService,
     private val apiNodeManager: ApiNodeManager,
-    private val nfcService: NfcService
+    private val nfcService: NfcService,
+    private val usbSerialService: UsbSerialService
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -257,11 +258,14 @@ class AgentService @Inject constructor(
         all[DetectionSource.OPTICAL] = { opticalService.searchAsset(asset) }
         all[DetectionSource.URBAN] = { urbanService.searchAsset(asset) }
 
+        // Satellite/GPS is a local hardware channel (device GNSS receiver),
+        // not an external cloud service – always available when permitted.
+        all[DetectionSource.SATELLITE] = { satelliteService.searchAsset(asset) }
+
         // External / internet channels are only used when permitted.
         if (!settings.offlineOnly || settings.externalSources) {
             if (asset.externalAllowed || settings.externalSources) {
                 all[DetectionSource.CROWD] = { crowdService.searchAsset(asset) }
-                all[DetectionSource.SATELLITE] = { satelliteService.searchAsset(asset) }
             }
         }
 
@@ -448,11 +452,12 @@ class AgentService @Inject constructor(
         return delivered
     }
 
-    /** Delivers pending actions from the offline queue via all channels. */
+    /** Delivers pending actions from the offline queue via MQTT. */
     suspend fun flushOfflineQueue(): Int {
+        if (!mqttService.isConnected) return 0
         return offlineQueue.retryPending { action ->
             mqttService.sendCommand(action.assetMac, action.actionType)
-            true
+            mqttService.isConnected
         }
     }
 
@@ -571,6 +576,38 @@ class AgentService @Inject constructor(
                 details = "$serviceName: ${e.message}"
             )
             false
+        }
+    }
+
+    /**
+     * Reads data from USB serial (FTDI/CP210x) and creates a detection
+     * if the data contains a known asset MAC.
+     */
+    suspend fun readUsbSerial(): Detection? {
+        val line = usbSerialService.readLine() ?: return null
+        // Try to extract a MAC address from the serial data
+        val macPattern = Regex("([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}")
+        val mac = macPattern.find(line)?.value?.uppercase() ?: return null
+
+        val asset = database.assetDao().getByMac(mac) ?: return null
+
+        return Detection(
+            assetMac = mac,
+            sourceType = DetectionSource.UNKNOWN,
+            nodeId = "usb-serial",
+            rssi = 0,
+            latitude = asset.latitude,
+            longitude = asset.longitude,
+            accuracyMeters = 1f,
+            message = "USB-Serial: ${line.take(80)}",
+            timestamp = Date()
+        ).also { detection ->
+            persist(detection)
+            updateAssetIfKnown(detection)
+            auditLogService.log(
+                action = "USB_SERIAL",
+                details = "Asset $mac via USB-Serial erkannt"
+            )
         }
     }
 
