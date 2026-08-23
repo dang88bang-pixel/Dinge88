@@ -1,34 +1,20 @@
-# SecureGuard Enterprise – API-Keys & lokale Build-Einstellungen
-# ----------------------------------------------------------------
-# Diese Datei ist eine VORLAGE. Kopiere sie nach `local.properties`
-# (wird von Git ignoriert) und trage deine echten Keys ein.
-# Alternativ können die Werte auch in `gradle.properties` stehen.
-#
-# Leere Werte sind erlaubt: Die zugehörigen API-Aufrufe liefern dann
-# sauber null/leere Listen, der Build funktioniert trotzdem.
+# SecureGuard Enterprise - Backend-Konfiguration
+# Kopiere diese Datei zu local.properties und fülle die Werte aus GitHub Secrets
 
-# WiGle.net (BSSID -> GPS) – https://wigle.net/account
-WIGLE_API_KEY=
+# API-Keys (aus GitHub Secrets)
+WIGLE_API_KEY=your_wigle_key_here
+OPEN_CHARGE_MAP_KEY=your_ocm_key_here
+NETATMO_TOKEN=your_netatmo_token_here
+GOOGLE_API_KEY=your_google_key_here
+HELIUM_API_KEY=your_helium_key_here
 
-# Open Charge Map (Ladesäulen) – https://openchargemap.org/site/account
-OPEN_CHARGE_MAP_KEY=
+# Backend-Endpunkte (für Pilot)
+MQTT_BROKER_URL=mqtt://broker.example.com:1883
+WEBSOCKET_URL=ws://api.example.com:8000/ws
+MCP_SERVER_URL=http://api.example.com:8000
 
-# Netatmo Weather (Wetterstationen) – OAuth2-Access-Token
-NETATMO_TOKEN=
-
-# Google Geolocation (WLAN-Triangulation) – https://console.cloud.google.com
-GOOGLE_API_KEY=
-
-# Helium Network (LoRaWAN-Hotspots)
-HELIUM_API_KEY=
-
-# MQTT-Broker (optional; Standard: tcp://10.0.2.2:1883 für Emulator)
-MQTT_BROKER_URL=
-
-# WebSocket-Fleet-Endpunkt (optional; leer = keine Verbindung)
-WEBSOCKET_URL=
-
-# MCP-Server für temporäre E-Mail-Dienste (OTP-Empfang für Registrierungen).
-# Nur für legitime Zwecke (Testumgebungen, autorisierte API-Key-Generierung).
-# Leer = Feature deaktiviert.
-MCP_SERVER_URL=
+# LoRa/Optik/Urban/Crowd-Endpunkte
+LORA_GATEWAY_URL=http://lora-gateway.example.com:8080
+YOLO_SERVER_URL=http://yolo-inference.example.com:5000
+OPEN_DATA_API_URL=https://demo.ckan.org/api/3
+FIND_MY_PROXY_URL=https://find-my-proxy.example.com
