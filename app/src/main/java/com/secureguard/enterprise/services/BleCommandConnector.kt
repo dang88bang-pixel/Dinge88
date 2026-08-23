@@ -78,20 +78,22 @@ class BleCommandConnector @Inject constructor(
      */
     suspend fun writeCommand(mac: String, command: String): Boolean {
         val written = withGatt(mac) { gatt, characteristic, done ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                gatt.writeCharacteristic(
-                    characteristic,
-                    command.toByteArray(Charsets.UTF_8),
-                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                ) == android.bluetooth.BluetoothStatusCodes.SUCCESS
-            } else {
-                @Suppress("DEPRECATION")
-                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                @Suppress("DEPRECATION")
-                characteristic.setValue(command.toByteArray(Charsets.UTF_8))
-                @Suppress("DEPRECATION")
-                gatt.writeCharacteristic(characteristic)
-            }.also { ok -> if (!ok) done.complete(null) }
+            val ok: Boolean =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    gatt.writeCharacteristic(
+                        characteristic,
+                        command.toByteArray(Charsets.UTF_8),
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    ) == android.bluetooth.BluetoothStatusCodes.SUCCESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    @Suppress("DEPRECATION")
+                    characteristic.setValue(command.toByteArray(Charsets.UTF_8))
+                    @Suppress("DEPRECATION")
+                    gatt.writeCharacteristic(characteristic)
+                }
+            if (!ok) done.complete(null)
         }
         return written != null
     }

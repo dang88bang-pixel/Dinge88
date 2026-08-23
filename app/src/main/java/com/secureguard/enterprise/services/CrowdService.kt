@@ -50,7 +50,7 @@ class CrowdService @Inject constructor(
             response.isJsonObject -> response.asJsonObject
             else -> return null
         }
-        if (!obj.get("found")?.asBoolean ?: false) return null
+        if (obj.get("found")?.asBoolean != true) return null
 
         val detection = Detection(
             assetMac = asset.mac,

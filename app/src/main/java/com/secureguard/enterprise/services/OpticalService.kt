@@ -45,7 +45,7 @@ class OpticalService @Inject constructor(
             asset.longitude?.let { addProperty("longitude", it) }
         }
         val response = httpClient.postJson(endpoint, body) ?: return null
-        if (!response.get("found")?.asBoolean ?: false) return null
+        if (response.get("found")?.asBoolean != true) return null
 
         val detection = Detection(
             assetMac = asset.mac,
