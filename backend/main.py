@@ -453,8 +453,9 @@ async def process_action(action: Action) -> None:
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Echtzeit-Kanal: Clients erhalten echte Broadcasts (Detektionen, Alerts,
-    Command-Status). Eingehende `command`-Nachrichten werden quittiert (ack)
-    und zusätzlich als MQTT-Befehl veröffentlicht."""
+    Command-Status). Eingehende `command`-Nachrichten werden quittiert (ack),
+    per MQTT veröffentlicht und – konsistent zu /api/actions/execute – in der
+    commands-Tabelle persistiert."""
     await manager.connect(websocket)
     try:
         while True:
@@ -465,6 +466,15 @@ async def websocket_endpoint(websocket: WebSocket):
                     asset_id = msg.get("assetId", "")
                     action = msg.get("action", "")
                     ok = publish_command(asset_id, action)
+                    # Command-Tracking wie beim REST-Pfad (/api/actions/execute)
+                    conn = get_db()
+                    conn.execute(
+                        "INSERT INTO commands (asset_id, command, status, timestamp) "
+                        "VALUES (?, ?, ?, ?)",
+                        (asset_id, action, "delivered" if ok else "failed", datetime.now()),
+                    )
+                    conn.commit()
+                    conn.close()
                     await websocket.send_text(
                         json.dumps({
                             "type": "ack",
