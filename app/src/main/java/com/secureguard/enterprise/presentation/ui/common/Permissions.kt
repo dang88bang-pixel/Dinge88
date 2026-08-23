@@ -33,3 +33,14 @@ fun missingPermissions(context: Context): List<String> =
     requiredPermissions().filter {
         ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
     }
+
+/** Returns a full completeness report for the agent to guarantee 100% functional availability. */
+fun permissionCompletenessReport(context: Context): Map<String, Boolean> {
+    return requiredPermissions().associateWith {
+        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+    }
+}
+
+/** Returns true only when ALL required permissions are granted (100% ready). */
+fun allPermissionsGranted(context: Context): Boolean =
+    missingPermissions(context).isEmpty()

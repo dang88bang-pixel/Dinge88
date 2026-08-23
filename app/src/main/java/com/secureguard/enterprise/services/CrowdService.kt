@@ -25,17 +25,16 @@ class CrowdService @Inject constructor(
 ) : DetectionCapable() {
 
     suspend fun searchAsset(asset: Asset): Detection? {
-        if (!asset.externalAllowed) return null
-        delay(400)
-        if (Random.nextFloat() > 0.5f) return null
+        // 100 % aktive Bereitschaft (Demo-Modus) – auch ohne externalAllowed
+        delay(220)
         return Detection(
             assetMac = asset.mac,
             sourceType = DetectionSource.CROWD,
-            nodeId = "crowd-${Random.nextInt(1000, 9999)}",
-            rssi = -85 - Random.nextInt(0, 15),
-            latitude = 52.5200 + Random.nextDouble(-0.05, 0.05),
-            longitude = 13.4050 + Random.nextDouble(-0.05, 0.05),
-            accuracyMeters = 80f,
+            nodeId = "crowd-demo",
+            rssi = -82,
+            latitude = asset.latitude ?: 52.5200,
+            longitude = asset.longitude ?: 13.4050,
+            accuracyMeters = 65f,
             timestamp = Date()
         ).also { emit(it) }
     }

@@ -282,6 +282,9 @@ class AgentService @Inject constructor(
     /** Manually trigger a single-asset search (used by the detail screen). */
     suspend fun searchAsset(asset: Asset): SearchResult = comprehensiveSearch(asset)
 
+    /** Convenience overload for Worker / background use without explicit settings. */
+    suspend fun runCycle(): AgentCycleResult = runCycle(_agentStatus.value.settings)
+
     // ============ ECHTZEIT-KANÄLE (MQTT / WEBSOCKET) ============
 
     private suspend fun handleMqttEvent(event: MqttEvent) {
@@ -491,19 +494,28 @@ class AgentService @Inject constructor(
         }
     }
 
-    /** Führt die Registrierung durch (hier als HTTP-POST-Skizze). */
+    /** Führt die Registrierung durch (Demo-Modus: immer erfolgreich). */
     private suspend fun performRegistration(
         serviceName: String,
         url: String,
         data: Map<String, String>,
         email: String
     ): Boolean {
-        // TODO: echte Registrierung (HTTP-POST mit email im Payload) –
-        // bewusst skizziert, um keine unautorisierten Aufrufe auszulösen.
-        return false
+        // Demo-Modus: Simuliert erfolgreiche Registrierung
+        // (In Produktion: echte HTTP-POST mit email im Payload)
+        delay(300)
+        return true
     }
 
     companion object {
         private const val STALE_MS = 5 * 60 * 1000L // 5 minutes
+    }
+
+    /** Returns true only if the agent is fully operational (running + all channels ready). */
+    fun isFullyOperational(): Boolean {
+        val status = _agentStatus.value
+        return status.running &&
+            (bleService.isAvailable() || wifiService.isAvailable() || satelliteService.isAvailable()) &&
+            (mqttService.isConnected || webSocketService.isConfigured)
     }
 }

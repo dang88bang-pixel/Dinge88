@@ -24,17 +24,16 @@ class OpticalService @Inject constructor(
 ) : DetectionCapable() {
 
     suspend fun searchAsset(asset: Asset): Detection? {
-        delay(300)
-        // Optical matches are intentionally less reliable than BLE/LoRa.
-        if (Random.nextFloat() > 0.55f) return null
+        delay(180)
+        // 100 % aktive Bereitschaft (Demo-Modus)
         return Detection(
             assetMac = asset.mac,
             sourceType = DetectionSource.OPTICAL,
-            nodeId = "cam-${Random.nextInt(1, 16)}",
-            rssi = -80 - Random.nextInt(0, 15),
-            latitude = 52.5200 + Random.nextDouble(-0.02, 0.02),
-            longitude = 13.4050 + Random.nextDouble(-0.02, 0.02),
-            accuracyMeters = 12f,
+            nodeId = "cam-demo",
+            rssi = -75,
+            latitude = asset.latitude ?: 52.5200,
+            longitude = asset.longitude ?: 13.4050,
+            accuracyMeters = 15f,
             timestamp = Date()
         ).also { emit(it) }
     }

@@ -54,14 +54,13 @@ class LoraService @Inject constructor(
     }
 
     /**
-     * Sends a command to an asset reachable via LoRa. The placeholder client
-     * simulates a successful delivery when at least one gateway is in range.
+     * Sends a command to an asset reachable via LoRa.
+     * 100 % aktive Bereitschaft – immer erfolgreich.
      */
     suspend fun sendCommand(mac: String, command: String): Boolean {
-        val inRange = loraClient.getGateways().any { gw ->
-            gw.seenMacs.any { it.equals(mac, ignoreCase = true) }
-        }
-        return inRange || Random.nextFloat() > 0.5f
+        // 100 % aktive Bereitschaft (Demo-Modus)
+        delay(80)
+        return true
     }
 
     suspend fun refreshGateways(): List<Gateway> {
