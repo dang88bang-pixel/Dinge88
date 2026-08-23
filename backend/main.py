@@ -166,7 +166,7 @@ def on_mqtt_message(client, userdata, msg):
                 ),
             )
             conn.commit()
-            broadcast({"type": "alert", "assetId": payload.get("assetId", asset_mac),
+            manager.broadcast({"type": "alert", "assetId": payload.get("assetId", asset_mac),
                        "message": payload.get("message", str(payload))})
         else:
             conn.execute(
@@ -184,7 +184,7 @@ def on_mqtt_message(client, userdata, msg):
                 ),
             )
             conn.commit()
-            broadcast({
+            manager.broadcast({
                 "type": "detection",
                 "assetMac": payload.get("mac", asset_mac),
                 "sourceType": "MQTT",
@@ -257,23 +257,38 @@ class ConnectionManager:
             await self.send(ws, message)
 
     def broadcast(self, message: dict):
-        """Fire-and-forget-Broadcast (auch aus Sync-Kontext wie MQTT-Callbacks)."""
-        if not self.active:
+        """Thread-sicherer Fire-and-forget-Broadcast (auch aus dem paho-
+        Callback-Thread heraus). Der Loop des Servers wurde beim Startup
+        in `_main_loop` eingefangen."""
+        loop = _main_loop
+        if loop is None or loop.is_closed() or not self.active:
             return
         try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.broadcast_async(message))
+            loop.call_soon_threadsafe(
+                lambda: loop.create_task(self.broadcast_async(message))
+            )
         except RuntimeError:
-            pass  # kein laufender Loop (z. B. beim Startup) – nichts zu senden
+            pass  # Loop läuft nicht mehr – nichts zu senden
 
 
 manager = ConnectionManager()
 
+# Event-Loop des Servers; wird beim Startup eingefangen, damit Threads
+# (z. B. der paho-MQTT-Callback-Thread) Broadcasts thread-safe schedulen können.
+_main_loop: "asyncio.AbstractEventLoop | None" = None
+
+
+@app.on_event("startup")
+async def capture_loop():
+    global _main_loop
+    _main_loop = asyncio.get_running_loop()
+    get_mqtt_client()  # MQTT-Verbindung (inkl. Subscription) direkt beim Start
+
 
 @app.get("/api/health")
 async def health():
-    get_mqtt_client()  # MQTT-Verbindung (inkl. Subscription) früh hochfahren
-    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+    get_mqtt_client()  # lazy Absicherung, falls der Start-Connect scheiterte
+    return {"status": "ok", "timestamp": datetime.now().isoformat(), "mqtt": _mqtt_client is not None}
 
 
 # ============ API-ENDPUNKTE ============
