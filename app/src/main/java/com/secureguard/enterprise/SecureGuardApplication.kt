@@ -10,6 +10,7 @@ import androidx.work.WorkManager
 import com.secureguard.enterprise.config.CT45PConfig
 import com.secureguard.enterprise.worker.SecureAgentWorker
 import dagger.hilt.android.HiltAndroidApp
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltAndroidApp
