@@ -46,7 +46,9 @@ import javax.inject.Singleton
  * [detections] als [DetectionSource.API]-Flow emittiert.
  */
 @Singleton
-class ApiServiceManager @Inject constructor() {
+class ApiServiceManager @Inject constructor(
+    private val cacheManager: com.secureguard.enterprise.util.CacheManager
+) {
 
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -134,7 +136,9 @@ class ApiServiceManager @Inject constructor() {
     /** WiGle.net: BSSID → GPS. Liefert eine [Detection] (Source API) oder null. */
     suspend fun searchViaWiGle(bssid: String): Detection? {
         if (com.secureguard.enterprise.BuildConfig.WIGLE_API_KEY.isBlank()) return null
-        return try {
+        // Check cache first
+        cacheManager.get<Detection>("wigle_$bssid")?.let { return it }
+        return com.secureguard.enterprise.util.RetryManager.withRetryOrNull(maxAttempts = 2) {
             val response = wigleApi.searchBssid(bssid)
             val result = response.results.firstOrNull()
             if (result != null && result.trilat != null && result.trilong != null) {
@@ -150,8 +154,10 @@ class ApiServiceManager @Inject constructor() {
                     timestamp = Date()
                 )
                 _detections.tryEmit(detection)
+                cacheManager.put("wigle_$bssid", detection)
                 detection
             } else null
+        }
         } catch (e: Exception) {
             null
         }
@@ -159,11 +165,12 @@ class ApiServiceManager @Inject constructor() {
 
     /** MacLookup.app: MAC → Hersteller (OUI-Auflösung). */
     suspend fun searchViaMacLookup(mac: String): String? {
-        return try {
+        cacheManager.get<String>("mac_$mac")?.let { return it }
+        val vendor = com.secureguard.enterprise.util.RetryManager.withRetryOrNull(maxAttempts = 2) {
             macLookupApi.lookupMac(mac).vendor
-        } catch (e: Exception) {
-            null
         }
+        if (vendor != null) cacheManager.put("mac_$mac", vendor)
+        return vendor
     }
 
     /** Open Charge Map: Ladesäulen um eine Position. */

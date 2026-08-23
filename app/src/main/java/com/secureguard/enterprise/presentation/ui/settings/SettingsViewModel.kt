@@ -20,13 +20,16 @@ data class SettingsUiState(
     val darkMode: Boolean = false,
     val consentGiven: Boolean = true,
     val userName: String = "Admin",
-    val organization: String = "SecureGuard"
+    val organization: String = "SecureGuard",
+    val statusMessage: String? = null
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val agentService: AgentService
+    private val agentService: AgentService,
+    private val backupManager: com.secureguard.enterprise.services.BackupManager,
+    private val exportService: com.secureguard.enterprise.services.ExportService
 ) : ViewModel() {
 
     private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
@@ -84,6 +87,55 @@ class SettingsViewModel @Inject constructor(
     fun setConsent(value: Boolean) = save { it.copy(consentGiven = value) }
     fun setUserName(value: String) = save { it.copy(userName = value) }
     fun setOrganization(value: String) = save { it.copy(organization = value) }
+
+    fun clearStatus() { _uiState.update { it.copy(statusMessage = null) } }
+
+    fun createBackup() {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val result = runCatching { backupManager.createBackup() }
+            _uiState.update {
+                it.copy(
+                    statusMessage = result.fold(
+                        onSuccess = { file -> "✅ Backup erstellt: ${file.name}" },
+                        onFailure = { e -> "❌ Backup fehlgeschlagen: ${e.message}" }
+                    )
+                )
+            }
+        }
+    }
+
+    fun exportCsv() {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val result = runCatching { exportService.exportAssetsCsv() }
+            _uiState.update {
+                it.copy(
+                    statusMessage = result.fold(
+                        onSuccess = { file -> "✅ CSV exportiert: ${file.name}" },
+                        onFailure = { e -> "❌ Export fehlgeschlagen: ${e.message}" }
+                    )
+                )
+            }
+        }
+    }
+
+    fun exportPdf() {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val result = runCatching {
+                val assets = exportService.exportAssetsCsv().readText()
+                exportService.exportPdfReport(emptyList(), emptyList())
+            }
+            _uiState.update {
+                it.copy(
+                    statusMessage = result.fold(
+                        onSuccess = { file -> "✅ PDF exportiert: ${file.name}" },
+                        onFailure = { e -> "❌ PDF-Export fehlgeschlagen: ${e.message}" }
+                    )
+                )
+            }
+        }
+    }
+
+    fun listBackups(): Int = backupManager.listBackups().size
 
     companion object {
         private const val KEY_NOTIFICATIONS = "notifications"

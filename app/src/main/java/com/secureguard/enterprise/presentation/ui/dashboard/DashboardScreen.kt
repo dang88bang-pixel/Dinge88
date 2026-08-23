@@ -124,6 +124,9 @@ fun DashboardScreen(
             Button(onClick = { navController.navigate(Routes.ALERTS) }) {
                 Text("Alarme (${uiState.alertCount})")
             }
+            Button(onClick = { viewModel.refresh() }) {
+                Text("🔄")
+            }
         }
     }
 }

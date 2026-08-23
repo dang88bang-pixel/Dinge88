@@ -70,7 +70,9 @@ class AgentService @Inject constructor(
     private val tempMailService: TempMailService,
     private val apiNodeManager: ApiNodeManager,
     private val nfcService: NfcService,
-    private val usbSerialService: UsbSerialService
+    private val usbSerialService: UsbSerialService,
+    private val alertSoundManager: AlertSoundManager,
+    private val errorHandler: com.secureguard.enterprise.util.ErrorHandler
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -141,6 +143,7 @@ class AgentService @Inject constructor(
         while (scope.isActive) {
             val cycleStart = System.currentTimeMillis()
             val result = runCatching { runCycle(settings) }
+                .onFailure { errorHandler.handleError(it, "AgentCycle") }
                 .getOrDefault(AgentCycleResult())
 
             val now = System.currentTimeMillis()
@@ -194,6 +197,10 @@ class AgentService @Inject constructor(
                 )
             )
         }
+
+        // Check USB serial for asset detections
+        runCatching { readUsbSerial() }
+            .onFailure { errorHandler.handleError(it, "UsbSerial") }
 
         // Flush offline queue when MQTT is connected
         if (mqttService.isConnected) {
@@ -349,6 +356,7 @@ class AgentService @Inject constructor(
                     )
                 )
                 notificationService.sendAlertNotification("MQTT-Alert", event.message)
+                alertSoundManager.playForSeverity("WARNING")
             }
 
             else -> Unit
@@ -387,6 +395,7 @@ class AgentService @Inject constructor(
                             timestamp = Date()
                         )
                     )
+                    alertSoundManager.playForSeverity("CRITICAL")
                 }
             }
 

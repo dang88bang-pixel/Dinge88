@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -238,11 +239,21 @@ fun AssetDetailScreen(
                         }
                         actionResult?.let { result ->
                             Spacer(Modifier.height(4.dp))
-                            Text(
-                                "${if (result.success) "✅" else "❌"} ${result.message}",
-                                color = if (result.success) Color(0xFF2E7D32) else Color(0xFFC62828),
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "${if (result.success) "✅" else "❌"} ${result.message}",
+                                    color = if (result.success) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(onClick = { viewModel.clearActionResult() }, modifier = Modifier.size(24.dp)) {
+                                    Icon(Icons.Default.ArrowBack, contentDescription = "Schließen", modifier = Modifier.size(16.dp))
+                                }
+                            }
+                            LaunchedEffect(result) {
+                                kotlinx.coroutines.delay(5000)
+                                viewModel.clearActionResult()
+                            }
                         }
                     }
                 }
