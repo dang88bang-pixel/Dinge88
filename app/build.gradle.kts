@@ -126,6 +126,16 @@ android {
     }
 }
 
+// GitHub Release erwartet genau diese Datei: release.apk
+android.applicationVariants.configureEach {
+    if (buildType.name == "release") {
+        outputs.configureEach {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+                .outputFileName = "release.apk"
+        }
+    }
+}
+
 dependencies {
     // Core
     implementation(libs.androidx.core.ktx)
