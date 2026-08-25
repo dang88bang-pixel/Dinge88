@@ -16,11 +16,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.GpsFixed
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.SatelliteAlt
-import androidx.compose.material.icons.filled.WifiTethering
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -115,24 +113,24 @@ fun SensorFusionScreen(
             }
 
             // GPS
-            SensorCard(Icons.Default.GpsFixed, "GPS", fusionState.gpsStatus, listOf(
+            SensorCard(Icons.Default.LocationOn, "GPS", fusionState.gpsStatus, listOf(
                 "Lat / Long" to "${fusionState.latitude}° N, ${fusionState.longitude}° E",
                 "Satelliten" to "${fusionState.satellites} / 14",
                 "Signalstärke" to fusionState.gpsSignal
             ))
 
             // Magnetometer
-            SensorCard(Icons.Default.Explore, "Magnetometer", if (fusionState.isActive) "Kalibriert" else "Standby", listOf(
+            SensorCard(Icons.Default.Map, "Magnetometer", if (fusionState.isActive) "Kalibriert" else "Standby", listOf(
                 "X-Achse" to "${fusionState.magX} μT",
                 "Y-Achse" to "${fusionState.magY} μT",
                 "Z-Achse" to "${fusionState.magZ} μT"
             ))
 
             // Kompass
-            SensorCard(Icons.Default.Navigation, "Kompass", "${fusionState.heading}° ${fusionState.headingDir}", emptyList())
+            SensorCard(Icons.Default.Map, "Kompass", "${fusionState.heading}° ${fusionState.headingDir}", emptyList())
 
             // Netzwerk RSSI
-            SensorCard(Icons.Default.WifiTethering, "Netzwerk (RSSI)", "${fusionState.networkNodes} Knoten", fusionState.rssiNodes)
+            SensorCard(Icons.Default.Search, "Netzwerk (RSSI)", "${fusionState.networkNodes} Knoten", fusionState.rssiNodes)
 
             // Assets mit Position
             if (assets.isNotEmpty()) {

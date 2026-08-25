@@ -17,9 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Card
@@ -88,7 +87,7 @@ fun MapScreen(
                     }
                     IconButton(onClick = { viewModel.toggleOfflineMode() }) {
                         Icon(
-                            if (isOffline) Icons.Default.CloudOff else Icons.Default.CloudQueue,
+                            if (isOffline) Icons.Default.Stop else Icons.Default.Refresh,
                             contentDescription = "Offline-Modus"
                         )
                     }

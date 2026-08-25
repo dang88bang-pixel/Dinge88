@@ -11,9 +11,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -79,7 +79,7 @@ fun Esp32ConfigScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Memory, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.padding(end = 8.dp))
                             Text("Ziel-Gerät", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         }
@@ -115,7 +115,7 @@ fun Esp32ConfigScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.padding(end = 8.dp))
                             Text("WiFi Konfiguration", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         }
@@ -178,7 +178,7 @@ fun Esp32ConfigScreen(
                             enabled = selectedMac.isNotBlank(),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Send, contentDescription = null)
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
                             Spacer(Modifier.padding(end = 8.dp))
                             Text("An ${selectedMac.ifBlank { "–" }} senden")
                         }

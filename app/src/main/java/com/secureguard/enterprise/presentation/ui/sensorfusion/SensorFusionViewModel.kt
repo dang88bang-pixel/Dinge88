@@ -2,7 +2,6 @@ package com.secureguard.enterprise.presentation.ui.sensorfusion
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow

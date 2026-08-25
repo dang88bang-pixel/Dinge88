@@ -2,6 +2,8 @@ package com.secureguard.enterprise.services
 
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -28,10 +30,18 @@ class AgentForegroundService : Service() {
                 return START_NOT_STICKY
             }
         }
-        startForeground(
-            NotificationService.AGENT_NOTIFICATION_ID,
-            notificationService.buildAgentNotification("Agent wird initialisiert …")
-        )
+        val notification = notificationService.buildAgentNotification("Agent wird initialisiert …")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NotificationService.AGENT_NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            )
+        } else {
+            startForeground(NotificationService.AGENT_NOTIFICATION_ID, notification)
+        }
         agentService.start()
         return START_STICKY
     }

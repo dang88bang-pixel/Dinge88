@@ -13,15 +13,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -75,19 +74,19 @@ fun DashboardScreen(
             )
             Row {
                 IconButton(onClick = { navController.navigate(Routes.TERMINAL) }) {
-                    Icon(Icons.Default.Terminal, contentDescription = "Terminal")
+                    Icon(Icons.Default.Bolt, contentDescription = "Terminal")
                 }
                 IconButton(onClick = { navController.navigate(Routes.SENSOR_FUSION) }) {
-                    Icon(Icons.Default.Explore, contentDescription = "Sensor-Fusion")
+                    Icon(Icons.Default.Map, contentDescription = "Sensor-Fusion")
                 }
                 IconButton(onClick = { navController.navigate(Routes.SECURITY) }) {
-                    Icon(Icons.Default.Security, contentDescription = "Security")
+                    Icon(Icons.Default.Warning, contentDescription = "Security")
                 }
                 IconButton(onClick = { navController.navigate(Routes.ESP32_CONFIG) }) {
-                    Icon(Icons.Default.Memory, contentDescription = "ESP32 Config")
+                    Icon(Icons.Default.Devices, contentDescription = "ESP32 Config")
                 }
                 IconButton(onClick = { navController.navigate(Routes.AGENT_CONFIG) }) {
-                    Icon(Icons.Default.SmartToy, contentDescription = "Agent-Konfiguration")
+                    Icon(Icons.Default.Notifications, contentDescription = "Agent-Konfiguration")
                 }
                 IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
                     Icon(Icons.Default.Settings, contentDescription = "Einstellungen")
@@ -103,7 +102,7 @@ fun DashboardScreen(
                 modifier = Modifier.weight(1f),
                 value = "$batteryLevel%",
                 label = "Batterie",
-                icon = Icons.Default.BatteryFull,
+                icon = Icons.Default.BatteryAlert,
                 color = Color(0xFF2E7D32)
             )
             StatCard(

@@ -23,9 +23,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.Date
 import java.util.concurrent.TimeUnit
@@ -644,10 +644,7 @@ class AgentService @Inject constructor(
                 .build()
 
             val payload = JSONObject(data.toMutableMap().apply { put("email", email) })
-            val body = RequestBody.create(
-                MediaType.parse("application/json"),
-                payload.toString()
-            )
+            val body = payload.toString().toRequestBody("application/json".toMediaType())
             val request = okhttp3.Request.Builder()
                 .url(url)
                 .post(body)
@@ -658,7 +655,7 @@ class AgentService @Inject constructor(
 
             auditLogService.log(
                 action = "REGISTER_HTTP",
-                details = "$serviceName: HTTP ${response.code()} (${if (success) "OK" else "FEHLER"})"
+                details = "$serviceName: HTTP ${response.code} (${if (success) "OK" else "FEHLER"})"
             )
 
             response.close()
