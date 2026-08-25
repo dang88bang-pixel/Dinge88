@@ -34,7 +34,7 @@ fun apiKey(name: String): String {
 
 android {
     namespace = "com.secureguard.enterprise"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.secureguard.enterprise"

@@ -734,9 +734,10 @@ services:
 ### GitHub Actions
 
 Workflow `.github/workflows/build-release.yml`:
-- **Trigger:** Push auf `main`/`develop`, Tags `v*`, Pull Requests, manuell
-- **JDK:** 17 · **SDK:** android-34 · **Build-Tools:** 34.0.0 · **Gradle:** 8.9
-- **Artefakte:** `secureguard-pro-debug` (Debug-APK), `secureguard-pro` (Release-APK)
+- **Trigger:** Push auf `main`/`develop`/`arena/**`, Tags `v*`, Pull Requests, manuell
+- **JDK:** 17 · **SDK:** android-35 · **Build-Tools:** 35.0.0 · **Gradle:** 8.9
+- **Artefakte:** `release.apk` (Release), `app-debug.apk` (Debug)
+- **GitHub Release:** Tag `v1.0.0` mit Datei `release.apk`
 - **Release-Signing:** Optional via `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
 
 ### Lokal bauen
