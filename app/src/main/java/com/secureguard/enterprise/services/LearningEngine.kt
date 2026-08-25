@@ -59,9 +59,7 @@ class LearningEngine @Inject constructor() {
 
     private fun analyzeSpatialPatterns(experiences: List<Experience>): List<Pattern> {
         val locationHits = experiences.filter { it.success && it.latitude != null && it.longitude != null }
-            .groupBy {
-                "${round(it.latitude!! * 1000) / 1000}_${round(it.longitude!! * 1000) / 1000}"
-            }
+            .groupBy { spatialKey(it.latitude!!, it.longitude!!) }
         if (experiences.isEmpty()) return emptyList()
         return locationHits.mapNotNull { (key, hits) ->
             if (hits.size < 3) null
@@ -112,18 +110,40 @@ class LearningEngine @Inject constructor() {
 
     // ============ PRÄDIKTION ============
 
-    /** Sagt den wahrscheinlichsten Aufenthaltsort anhand gelernter Muster voraus. */
+    /**
+     * Grid key for a position, rounded to ~110 m, e.g. "51.227_6.773".
+     *
+     * [predictNextLocation] parses this key back into a coordinate pair, so the
+     * format is pinned to `Locale.US`: with a decimal-comma locale the default
+     * string conversion would emit "51,227", which no longer parses as a Double
+     * and would silently disable every prediction.
+     */
+    private fun spatialKey(lat: Double, lon: Double): String =
+        "${roundCoord(lat)}_${roundCoord(lon)}"
+
+    /** Rounds to 3 decimals using a locale-independent US formatter. */
+    private fun roundCoord(value: Double): String =
+        String.format(java.util.Locale.US, "%.3f", round(value * 1000) / 1000)
+
+    /**
+     * Sagt den wahrscheinlichsten Aufenthaltsort anhand gelernter Muster voraus.
+     *
+     * Nur räumliche Muster tragen Koordinaten im Key; zeitliche Muster haben
+     * Keys wie "hour_14" und ergeben keine Position.
+     */
     fun predictNextLocation(currentTime: Date = Date()): Pair<Double, Double>? {
-        val relevant = _patterns.value.filter {
-            it.type == PatternType.TEMPORAL || it.type == PatternType.SPATIAL
-        }
-        val best = relevant.maxByOrNull { it.confidence } ?: return null
+        val best = _patterns.value
+            .filter { it.type == PatternType.SPATIAL }
+            .maxByOrNull { it.confidence } ?: return null
         if (best.confidence < 0.5f) return null
         val coords = best.key.split("_")
         if (coords.size != 2) return null
         return try {
-            Pair(coords[0].toDouble(), coords[1].toDouble())
-        } catch (e: Exception) {
+            val lat = coords[0].toDouble()
+            val lon = coords[1].toDouble()
+            if (lat !in -90.0..90.0 || lon !in -180.0..180.0) null
+            else Pair(lat, lon)
+        } catch (e: NumberFormatException) {
             null
         }
     }
@@ -162,6 +182,12 @@ class LearningEngine @Inject constructor() {
         if (assetExperiences.isEmpty()) return 0.3f
         return assetExperiences.count { it.success }.toFloat() / assetExperiences.size
     }
+
+    /**
+     * Snapshot der gelernten Erfahrungen (max. [maxMemorySize], älteste zuerst).
+     * Wird vom Agenten genutzt, um Muster über echte Daten zu analysieren.
+     */
+    fun recentExperiences(): List<Experience> = experienceMemory.toList()
 }
 
 /** Eine einzelne gelernte Erfahrung (Suchergebnis eines Assets). */

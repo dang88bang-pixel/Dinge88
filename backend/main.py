@@ -17,8 +17,9 @@ import json
 import logging
 import os
 import sqlite3
+from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import List, Optional, Set
+from typing import Optional, Set
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, BackgroundTasks
@@ -39,7 +40,19 @@ except ImportError:
 DB_PATH = os.environ.get("DATABASE_PATH", "secureguard.db")
 MQTT_BROKER = os.environ.get("MQTT_BROKER", "mqtt:1883")
 
-app = FastAPI(title="SecureGuard API", version="1.0.0")
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Captures the serving event loop and starts the MQTT → WebSocket bridge."""
+    global _main_loop
+    _main_loop = asyncio.get_running_loop()
+    start_mqtt_subscriber()
+    logger.info("SecureGuard Backend gestartet")
+    yield
+    _main_loop = None
+
+
+app = FastAPI(title="SecureGuard API", version="1.0.0", lifespan=_lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,6 +64,11 @@ app.add_middleware(
 
 # Active WebSocket connections for broadcasting
 active_websockets: Set[WebSocket] = set()
+
+# Event loop of the FastAPI/uvicorn main thread. The MQTT callbacks run on a
+# paho network thread, which has *no* event loop of its own, so the loop has to
+# be captured here to hand coroutines over via `run_coroutine_threadsafe`.
+_main_loop: Optional[asyncio.AbstractEventLoop] = None
 
 
 # ============ MODELLE ============
@@ -172,12 +190,35 @@ def get_mqtt_client():
     if _mqtt_client is None:
         try:
             host, _, port = MQTT_BROKER.partition(":")
-            _mqtt_client = mqtt.Client(client_id="secureguard-backend")
-            _mqtt_client.connect(host, int(port or 1883), 60)
-            _mqtt_client.loop_start()
-        except Exception:
+            client = _new_mqtt_client("secureguard-backend")
+            client.connect(host, int(port or 1883), 60)
+            client.loop_start()
+            _mqtt_client = client
+        except Exception as exc:
+            logger.warning("MQTT-Verbindung zu %s fehlgeschlagen: %s", MQTT_BROKER, exc)
             _mqtt_client = None
     return _mqtt_client
+
+
+def _new_mqtt_client(client_id: str):
+    """
+    Creates a paho client for both paho 1.x and 2.x.
+
+    paho 2.x requires `callback_api_version`: omitting it emits a
+    DeprecationWarning today and raises in paho 3. We prefer VERSION2
+    (`on_message(client, message)`) and fall back to VERSION1 on old clients.
+    `on_mqtt_message` accepts either signature.
+    """
+    api_version = getattr(mqtt, "CallbackAPIVersion", None)
+    if api_version is not None and hasattr(api_version, "VERSION2"):
+        return mqtt.Client(
+            callback_api_version=api_version.VERSION2, client_id=client_id
+        )
+    if api_version is not None:
+        return mqtt.Client(
+            callback_api_version=api_version.VERSION1, client_id=client_id
+        )
+    return mqtt.Client(client_id=client_id)
 
 
 def publish_command(asset_mac: str, command: str) -> bool:
@@ -193,6 +234,55 @@ def publish_command(asset_mac: str, command: str) -> bool:
 
 # ============ MQTT → WEBSOCKET BRIDGE ============
 
+def forward_mqtt_message(topic: str, payload) -> None:
+    """
+    Maps an MQTT topic/payload onto a WebSocket frame and hands it to the
+    asyncio loop of the FastAPI thread.
+
+    Called from the paho network thread, which has **no** event loop of its own:
+    `asyncio.get_event_loop()` raises RuntimeError there, so the previous
+    `try/except RuntimeError: pass` silently dropped every single message.
+    """
+    if isinstance(payload, (bytes, bytearray)):
+        payload = payload.decode("utf-8", errors="replace")
+
+    def _maybe_json(raw: str):
+        try:
+            return json.loads(raw) if raw.startswith("{") else raw
+        except json.JSONDecodeError:
+            return raw
+
+    if "/telemetry" in topic:
+        ws_msg = json.dumps({"type": "telemetry", "topic": topic, "data": _maybe_json(payload)})
+    elif "/alert" in topic:
+        ws_msg = json.dumps({"type": "alert", "topic": topic, "data": _maybe_json(payload)})
+    elif "/status" in topic:
+        ws_msg = json.dumps({"type": "system_status", "topic": topic, "data": payload})
+    else:
+        ws_msg = json.dumps({"type": "unknown", "topic": topic, "data": payload})
+
+    loop = _main_loop
+    if loop is None or loop.is_closed():
+        logger.warning(
+            "Kein Event-Loop erfasst – MQTT-Nachricht %s nicht weitergeleitet", topic
+        )
+        return
+    asyncio.run_coroutine_threadsafe(broadcast_websocket(ws_msg), loop)
+
+
+def on_mqtt_message(*args):
+    """
+    paho `on_message` callback, tolerant to both callback API versions:
+      VERSION1 -> (client, userdata, message)
+      VERSION2 -> (client, message)
+    """
+    msg = args[-1]
+    forward_mqtt_message(
+        getattr(msg, "topic", "") or "",
+        getattr(msg, "payload", b"") or b"",
+    )
+
+
 def start_mqtt_subscriber():
     """Subscribes to all telemetry/alert/status topics and forwards to WebSockets."""
     client = get_mqtt_client()
@@ -200,49 +290,21 @@ def start_mqtt_subscriber():
         logger.warning("MQTT nicht verfügbar – WebSocket-Forwarding deaktiviert")
         return
 
-    def on_message(mqtt_client, userdata, msg):
-        """MQTT message received – format and broadcast to all WebSocket clients."""
-        topic = msg.topic
-        payload = msg.payload.decode("utf-8", errors="replace")
-
-        if "/telemetry" in topic:
-            try:
-                data = json.loads(payload) if payload.startswith("{") else payload
-            except json.JSONDecodeError:
-                data = payload
-            ws_msg = json.dumps({"type": "telemetry", "topic": topic, "data": data})
-        elif "/alert" in topic:
-            try:
-                data = json.loads(payload) if payload.startswith("{") else payload
-            except json.JSONDecodeError:
-                data = payload
-            ws_msg = json.dumps({"type": "alert", "topic": topic, "data": data})
-        elif "/status" in topic:
-            ws_msg = json.dumps({"type": "system_status", "topic": topic, "data": payload})
-        else:
-            ws_msg = json.dumps({"type": "unknown", "topic": topic, "data": payload})
-
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.run_coroutine_threadsafe(
-                    broadcast_websocket(ws_msg), loop
-                )
-        except RuntimeError:
-            pass
-
     client.subscribe("secureguard/+/telemetry")
     client.subscribe("secureguard/+/alert")
     client.subscribe("secureguard/+/status")
     client.subscribe("secureguard/broadcast")
-    client.on_message = on_message
+    client.on_message = on_mqtt_message
     logger.info("MQTT-Subscriber gestartet – Topics abonniert")
 
 
 async def broadcast_websocket(message: str):
     """Sends a message to all connected WebSocket clients."""
     disconnected = set()
-    for ws in active_websockets:
+    # Iterate over a snapshot: clients connect/disconnect concurrently, and
+    # mutating `active_websockets` while iterating it raises
+    # "RuntimeError: Set changed size during iteration".
+    for ws in list(active_websockets):
         try:
             await ws.send_text(message)
         except Exception:
@@ -426,9 +488,14 @@ async def report_crowd_sighting(sighting: dict):
 async def search_crowd_sightings(mac: str, hours: int = 24):
     """Returns recent crowd sightings for a MAC address."""
     conn = get_db()
+    # Sightings are written with Python's `datetime.now()`, i.e. *local* time,
+    # while SQLite's `datetime('now')` is UTC. Comparing the two shifts the
+    # window by the UTC offset (in Europe/Berlin a 25 h old sighting is still
+    # reported for `hours=24`). `'localtime'` puts the cutoff on the same clock
+    # as the stored values.
     rows = conn.execute(
         "SELECT * FROM crowd_sightings WHERE mac = ? "
-        "AND timestamp > datetime('now', ? || ' hours') "
+        "AND timestamp > datetime('now', 'localtime', ? || ' hours') "
         "ORDER BY timestamp DESC LIMIT 10",
         (mac.upper(), -hours),
     ).fetchall()
@@ -472,11 +539,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 # ============ STARTUP ============
-
-@app.on_event("startup")
-async def startup_event():
-    start_mqtt_subscriber()
-    logger.info("SecureGuard Backend gestartet")
+#
+# Der Application-Lifespan wird weiter oben (vor `app = FastAPI(...)`) über
+# `_lifespan` definiert; er erfasst hier den Event-Loop der uvicorn-Threads,
+# damit der MQTT-Thread Nachrichten an die WebSockets übergeben kann.
 
 
 if __name__ == "__main__":

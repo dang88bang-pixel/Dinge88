@@ -52,6 +52,11 @@ class WebSocketService @Inject constructor() {
 
     val isConfigured: Boolean get() = serverUrl.isNotBlank()
 
+    /** True, solange eine Verbindung offen ist (onOpen → onClosed/onFailure). */
+    @Volatile
+    var isConnected: Boolean = false
+        private set
+
     /** Baut die WebSocket-Verbindung auf. */
     fun connect(url: String = serverUrl) {
         if (url.isBlank()) {
@@ -65,6 +70,7 @@ class WebSocketService @Inject constructor() {
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                isConnected = true
                 _events.tryEmit(WebSocketEvent.Connected)
             }
 
@@ -85,36 +91,50 @@ class WebSocketService @Inject constructor() {
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                isConnected = false
                 _events.tryEmit(WebSocketEvent.Disconnected(reason))
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                isConnected = false
                 _events.tryEmit(WebSocketEvent.Error(t.message ?: "Verbindung fehlgeschlagen"))
             }
         })
     }
 
-    /** Sendet eine Nachricht als JSON. */
-    fun sendMessage(data: Any) {
-        try {
-            webSocket?.send(gson.toJson(data))
+    /**
+     * Sendet eine Nachricht als JSON.
+     * @return true, wenn OkHttp den Frame in die Schreib-Queue übernehmen konnte.
+     */
+    fun sendMessage(data: Any): Boolean {
+        val socket = webSocket
+        if (socket == null) {
+            _events.tryEmit(WebSocketEvent.Error("Keine WebSocket-Verbindung offen"))
+            return false
+        }
+        return try {
+            // OkHttp liefert false, wenn die Verbindung bereits geschlossen ist.
+            socket.send(gson.toJson(data))
         } catch (e: Exception) {
             _events.tryEmit(WebSocketEvent.Error("Senden fehlgeschlagen: ${e.message}"))
+            false
         }
     }
 
-    /** Sendet einen Befehl an ein Asset. */
-    fun sendCommand(assetId: String, action: String) {
-        sendMessage(
-            mapOf(
-                "type" to "command",
-                "assetId" to assetId,
-                "action" to action
-            )
+    /**
+     * Sendet einen Befehl an ein Asset.
+     * @return true, wenn der Befehl über eine offene Verbindung angenommen wurde.
+     */
+    fun sendCommand(assetId: String, action: String): Boolean = sendMessage(
+        mapOf(
+            "type" to "command",
+            "assetId" to assetId,
+            "action" to action
         )
-    }
+    )
 
     fun disconnect() {
+        isConnected = false
         try {
             webSocket?.close(1000, "Normal closure")
         } catch (_: Exception) {

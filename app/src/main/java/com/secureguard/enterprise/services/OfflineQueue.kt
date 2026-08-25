@@ -43,17 +43,24 @@ class OfflineQueue @Inject constructor(
         val dao = database.pendingActionDao()
         var delivered = 0
         for (action in dao.getAll()) {
+            // `attempts` comes from the snapshot taken before this run, so count
+            // the attempt we are about to make.
+            val exhausted = action.attempts + 1 >= MAX_ATTEMPTS
             val ok = try {
                 executor(action)
             } catch (e: Exception) {
                 dao.markAttempt(action.id, e.message)
                 false
             }
-            if (ok) {
-                dao.deleteById(action.id)
-                delivered++
-            } else if (action.attempts >= MAX_ATTEMPTS) {
-                dao.markAttempt(action.id, "Max. Versuche erreicht")
+            when {
+                ok -> {
+                    dao.deleteById(action.id)
+                    delivered++
+                }
+                // After the last allowed attempt the entry is dropped; otherwise
+                // it would be retried on every cycle forever.
+                exhausted -> dao.deleteById(action.id)
+                else -> dao.markAttempt(action.id, "Zustellung fehlgeschlagen")
             }
         }
         return delivered

@@ -504,9 +504,30 @@ getWhitelistedAssets, getAllAssets, getAssetByMac, getAssetById, resolveAsset, u
 
 Das Backend abonniert `secureguard/+/telemetry`, `+/alert`, `+/status` und forwarded alle Nachrichten als JSON an alle verbundenen WebSocket-Clients.
 
+Die MQTT-Callbacks laufen im paho-Netzwerkthread, der **keinen eigenen Event-Loop**
+hat. Der Loop des uvicorn-Threads wird deshalb beim Start (`_lifespan`) in
+`_main_loop` erfasst und die Frames werden per `run_coroutine_threadsafe`
+übergeben. `broadcast_websocket()` iteriert über eine Kopie von
+`active_websockets`, weil sich Clients während des Sendens verbinden/trennen.
+
 ### Datenbank (SQLite)
 
 5 Tabellen: `assets`, `detections`, `alerts`, `commands`, `crowd_sightings` (+ Index auf `crowd_sightings.mac`)
+
+Zeitstempel werden mit `datetime.now()` (lokale Zeit) geschrieben; Abfragen mit
+Zeitfenster vergleichen deshalb gegen `datetime('now','localtime', …)`, sonst ist
+das Fenster um den UTC-Offset verschoben.
+
+### Backend-Tests
+
+```bash
+cd backend
+pip install -r requirements.txt -r requirements-dev.txt
+pytest            # 12 Tests
+```
+
+Die Tests laufen in CI (Job `backend-test`), die Android-Unit-Tests im Job
+`unit-test` (`./gradlew testDebugUnitTest`).
 
 ---
 

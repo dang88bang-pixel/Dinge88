@@ -23,9 +23,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.Date
 import java.util.concurrent.TimeUnit
@@ -239,7 +239,7 @@ class AgentService @Inject constructor(
                 }
                 // Periodic pattern analysis every 10 cycles
                 if (cycleCount.get() % 10 == 0L) {
-                    val patterns = learningEngine.analyzePatterns(emptyList())
+                    val patterns = learningEngine.analyzePatterns(learningEngine.recentExperiences())
                     if (patterns.isNotEmpty()) {
                         auditLogService.log(
                             action = "PATTERNS",
@@ -521,9 +521,9 @@ class AgentService @Inject constructor(
         mqttService.sendCommand(asset.mac, action)
         if (mqttService.isConnected) delivered = true
 
-        // 2. WebSocket
-        if (webSocketService.isConfigured) {
-            webSocketService.sendCommand(asset.id, action)
+        // 2. WebSocket – "isConfigured" alone is not delivery: without an open
+        // connection the frame is dropped, so the action must stay in the queue.
+        if (webSocketService.isConnected && webSocketService.sendCommand(asset.id, action)) {
             delivered = true
         }
 
@@ -548,9 +548,11 @@ class AgentService @Inject constructor(
     /** Delivers pending actions from the offline queue via MQTT. */
     suspend fun flushOfflineQueue(): Int {
         if (!mqttService.isConnected) return 0
+        // Use the actual publish result: `isConnected` stays true even when the
+        // individual publish fails, which would drop actions from the queue
+        // although they were never delivered.
         return offlineQueue.retryPending { action ->
             mqttService.sendCommand(action.assetMac, action.actionType)
-            mqttService.isConnected
         }
     }
 
@@ -644,10 +646,7 @@ class AgentService @Inject constructor(
                 .build()
 
             val payload = JSONObject(data.toMutableMap().apply { put("email", email) })
-            val body = RequestBody.create(
-                MediaType.parse("application/json"),
-                payload.toString()
-            )
+            val body = payload.toString().toRequestBody(JSON_MEDIA_TYPE)
             val request = okhttp3.Request.Builder()
                 .url(url)
                 .post(body)
@@ -707,6 +706,7 @@ class AgentService @Inject constructor(
     companion object {
         private const val STALE_MS = 5 * 60 * 1000L // 5 minutes
         private const val GEOFENCE_RADIUS_KM = 5.0
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
         /** Haversine formula: distance in km between two lat/lon points. */
         private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
