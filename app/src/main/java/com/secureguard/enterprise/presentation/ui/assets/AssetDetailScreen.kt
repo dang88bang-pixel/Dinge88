@@ -188,7 +188,7 @@ fun AssetDetailScreen(
                                     Text(" Crowd", modifier = Modifier.padding(start = 4.dp))
                                 }
                                 Button(onClick = { viewModel.startSatelliteSearch() }) {
-                                    Icon(Icons.Default.Satellite, contentDescription = null)
+                                    Icon(Icons.Default.LocationOn, contentDescription = null)
                                     Text(" Sat", modifier = Modifier.padding(start = 4.dp))
                                 }
                             }

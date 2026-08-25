@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -288,7 +289,7 @@ fun SettingsScreen(
 
             item {
                 Text(
-                    "SecureGuard Enterprise v1.0.0 · generisches LoRa/LoRaWAN",
+                    "SecureGuard Enterprise v1.0.7 · generisches LoRa/LoRaWAN",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp)

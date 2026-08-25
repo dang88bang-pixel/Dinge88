@@ -5,7 +5,9 @@ import androidx.room.Room
 import com.secureguard.enterprise.data.local.SecureGuardDatabase
 import com.secureguard.enterprise.data.local.dao.AlertDao
 import com.secureguard.enterprise.data.local.dao.AssetDao
+import com.secureguard.enterprise.data.local.dao.AuditLogDao
 import com.secureguard.enterprise.data.local.dao.DetectionDao
+import com.secureguard.enterprise.data.local.dao.PendingActionDao
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.data.repository.SecureGuardRepositoryImpl
 import dagger.Module
@@ -38,6 +40,12 @@ object AppModule {
 
     @Provides
     fun provideAlertDao(db: SecureGuardDatabase): AlertDao = db.alertDao()
+
+    @Provides
+    fun provideAuditLogDao(db: SecureGuardDatabase): AuditLogDao = db.auditLogDao()
+
+    @Provides
+    fun providePendingActionDao(db: SecureGuardDatabase): PendingActionDao = db.pendingActionDao()
 
     @Provides
     @Singleton
