@@ -30,6 +30,7 @@ services:
     volumes:
       - ./backend:/app
       - ./data:/data
+    # Schema: backend/schema.sql → /data/secureguard.db
     depends_on:
       - mqtt
     networks:

@@ -57,61 +57,6 @@ class TempMailViewModel @Inject constructor(
         addLog("🗑️ Inbox geleert")
     }
 
-    fun checkExistingOtp() {
-        viewModelScope.launch {
-            val otp = tempMailService.getOTP()
-            if (otp != null) {
-                addLog("📋 Letztes OTP: ${otp.otp} (${otp.email})")
-            } else {
-                addLog("ℹ️ Kein gespeichertes OTP vorhanden")
-            }
-        }
-    }
-
-    fun waitForMagicLink() {
-        viewModelScope.launch {
-            addLog("⏳ Warte auf Magic Link (45s)...")
-            val result = tempMailService.waitForMagicLink()
-            if (result?.success == true) {
-                addLog("✅ Magic Link: ${result.magicLink.take(60)}...")
-            } else {
-                addLog("❌ Kein Magic Link empfangen")
-            }
-        }
-    }
-
-    fun quickRegister() {
-        viewModelScope.launch {
-            addLog("🔄 Quick-Register: Inbox + OTP...")
-            val result = tempMailService.autoRegisterAndGetOTP()
-            if (result?.success == true) {
-                addLog("✅ OTP: ${result.otp}")
-            } else {
-                addLog("❌ Quick-Register fehlgeschlagen")
-            }
-        }
-    }
-
-    fun autoRegisterService(serviceName: String, url: String) {
-        viewModelScope.launch {
-            addLog("🌐 Auto-Register bei $serviceName...")
-            // Uses AgentService.autoRegisterExternalService indirectly via TempMailService
-            val inbox = tempMailService.createInbox()
-            if (inbox?.success == true) {
-                addLog("✅ Inbox: ${inbox.email}")
-                addLog("⏳ Warte auf OTP...")
-                val otp = tempMailService.waitForOTP()
-                if (otp?.success == true) {
-                    addLog("✅ OTP empfangen: ${otp.otp}")
-                } else {
-                    addLog("❌ Kein OTP (Timeout)")
-                }
-            } else {
-                addLog("❌ Inbox-Erstellung fehlgeschlagen")
-            }
-        }
-    }
-
     private fun addLog(message: String) {
         val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         val entry = "[$timestamp] $message"

@@ -34,14 +34,14 @@ fun apiKey(name: String): String {
 
 android {
     namespace = "com.secureguard.enterprise"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.secureguard.enterprise"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 6
+        versionName = "1.0.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -55,6 +55,7 @@ android {
         buildConfigField("String", "OPEN_CHARGE_MAP_KEY", "\"${apiKey("OPEN_CHARGE_MAP_KEY")}\"")
         buildConfigField("String", "NETATMO_TOKEN", "\"${apiKey("NETATMO_TOKEN")}\"")
         buildConfigField("String", "GOOGLE_API_KEY", "\"${apiKey("GOOGLE_API_KEY")}\"")
+        buildConfigField("String", "HELIUM_API_KEY", "\"${apiKey("HELIUM_API_KEY")}\"")
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
         buildConfigField("String", "WEBSOCKET_URL", "\"${apiKey("WEBSOCKET_URL")}\"")
         buildConfigField("String", "MCP_SERVER_URL", "\"${apiKey("MCP_SERVER_URL")}\"")
@@ -189,16 +190,13 @@ dependencies {
     kapt(libs.moshi.kotlin.codegen)
     implementation(libs.gson)
 
-    // MQTT (Paho – clientseitiger MqttAsyncClient; der veraltete
-    // org.eclipse.paho.android.service wird bewusst NICHT genutzt, siehe
-    // IMPLEMENTIERUNGS_INVENTUR.md "Abweichungen")
+    // MQTT (Paho MqttAsyncClient, ohne veralteten android.service)
     implementation(libs.paho.mqtt.client)
 
     // Location (echte GPS-Position)
     implementation(libs.play.services.location)
 
-    // BLE – Nordic ble-ktx (optional; der aktive Scan läuft über die
-    // Plattform-API in BleService.kt, siehe IMPLEMENTIERUNGS_INVENTUR.md)
+    // BLE – Nordic ble-ktx (Scan über Plattform-API in BleService)
     implementation(libs.nordic.ble.ktx)
 
     // Permissions (Accompanist – optional, Plattform-Permissions util vorhanden)
@@ -235,4 +233,14 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// GitHub Release erwartet genau diese Datei: release.apk
+android.applicationVariants.configureEach {
+    if (buildType.name == "release") {
+        outputs.configureEach {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+                .outputFileName = "release.apk"
+        }
+    }
 }

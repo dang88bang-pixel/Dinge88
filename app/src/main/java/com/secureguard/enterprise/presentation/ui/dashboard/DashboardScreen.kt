@@ -1,179 +1,240 @@
 package com.secureguard.enterprise.presentation.ui.dashboard
 
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.os.BatteryManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BatteryFull
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.presentation.components.AssetCard
 import com.secureguard.enterprise.presentation.components.StatCard
 import com.secureguard.enterprise.presentation.navigation.Routes
+import com.secureguard.enterprise.presentation.ui.common.missingPermissions
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     navController: NavController,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val batteryLevel = remember { getBatteryLevel(context) }
     val uiState by viewModel.uiState.collectAsState()
-    val detections by viewModel.detections.collectAsState()
-    val alerts by viewModel.alerts.collectAsState()
+    val assets by viewModel.assets.collectAsState()
+    val agentRunning by viewModel.agentRunning.collectAsState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            "🛡️ SecureGuard Dashboard",
-            style = MaterialTheme.typography.headlineSmall
-        )
+    // Request all runtime permissions once on first launch.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* result intentionally ignored; channels handle missing perms */ }
+    LaunchedEffect(Unit) {
+        val missing = missingPermissions(context)
+        if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
+    }
 
-        // Navigation zu Settings + Agent-Konfiguration
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                if (uiState.agentRunning) "🟢 Agent aktiv" else "🔴 Agent inaktiv",
-                style = MaterialTheme.typography.bodyMedium
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("🛡️ SecureGuard Pro", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = { viewModel.refresh() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Aktualisieren")
+                    }
+                    BadgedBox(badge = {
+                        if (uiState.alertCount > 0) Badge { Text(uiState.alertCount.toString()) }
+                    }) {
+                        IconButton(onClick = { navController.navigate(Routes.ALERTS) }) {
+                            Icon(Icons.Default.Notifications, contentDescription = "Alarme")
+                        }
+                    }
+                    IconButton(onClick = { navController.navigate(Routes.AGENT_CONFIG) }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Agent-Konfiguration")
+                    }
+                }
             )
-            Row {
-                IconButton(onClick = { navController.navigate(Routes.TERMINAL) }) {
-                    Icon(Icons.Default.Terminal, contentDescription = "Terminal")
-                }
-                IconButton(onClick = { navController.navigate(Routes.SENSOR_FUSION) }) {
-                    Icon(Icons.Default.Explore, contentDescription = "Sensor-Fusion")
-                }
-                IconButton(onClick = { navController.navigate(Routes.SECURITY) }) {
-                    Icon(Icons.Default.Security, contentDescription = "Security")
-                }
-                IconButton(onClick = { navController.navigate(Routes.ESP32_CONFIG) }) {
-                    Icon(Icons.Default.Memory, contentDescription = "ESP32 Config")
-                }
-                IconButton(onClick = { navController.navigate(Routes.AGENT_CONFIG) }) {
-                    Icon(Icons.Default.SmartToy, contentDescription = "Agent-Konfiguration")
-                }
-                IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
-                    Icon(Icons.Default.Settings, contentDescription = "Einstellungen")
-                }
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { viewModel.toggleAgent() },
+                containerColor = if (agentRunning) Color(0xFF2E7D32) else Color(0xFFC62828)
+            ) {
+                Icon(
+                    if (agentRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
+                    contentDescription = if (agentRunning) "Agent stoppen" else "Agent starten"
+                )
             }
         }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            StatCard(
-                modifier = Modifier.weight(1f),
-                value = "$batteryLevel%",
-                label = "Batterie",
-                icon = Icons.Default.BatteryFull,
-                color = Color(0xFF2E7D32)
-            )
-            StatCard(
-                modifier = Modifier.weight(1f),
-                value = uiState.totalAssets.toString(),
-                label = "Assets",
-                icon = Icons.Default.LocationOn,
-                color = Color(0xFF1565C0)
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatCard(
-                modifier = Modifier.weight(1f),
-                value = uiState.detectionCount.toString(),
-                label = "Detektionen",
-                icon = Icons.Default.Search,
-                color = Color(0xFF6A1B9A)
-            )
-            StatCard(
-                modifier = Modifier.weight(1f),
-                value = uiState.alertCount.toString(),
-                label = "Alarme",
-                icon = Icons.Default.Warning,
-                color = Color(0xFFC62828)
-            )
-        }
-
-        // Status-Übersicht
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Text("🟢 ${uiState.onlineAssets}", style = MaterialTheme.typography.bodyMedium)
-            Text("🔴 ${uiState.offlineAssets}", style = MaterialTheme.typography.bodyMedium)
-            Text("🟡 ${uiState.maintenanceAssets}", style = MaterialTheme.typography.bodyMedium)
-        }
-
-        // Agent-Status
-        Text(
-            if (uiState.agentRunning) "🤖 Agent: Läuft" else "🤖 Agent: Gestoppt",
-            style = MaterialTheme.typography.titleMedium
-        )
-        Text(
-            "Letzte Sync: ${uiState.lastSyncTime}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { viewModel.toggleAgent() }) {
-                Text(if (uiState.agentRunning) "Agent stoppen" else "Agent starten")
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .background(
+                                    color = if (agentRunning) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                    shape = CircleShape
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (agentRunning) "AKTIV" else "INAKTIV",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (agentRunning) Color(0xFF2E7D32) else Color(0xFFC62828),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text("📶 ${uiState.onlineAssets}/${uiState.totalAssets}")
+                    Text("🔋 ${uiState.batteryLevel}%")
+                    Text("⏱ ${uiState.lastSyncTime}")
+                }
             }
-            Button(onClick = { navController.navigate(Routes.ALERTS) }) {
-                Text("Alarme (${uiState.alertCount})")
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        value = "${uiState.onlineAssets}/${uiState.totalAssets}",
+                        label = "Assets",
+                        icon = Icons.Default.Devices,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        value = "${uiState.activeSearches}",
+                        label = "Suchen",
+                        icon = Icons.Default.Search,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        value = "${uiState.alertCount}",
+                        label = "Alarme",
+                        icon = Icons.Default.Warning,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
-            Button(onClick = { viewModel.refresh() }) {
-                Text("🔄")
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("🎯 Geschützte Assets", style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = { navController.navigate(Routes.ASSETS) }) {
+                        Text("Alle anzeigen →")
+                    }
+                }
+            }
+
+            items(assets.take(5)) { asset ->
+                AssetCard(
+                    asset = asset,
+                    onClick = { navController.navigate(Routes.assetDetail(asset.id)) }
+                )
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { navController.navigate(Routes.ADD_ASSET) }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("➕ Asset hinzufügen")
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Button(onClick = { navController.navigate(Routes.SCAN_QR) }) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("QR-Scan")
+                        }
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "📊 Agent: ${if (agentRunning) "Aktiv" else "Inaktiv"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "🔄 Sync: ${uiState.lastSyncTime}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
-}
-
-fun getBatteryLevel(context: Context): Int {
-    val ifilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-    val batteryStatus = context.registerReceiver(null, ifilter)
-    val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-    val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-    return if (level >= 0 && scale > 0) (level * 100) / scale else 0
 }

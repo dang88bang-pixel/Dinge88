@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -134,33 +133,6 @@ fun TempMailScreen(
                         Text("📬 Neue Inbox")
                     }
                 }
-                Button(
-                    onClick = { viewModel.quickRegister() },
-                    enabled = !isProcessing && isConfigured,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (isProcessing) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text("⚡ Quick-Register + OTP")
-                }
-
-                Button(
-                    onClick = { viewModel.waitForMagicLink() },
-                    enabled = !isProcessing && currentInbox != null,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("🔗 Magic Link abrufen")
-                }
-
-                Button(
-                    onClick = { viewModel.checkExistingOtp() },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("📋 Gespeichertes OTP prüfen")
-                }
-
                 Button(
                     onClick = { viewModel.waitForOTP() },
                     modifier = Modifier.weight(1f),

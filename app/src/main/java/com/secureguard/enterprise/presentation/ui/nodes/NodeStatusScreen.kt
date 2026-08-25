@@ -66,9 +66,6 @@ fun NodeStatusScreen(
                     IconButton(onClick = { viewModel.runFullQuery() }) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "Test-Suche")
                     }
-                    IconButton(onClick = { viewModel.refreshLoRaGateways() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "LoRa-Gateways")
-                    }
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Aktualisieren")
                     }
