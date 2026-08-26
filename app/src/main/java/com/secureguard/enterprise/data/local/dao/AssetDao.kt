@@ -75,4 +75,7 @@ interface AssetDao {
         """
     )
     suspend fun getPage(offset: Int, limit: Int, filter: String?): List<Asset>
+
+    @Query("DELETE FROM assets")
+    suspend fun clear()
 }

@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -236,10 +237,34 @@ fun SettingsScreen(
                         Text(
                             "Alle Ortungsdaten werden ausschließlich lokal auf dem Gerät " +
                                 "gespeichert. Externe Kanäle (Crowd/Satellit) sind standardmäßig " +
-                                "deaktiviert und bedürfen ausdrücklicher Zustimmung.",
+                                "deaktiviert und bedürfen ausdrücklicher Zustimmung. " +
+                                "Passwörter und PINs legt der Anwender selbst fest.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Löschkonzept: Detektionen/Alerts/Audit standardmäßig 90 Tage. " +
+                                "Datenauskunft (Art. 15) und vollständige Löschung (Art. 17) unten.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.Button(
+                                onClick = { viewModel.exportDataSubjectAccess() },
+                                modifier = Modifier.weight(1f).testTag("privacy_export_button")
+                            ) { Text("Datenauskunft") }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.applyDataRetention() },
+                                modifier = Modifier.weight(1f).testTag("privacy_retention_button")
+                            ) { Text("Retention 90d") }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { viewModel.eraseAllLocalData(alsoClearAuth = false) },
+                            modifier = Modifier.fillMaxWidth().testTag("privacy_erase_button")
+                        ) { Text("Alle lokalen Daten löschen (Art. 17)") }
                     }
                 }
             }
@@ -284,6 +309,15 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
                                 .clickable { navController.navigate(Routes.ESP32_CONFIG) }
+                        )
+                        HorizontalDivider()
+                        Text(
+                            "System-Health / Monitoring",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.HEALTH) }
                         )
                         HorizontalDivider()
                         Spacer(Modifier.height(8.dp))

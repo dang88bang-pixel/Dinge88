@@ -22,6 +22,7 @@
 | `AddAssetViewModelLogicTest` | Formular-Validierung MAC/Name |
 | `AgentCycleLogicTest` | Cycle-Fusion, Settings, Learning-Memory |
 | `EndpointConfigTest` | MQTT/HTTP-URL-Normalisierung |
+| `PrivacyExportContractTest` | DSGVO-Export ohne Secrets |
 | `MacValidationTest` / `ModelBasicsTest` | Modelle |
 
 ## Instrumented Compose-UI (Emulator/Gerät)

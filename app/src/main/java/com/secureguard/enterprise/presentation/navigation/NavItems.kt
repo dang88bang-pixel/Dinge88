@@ -40,5 +40,6 @@ object Routes {
     const val SENSOR_FUSION = "sensor_fusion"
     const val SECURITY = "security"
     const val ESP32_CONFIG = "esp32_config"
+    const val HEALTH = "health"
     fun assetDetail(id: String) = "asset_detail/$id"
 }

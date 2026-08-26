@@ -26,4 +26,7 @@ interface PendingActionDao {
 
     @Query("UPDATE pending_actions SET attempts = attempts + 1, lastError = :error WHERE id = :id")
     suspend fun markAttempt(id: Long, error: String?)
+
+    @Query("DELETE FROM pending_actions")
+    suspend fun clear()
 }

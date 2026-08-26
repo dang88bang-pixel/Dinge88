@@ -52,7 +52,8 @@ class SettingsViewModel @Inject constructor(
     private val endpointConfig: EndpointConfig,
     private val mqttService: MqttService,
     private val webSocketService: WebSocketService,
-    private val backendSyncService: BackendSyncService
+    private val backendSyncService: BackendSyncService,
+    private val privacyService: com.secureguard.enterprise.services.PrivacyService
 ) : ViewModel() {
 
     private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
@@ -300,6 +301,67 @@ class SettingsViewModel @Inject constructor(
         intent.action = AgentForegroundService.ACTION_STOP
         context.startService(intent)
         _uiState.update { it.copy(statusMessage = "⏹ Vordergrund-Dienst gestoppt") }
+    }
+
+    /** DSGVO Art. 15 – Datenauskunft als JSON (ohne Passwörter/PINs). */
+    fun exportDataSubjectAccess() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val result = runCatching { privacyService.exportDataSubjectAccess() }
+            _uiState.update {
+                it.copy(
+                    statusMessage = result.fold(
+                        onSuccess = { exp ->
+                            "✅ Datenauskunft: ${exp.file.name} " +
+                                "(${exp.assetCount} Assets, ${exp.detectionCount} Detektionen)"
+                        },
+                        onFailure = { e -> "❌ Datenauskunft: ${e.message}" }
+                    )
+                )
+            }
+        }
+    }
+
+    /** Retention: Historie älter als 90 Tage. */
+    fun applyDataRetention() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val result = runCatching {
+                privacyService.applyRetention(
+                    com.secureguard.enterprise.services.PrivacyService.DEFAULT_RETENTION_DAYS
+                )
+            }
+            _uiState.update {
+                it.copy(
+                    statusMessage = result.fold(
+                        onSuccess = { r ->
+                            "✅ Retention 90 Tage: Detektionen −${r.detectionsDeleted}, " +
+                                "Alerts −${r.alertsDeleted}, Audit −${r.auditDeleted}"
+                        },
+                        onFailure = { e -> "❌ Retention: ${e.message}" }
+                    )
+                )
+            }
+        }
+    }
+
+    /**
+     * DSGVO Art. 17 – alle lokalen Nutzdaten löschen.
+     * PIN bleibt, sofern [alsoClearAuth] false (Passwort setzt der Anwender selbst neu).
+     */
+    fun eraseAllLocalData(alsoClearAuth: Boolean = false) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val result = runCatching { privacyService.eraseAllLocalData(alsoClearAuth) }
+            _uiState.update {
+                it.copy(
+                    statusMessage = result.fold(
+                        onSuccess = { r ->
+                            "✅ Lokale Daten gelöscht (Assets −${r.assetsDeleted}, " +
+                                "Detektionen −${r.detectionsDeleted})"
+                        },
+                        onFailure = { e -> "❌ Löschen: ${e.message}" }
+                    )
+                )
+            }
+        }
     }
 
     companion object {

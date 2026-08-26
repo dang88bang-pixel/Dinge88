@@ -254,7 +254,28 @@ async def broadcast_websocket(message: str):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+    """Ops-Health: Status + DB-Zähler für Monitoring/Dashboard."""
+    conn = get_db()
+    try:
+        assets = conn.execute("SELECT COUNT(*) AS c FROM assets").fetchone()["c"]
+        detections = conn.execute("SELECT COUNT(*) AS c FROM detections").fetchone()["c"]
+        alerts = conn.execute("SELECT COUNT(*) AS c FROM alerts").fetchone()["c"]
+    except Exception as e:
+        return {
+            "status": "degraded",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+        }
+    finally:
+        conn.close()
+    return {
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "assets": assets,
+        "detections": detections,
+        "alerts": alerts,
+        "service": "secureguard-backend",
+    }
 
 
 @app.get("/api/assets")

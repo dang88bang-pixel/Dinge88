@@ -836,8 +836,8 @@ cd firmware/secureguard_esp32 && pio run
 | Gradle-Cache | `download-gradle-deps.sh` | `install-gradle-cache.sh` |
 | PlatformIO ESP32 | `download-platformio.sh` | `install-platformio.sh` |
 
-**Phase 2 (bewusst später):** SQLCipher-Umstellung der Room-DB und produktive
-API-Keys – erst wenn der Offline-Android-Build verifiziert ist.
+**SQLCipher** ist implementiert (Batch 2). Produktive API-Keys und Host-Build
+bleiben Sache der Einsatzumgebung – siehe [docs/GO_LIVE.md](docs/GO_LIVE.md).
 
 Vollständige Anleitung, manuelle Befehle und Troubleshooting:
 **[docs/OFFLINE_SETUP.md](docs/OFFLINE_SETUP.md)**
@@ -873,11 +873,13 @@ Vollständige Anleitung, manuelle Befehle und Troubleshooting:
 
 ## 🛡️ Datenschutz
 
-- Alle Ortungsdaten verbleiben in der lokalen Room-Datenbank
+- Alle Ortungsdaten verbleiben in der lokalen Room-Datenbank (SQLCipher)
 - Externe Kanäle (Crowd/Satellit/APIs) standardmäßig deaktiviert
 - DSGVO-Einwilligung erforderlich für externe Datenverarbeitung
+- **Datenauskunft (Art. 15)**, **Retention 90 Tage**, **Löschen (Art. 17)** in Einstellungen
 - Audit-Log dokumentiert alle sicherheitsrelevanten Aktionen
 - Export/Backup optional AES/GCM-verschlüsselt
+- PIN und Keystore-Passwörter legt der **Anwender selbst** fest
 
 ---
 

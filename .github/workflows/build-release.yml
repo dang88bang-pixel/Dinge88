@@ -2,10 +2,10 @@ name: 🛡️ Build SecureGuard APK
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'arena/**' ]
     tags: [ 'v*' ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'arena/**' ]
   workflow_dispatch:
     inputs:
       build_type:
@@ -112,6 +112,10 @@ jobs:
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
+
+      - name: Unit tests
+        if: matrix.task == 'assembleDebug'
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
       - name: Build ${{ matrix.task }}
         env:

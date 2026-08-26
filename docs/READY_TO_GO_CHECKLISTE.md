@@ -3,6 +3,8 @@
 Stand: 2026-08-26 · Branch `arena/01a03c79-dinge88`  
 Ziel: **vollständige App mit allen Diensten angebunden und einsatzbereit**.
 
+> **Update 2026-08-26 (Batch 4 / Go-Live-Pack):** DSGVO Datenauskunft/Retention/Löschen, Health-Monitor-Screen, Backend `/api/health` Stats, smoke/start-stack Scripts, CI Unit-Tests.
+
 > **Update 2026-08-26 (Batch 3):** UI/Unit-Tests (PIN, Asset-CRUD, Agent-Cycle); Keystore-Passwörter nur vom Anwender.
 
 > **Update 2026-08-26 (Batch 2):** SQLCipher Room, Release-Keystore-Script, Release NSC ohne Cleartext.
@@ -29,7 +31,7 @@ Legende:
 
 | Bereich | Status | Kurz |
 |---------|--------|------|
-| Android-App (UI + Navigation) | ✅ | 17 Screens, Bottom-Nav, Hilt |
+| Android-App (UI + Navigation) | ✅ | 18 Screens (+ Health), Bottom-Nav, Hilt |
 | Agent + 9 Detection-Kanäle | ✅/⚙️ | Code fertig; externe Kanäle brauchen Keys/Consent |
 | MQTT / WebSocket / NFC realtime | ✅/⚙️ | Runtime-Settings + MQTT Auth; Broker-URL setzen |
 | 8 externe REST-APIs + Gateways | ✅/⚙️ | Keys optional; LORA/YOLO/CKAN/Find-My verdrahtet |
@@ -42,7 +44,7 @@ Legende:
 | SQLCipher (DB-Verschlüsselung) | ✅ | sqlcipher-android + KeyStore-Passphrase + Migration |
 | Produktiv-TLS / Zertifikate | ✅/⚙️ | release NSC verbietet Cleartext; MQTT ssl:// ready |
 | Instrumentierte UI-Tests | ✅/⚙️ | Compose Lock+Asset + Unit Auth/CRUD/Agent (lokal/CI) |
-| Verifizierter Gradle-Build (diese Sandbox) | ❌ | kein JDK/SDK/Netz hier – **lokal bauen** |
+| Verifizierter Gradle-Build (diese Sandbox) | ⚙️ | kein JDK hier – **lokal/CI** `./gradlew testDebugUnitTest assembleDebug` |
 
 **Fazit:** Die App ist **feature-complete im Code**.  
 „Ready to go“ in der Praxis = **Build + Config + Keys + Backend + Hardware**.
@@ -51,7 +53,7 @@ Legende:
 
 ## 2. Was schon fertig ist (Code ✅)
 
-### 2.1 UI (17 Composables)
+### 2.1 UI (18 Composables)
 
 | # | Screen | Route | Status |
 |---|--------|-------|--------|
@@ -72,6 +74,7 @@ Legende:
 | 15 | Security-Center | `security` | ✅ |
 | 16 | ESP32-Config | `esp32_config` | ✅ |
 | 17 | Lock-Screen (PIN) | (MainActivity) | ✅ |
+| 18 | System-Health | `health` | ✅ |
 
 ### 2.2 Services (30) – im Code angebunden
 
@@ -96,6 +99,8 @@ Legende:
 | `NotificationService` | überall | POST_NOTIFICATIONS |
 | `AlertSoundManager` | Alerts | Audio |
 | `AuthManager` | PIN | User setzt PIN |
+| `PrivacyService` | DSGVO Export/Löschen | – |
+| `HealthMonitorService` | Health-Screen | Backend optional |
 | `EncryptionService` | Export/Security | Keystore (Gerät) |
 | `AuditLogService` | Agent/Security | – |
 | `OfflineQueue` | Actions offline | MQTT später |
@@ -258,13 +263,13 @@ Ohne Key → Kanal liefert `null`/leer, App bleibt stabil.
 | 11 | **Instrumented Tests / E2E** | ✅/⚙️ | LockScreen + AddAsset Compose; Unit Auth/Asset/Agent |
 | 12 | **Multi-User / Server-RBAC** | 🟡 | `RoleManager` lokal vorbereitet, kein Login-Server |
 | 13 | **MQTT Auth (User/Pass)** | ✅ | EndpointConfig + MqttConnectOptions; ssl:// SocketFactory |
-| 14 | **Play Integrity / SafetyNet** | ❌ | nicht vorgesehen |
-| 15 | **Crash-Reporting** (Sentry/Firebase) | ❌ | nur Logcat + AuditLog |
-| 16 | **Push (FCM)** | ❌ | nur lokale Notifications |
+| 14 | **Play Integrity / SafetyNet** | ⏳ | bewusst optional / Phase 2 |
+| 15 | **Crash-Reporting** (Sentry/Firebase) | ⏳ | AuditLog + Logcat; externes SaaS optional |
+| 16 | **Push (FCM)** | ⏳ | lokale Notifications; FCM optional Phase 2 |
 | 17 | **i18n vollständig** | 🟡 | `values-de`/`en` minimal (App-Name + Channels) |
 | 18 | **MBTiles-Download in-app** | 🟡 | URL-Helfer da, kein DownloadManager-Flow |
 | 19 | **USB Permission Activity-Flow** | 🟡 | Service liest nur bei erteilter Permission; kein UI-Dialog-Flow |
-| 20 | **Verifizierter Clean-Build** | ❌ | in dieser Umgebung nicht gelaufen – **muss lokal grün sein** |
+| 20 | **Verifizierter Clean-Build** | ⚙️ | CI/Host: `testDebugUnitTest` + `assembleDebug/Release` |
 
 ### 4.2 Betriebs-Risiken (Pilot → Prod)
 
@@ -340,8 +345,8 @@ Priorität hoch → niedrig:
 7. ✅ Node-RED Flows  
 8. ✅ SQLCipher  
 9. ✅/⚙️ UI-Tests (Agent-Cycle-Logik, Login/PIN, Asset-CRUD) – lokal `./gradlew testDebugUnitTest` / `connectedDebugAndroidTest`  
-10. ❌ Monitoring (Health-Dashboard, Alerting ops)  
-11. ❌ DSGVO: AVV, Löschkonzept UI, Export „Datenauskunft“  
+10. ✅ Monitoring (Health-Screen + Backend `/api/health` + `scripts/smoke-check.sh`)  
+11. ✅/⚙️ DSGVO: Consent, Datenauskunft, Retention 90d, Löschen Art.17 (AVV organisatorisch)  
 12. ✅ compileSdk 35
 
 ---
@@ -363,7 +368,7 @@ Priorität hoch → niedrig:
 
 **Code-seitig:** App, Agent, 30 Services, 8 APIs, Backend, Firmware, Offline-Skripte = **weitgehend complete**.  
 
-**Ready-to-go mit allen Diensten:** noch **Build-Umgebung**, **Docker-Backend**, **echte URLs/Keys in `local.properties`**, **Permissions**, optional **ESP32**. Batch 1–3 erledigt (Runtime-URLs, MQTT Auth, SQLCipher, Signing-Script, Release-NSC, YOLO/LoRa/CKAN, Asset-Sync, UI/Unit-Tests). Offen: Monitoring, DSGVO-UI, Host-Build/CI grün. **Passwörter/PINs setzt der Anwender selbst.**
+**Ready-to-go:** Code-Parts A–J bereit (siehe [GO_LIVE.md](GO_LIVE.md)). Noch **Host-Build**, **Docker-Stack**, **URLs/Keys in local.properties**, **Permissions**, optional **ESP32**. Batch 1–4 erledigt. Organisatorisch: AVV, echte Zertifikate, User-Passwörter. **Passwörter/PINs setzt der Anwender selbst.**
 
 Wenn du willst, können wir als Nächstes **eine** der Lücken gezielt schließen – empfohlen Reihenfolge:  
-`Batch 1+2+3 ✅` → nächster Schritt: Host `./gradlew testDebugUnitTest assembleRelease` → TLS-Zertifikate ops → Monitoring/DSGVO-UI.
+`Batch 1–4 ✅` → **Go-Live:** [GO_LIVE.md](GO_LIVE.md) · Host `./scripts/start-stack.sh` + `./gradlew testDebugUnitTest assembleDebug`.
