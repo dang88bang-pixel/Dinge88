@@ -77,7 +77,7 @@ class ActionsViewModel @Inject constructor(
             val mark = if (success) "✓" else "✗"
             _commandLog.value = _commandLog.value + context.getString(
                 R.string.log_command,
-                ts, actionType.label, asset.shortName, mark
+                ts, context.getString(actionType.labelRes), asset.shortName, mark
             )
             _isExecuting.value = false
         }

@@ -102,7 +102,7 @@ class AssetDetailViewModel @Inject constructor(
 
             val success = agentService.sendAction(asset, actionType.wireCommand)
             val result = if (success) {
-                ActionResult(true, context.getString(R.string.action_executed, actionType.label))
+                ActionResult(true, context.getString(R.string.action_executed, context.getString(actionType.labelRes)))
             } else {
                 ActionResult(false, context.getString(R.string.error_delivery_failed))
             }
@@ -112,7 +112,7 @@ class AssetDetailViewModel @Inject constructor(
                 assetId = asset.id,
                 type = if (success) AlertType.INFO else AlertType.WARNING,
                 severity = if (success) AlertSeverity.INFO else AlertSeverity.WARNING,
-                message = context.getString(R.string.alert_action_message, actionType.label, result.message)
+                message = context.getString(R.string.alert_action_message, context.getString(actionType.labelRes), result.message)
             )
             notificationService.sendActionNotification(asset, actionType, success)
         }
