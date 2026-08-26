@@ -13,6 +13,8 @@ import org.eclipse.paho.client.mqttv3.MqttCallbackExtended
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,7 +28,9 @@ import javax.inject.Singleton
  * [MqttEvent]s, die vom Agenten gesammelt werden.
  */
 @Singleton
-class MqttService @Inject constructor() {
+class MqttService @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
 
     private val gson = Gson()
 
@@ -42,8 +46,9 @@ class MqttService @Inject constructor() {
     fun connect() {
         if (client?.isConnected == true) return
         val clientId = "${MqttConfig.CLIENT_ID_PREFIX}_${System.currentTimeMillis()}"
+        val brokerUrl = ServiceEndpoints.mqttUrl(context)
         val newClient = try {
-            MqttAsyncClient(MqttConfig.BROKER_URL, clientId, MemoryPersistence())
+            MqttAsyncClient(brokerUrl, clientId, MemoryPersistence())
         } catch (e: Exception) {
             _events.tryEmit(MqttEvent.Error("MQTT-Client konnte nicht erstellt werden: ${e.message}"))
             return

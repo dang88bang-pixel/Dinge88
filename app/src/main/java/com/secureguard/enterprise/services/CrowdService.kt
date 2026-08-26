@@ -37,13 +37,7 @@ class CrowdService @Inject constructor(
     }
 
     private val backendUrl: String
-        get() {
-            val ws = BuildConfig.WEBSOCKET_URL
-            return ws.replace("ws://", "http://")
-                .replace("wss://", "https://")
-                .removeSuffix("/ws")
-                .trimEnd('/')
-        }
+        get() = ServiceEndpoints.backendHttpUrl(context)
 
     suspend fun searchAsset(asset: Asset): Detection? {
         if (!asset.externalAllowed) return null

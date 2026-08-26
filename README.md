@@ -583,12 +583,37 @@ services:
     ports: 1883 (MQTT), 9001 (WebSocket)
   backend:     # FastAPI + Uvicorn
     ports: 8000
-    depends_on: mqtt
-  nodered:     # Node-RED Dashboard
+    depends_on: mqtt (healthy)
+  seed:        # befüllt data/secureguard.db mit Demo-Daten (einmalig)
+  nodered:     # Node-RED + Dashboard (flows.docker.json)
     ports: 1880
 ```
 
 **Start:** `docker compose up --build`
+
+### Komplett-Setup ohne Docker (lokaler Pilot-Stack)
+
+```bash
+# 1. Alle Abhängigkeiten installieren (Python-venv, MQTT-Broker, Node-RED,
+#    Demo-Datenbank → data/secureguard.db)
+./scripts/setup-all.sh
+
+# 2. Dienste starten (Broker 1883/9001, Backend 8000, Node-RED 1880,
+#    Demo-Telemetrie-Simulator)
+./scripts/start-services.sh
+```
+
+| Dienst | URL | Zweck |
+|--------|-----|-------|
+| MQTT (TCP) | `tcp://127.0.0.1:1883` | App, ESP32-Gateways, Backend |
+| MQTT (WebSocket) | `ws://127.0.0.1:9001` | Browser-Dashboards |
+| FastAPI | `http://127.0.0.1:8000` | REST + `/docs` + `/api/health` |
+| Node-RED | `http://127.0.0.1:1880/ui` | Live-Dashboard (Telemetrie, Alarme) |
+| Demo-Simulator | – | publiziert alle 15 s Telemetrie |
+
+Die Beispiel-Telemetrie läuft über `secureguard/+/telemetry` in den Broker,
+das Backend bridged sie an `ws://…/ws` und Node-RED zeigt sie im Dashboard
+(Batterie-Gauge, Alarme, Systemstatus).
 
 ---
 
@@ -776,10 +801,13 @@ WIGLE_API_KEY=your_wigle_key_here
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
 NETATMO_TOKEN=your_netatmo_token_here
 GOOGLE_API_KEY=your_google_key_here
-MQTT_BROKER_URL=mqtt://broker.example.com:1883
-WEBSOCKET_URL=ws://api.example.com:8000/ws
-MCP_SERVER_URL=http://api.example.com:8000
+MQTT_BROKER_URL=tcp://10.0.2.2:1883      # Emulator → lokaler Broker
+WEBSOCKET_URL=ws://10.0.2.2:8000/ws      # FastAPI-Backend
+MCP_SERVER_URL=http://10.0.2.2:8000
 ```
+
+**Zur Laufzeit änderbar:** Einstellungen → „Anbindungen“ (MQTT/WS/MCP) –
+die Verbindung wird nach dem Speichern automatisch neu aufgebaut.
 
 ---
 

@@ -11,6 +11,8 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okhttp3.logging.HttpLoggingInterceptor
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,7 +25,9 @@ import javax.inject.Singleton
  * local.properties); ohne Konfiguration wird keine Verbindung aufgebaut.
  */
 @Singleton
-class WebSocketService @Inject constructor() {
+class WebSocketService @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
 
     private val gson = Gson()
 
@@ -48,7 +52,8 @@ class WebSocketService @Inject constructor() {
     val events: SharedFlow<WebSocketEvent> = _events.asSharedFlow()
 
     /** Standard-Endpunkt (Fleet-Instanz); leer → keine Verbindung. */
-    private val serverUrl: String = BuildConfig.WEBSOCKET_URL
+    private val serverUrl: String
+        get() = ServiceEndpoints.webSocketUrl(context)
 
     val isConfigured: Boolean get() = serverUrl.isNotBlank()
 

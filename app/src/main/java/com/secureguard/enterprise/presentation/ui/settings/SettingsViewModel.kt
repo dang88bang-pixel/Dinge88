@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import com.secureguard.enterprise.services.AgentForegroundService
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
+import com.secureguard.enterprise.services.MqttService
+import com.secureguard.enterprise.services.ServiceEndpoints
+import com.secureguard.enterprise.services.WebSocketService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +25,10 @@ data class SettingsUiState(
     val consentGiven: Boolean = true,
     val userName: String = "Admin",
     val organization: String = "SecureGuard",
+    // Laufzeit-Endpunkte (Anbindungen)
+    val mqttUrl: String = "",
+    val websocketUrl: String = "",
+    val mcpUrl: String = "",
     val statusMessage: String? = null
 )
 
@@ -30,7 +37,9 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val agentService: AgentService,
     private val backupManager: com.secureguard.enterprise.services.BackupManager,
-    private val exportService: com.secureguard.enterprise.services.ExportService
+    private val exportService: com.secureguard.enterprise.services.ExportService,
+    private val mqttService: MqttService,
+    private val webSocketService: WebSocketService
 ) : ViewModel() {
 
     private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
@@ -46,7 +55,10 @@ class SettingsViewModel @Inject constructor(
         darkMode = prefs.getBoolean(KEY_DARK, false),
         consentGiven = prefs.getBoolean(KEY_CONSENT, true),
         userName = prefs.getString(KEY_USERNAME, "Admin") ?: "Admin",
-        organization = prefs.getString(KEY_ORG, "SecureGuard") ?: "SecureGuard"
+        organization = prefs.getString(KEY_ORG, "SecureGuard") ?: "SecureGuard",
+        mqttUrl = ServiceEndpoints.mqttUrl(context),
+        websocketUrl = ServiceEndpoints.webSocketUrl(context),
+        mcpUrl = ServiceEndpoints.mcpUrl(context)
     )
 
     private fun save(transform: (SettingsUiState) -> SettingsUiState) {
@@ -88,6 +100,39 @@ class SettingsViewModel @Inject constructor(
     fun setConsent(value: Boolean) = save { it.copy(consentGiven = value) }
     fun setUserName(value: String) = save { it.copy(userName = value) }
     fun setOrganization(value: String) = save { it.copy(organization = value) }
+
+    /** Textfeld-Zwischenstand für die Endpunkt-Felder (noch nicht gespeichert). */
+    fun updateEndpointFields(
+        mqttUrl: String? = null,
+        websocketUrl: String? = null,
+        mcpUrl: String? = null
+    ) {
+        _uiState.update {
+            it.copy(
+                mqttUrl = mqttUrl ?: it.mqttUrl,
+                websocketUrl = websocketUrl ?: it.websocketUrl,
+                mcpUrl = mcpUrl ?: it.mcpUrl
+            )
+        }
+    }
+
+    /** Endpunkt-Werte aus den Textfeldern übernehmen und Verbindungen neu aufbauen. */
+    fun applyEndpoints(mqtt: String, ws: String, mcp: String) {
+        ServiceEndpoints.save(context, mqtt, ws, mcp)
+        _uiState.update {
+            it.copy(
+                mqttUrl = ServiceEndpoints.mqttUrl(context),
+                websocketUrl = ServiceEndpoints.webSocketUrl(context),
+                mcpUrl = ServiceEndpoints.mcpUrl(context)
+            )
+        }
+        // Verbindungen mit den neuen URLs neu aufbauen
+        mqttService.disconnect()
+        mqttService.connect()
+        webSocketService.disconnect()
+        webSocketService.connect()
+        _uiState.update { it.copy(statusMessage = "✅ Endpunkte gespeichert & neu verbunden") }
+    }
 
     fun clearStatus() { _uiState.update { it.copy(statusMessage = null) } }
 

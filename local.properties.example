@@ -1,15 +1,24 @@
 # SecureGuard Enterprise - Backend-Konfiguration
-# Kopiere diese Datei zu local.properties und fülle die Werte aus GitHub Secrets
+# Kopiere diese Datei zu local.properties und fülle die Werte aus GitHub Secrets.
+#
+# LOKALER PILOT-STACK (scripts/start-services.sh, ohne Docker):
+#   MQTT_BROKER_URL = tcp://10.0.2.2:1883        (Emulator → Host-Broker)
+#   WEBSOCKET_URL   = ws://10.0.2.2:8000/ws      (FastAPI-Backend)
+#   MCP_SERVER_URL  = http://10.0.2.2:8000       (gleiche Instanz)
+#
+# Hinweis: Die Endpunkte können zusätzlich zur Laufzeit in den
+# Einstellungen der App überschrieben werden (→ „Anbindungen").
 
 # API-Keys (aus GitHub Secrets)
 WIGLE_API_KEY=your_wigle_key_here
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
 NETATMO_TOKEN=your_netatmo_token_here
 GOOGLE_API_KEY=your_google_key_here
-# Backend-Endpunkte (für Pilot)
-MQTT_BROKER_URL=mqtt://broker.example.com:1883
-WEBSOCKET_URL=ws://api.example.com:8000/ws
-MCP_SERVER_URL=http://api.example.com:8000
+
+# Backend-Endpunkte (für Pilot / lokalen Stack)
+MQTT_BROKER_URL=tcp://10.0.2.2:1883
+WEBSOCKET_URL=ws://10.0.2.2:8000/ws
+MCP_SERVER_URL=http://10.0.2.2:8000
 
 # LoRa/Optik/Urban/Crowd-Endpunkte
 LORA_GATEWAY_URL=http://lora-gateway.example.com:8080

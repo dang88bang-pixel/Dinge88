@@ -121,6 +121,65 @@ fun SettingsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
+                        Text("🔌 Anbindungen (Laufzeit-Endpunkte)",
+                            style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(8.dp))
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.mqttUrl,
+                            onValueChange = { mqttUrl ->
+                                viewModel.updateEndpointFields(
+                                    mqttUrl = mqttUrl
+                                )
+                            },
+                            label = { Text("MQTT-Broker (tcp://host:1883)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.websocketUrl,
+                            onValueChange = { wsUrl ->
+                                viewModel.updateEndpointFields(
+                                    websocketUrl = wsUrl
+                                )
+                            },
+                            label = { Text("Backend WebSocket (ws://host:8000/ws)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.mcpUrl,
+                            onValueChange = { mcpUrl ->
+                                viewModel.updateEndpointFields(
+                                    mcpUrl = mcpUrl
+                                )
+                            },
+                            label = { Text("MCP-Server (http://host:8000)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        androidx.compose.material3.Button(
+                            onClick = {
+                                viewModel.applyEndpoints(
+                                    state.mqttUrl, state.websocketUrl, state.mcpUrl
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Endpunkte speichern & verbinden") }
+                        Text(
+                            "Leere Felder → Standardwerte (BuildConfig bzw. Emulator-Host 10.0.2.2).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text("🛡️ Datenschutz (DSGVO)",
                             style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(8.dp))

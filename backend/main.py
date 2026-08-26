@@ -52,6 +52,10 @@ app.add_middleware(
 # Active WebSocket connections for broadcasting
 active_websockets: Set[WebSocket] = set()
 
+# Wird beim Startup gesetzt, damit MQTT-Callbacks (paho-Thread) Nachrichten
+# sicher an den Uvicorn-Event-Loop weiterreichen können.
+MAIN_LOOP: Optional[asyncio.AbstractEventLoop] = None
+
 
 # ============ MODELLE ============
 
@@ -173,6 +177,7 @@ def get_mqtt_client():
         try:
             host, _, port = MQTT_BROKER.partition(":")
             _mqtt_client = mqtt.Client(client_id="secureguard-backend")
+            _mqtt_client.reconnect_delay_set(min_delay=1, max_delay=30)
             _mqtt_client.connect(host, int(port or 1883), 60)
             _mqtt_client.loop_start()
         except Exception:
@@ -200,6 +205,19 @@ def start_mqtt_subscriber():
         logger.warning("MQTT nicht verfügbar – WebSocket-Forwarding deaktiviert")
         return
 
+    def on_connect(client_, userdata, flags, rc):
+        logger.info("MQTT verbunden (rc=%s) – abonniere Topics", rc)
+        client_.subscribe("secureguard/+/telemetry")
+        client_.subscribe("secureguard/+/alert")
+        client_.subscribe("secureguard/+/status")
+        client_.subscribe("secureguard/broadcast")
+
+    def on_disconnect(client_, userdata, rc):
+        logger.warning("MQTT getrennt (rc=%s) – reconnect über den Loop-Thread", rc)
+
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
+
     def on_message(mqtt_client, userdata, msg):
         """MQTT message received – format and broadcast to all WebSocket clients."""
         topic = msg.topic
@@ -223,20 +241,20 @@ def start_mqtt_subscriber():
             ws_msg = json.dumps({"type": "unknown", "topic": topic, "data": payload})
 
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
+            if MAIN_LOOP is not None:
                 asyncio.run_coroutine_threadsafe(
-                    broadcast_websocket(ws_msg), loop
+                    broadcast_websocket(ws_msg), MAIN_LOOP
                 )
+            else:
+                # Fallback: laufende Loop im Callback-Thread verwenden
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.run_coroutine_threadsafe(broadcast_websocket(ws_msg), loop)
         except RuntimeError:
             pass
 
-    client.subscribe("secureguard/+/telemetry")
-    client.subscribe("secureguard/+/alert")
-    client.subscribe("secureguard/+/status")
-    client.subscribe("secureguard/broadcast")
     client.on_message = on_message
-    logger.info("MQTT-Subscriber gestartet – Topics abonniert")
+    logger.info("MQTT-Subscriber konfiguriert – Topics werden bei Verbindung abonniert")
 
 
 async def broadcast_websocket(message: str):
@@ -381,8 +399,11 @@ async def process_action(action: Action) -> None:
 
     conn = get_db()
     conn.execute(
-        "UPDATE commands SET status = ? WHERE asset_id = ? AND command = ? "
-        "ORDER BY timestamp DESC LIMIT 1",
+        "UPDATE commands SET status = ? WHERE id = ("
+        "  SELECT id FROM commands"
+        "  WHERE asset_id = ? AND command = ?"
+        "  ORDER BY timestamp DESC LIMIT 1"
+        ")",
         ("delivered" if ok else "failed", action.asset_id, action.action_type),
     )
     conn.commit()
@@ -475,6 +496,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.on_event("startup")
 async def startup_event():
+    global MAIN_LOOP
+    MAIN_LOOP = asyncio.get_running_loop()
     start_mqtt_subscriber()
     logger.info("SecureGuard Backend gestartet")
 

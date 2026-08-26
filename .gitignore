@@ -5,6 +5,18 @@ build/
 # Local configuration file (sdk path, etc)
 local.properties
 
+# Lokale Laufzeit / Python / Node
+.venv/
+venv/
+node_modules/
+.secureguard-runtime/
+
+# Datenbanken (werden von scripts/seed_backend.py erzeugt)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
 # Log/OS Files
 *.log
 
@@ -32,3 +44,7 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Python
+__pycache__/
+*.pyc

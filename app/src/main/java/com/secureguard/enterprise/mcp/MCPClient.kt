@@ -3,6 +3,8 @@ package com.secureguard.enterprise.mcp
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.secureguard.enterprise.BuildConfig
+import com.secureguard.enterprise.services.ServiceEndpoints
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -35,14 +37,17 @@ import kotlin.coroutines.resume
  * - QA/E2E-Testkonten
  */
 @Singleton
-class MCPClient @Inject constructor() {
+class MCPClient @Inject constructor(
+    @ApplicationContext private val context: android.content.Context
+) {
 
     companion object {
         private const val TIMEOUT_MS = 45_000L // 45 Sekunden
         private val gson = Gson()
     }
 
-    private val serverUrl: String = BuildConfig.MCP_SERVER_URL
+    private val serverUrl: String
+        get() = ServiceEndpoints.mcpUrl(context)
 
     val isConfigured: Boolean get() = serverUrl.isNotBlank()
 
