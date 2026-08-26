@@ -106,6 +106,14 @@ fun SecurityScreen(
                         StatusRow("AndroidKeyStore", true)
                         StatusRow("256-Bit Schlüssel", true)
                         StatusRow("Hardware-gesichert", true)
+                        StatusRow("SQLCipher (Room at-rest)", true)
+                        StatusRow("DB-Key im KeyStore", true)
+                        Text(
+                            "Key-Fingerprint: ${viewModel.dbKeyFingerprint}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace
+                        )
                     }
                 }
             }

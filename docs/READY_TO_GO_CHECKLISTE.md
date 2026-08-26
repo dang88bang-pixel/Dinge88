@@ -3,6 +3,8 @@
 Stand: 2026-08-26 · Branch `arena/01a03c79-dinge88`  
 Ziel: **vollständige App mit allen Diensten angebunden und einsatzbereit**.
 
+> **Update 2026-08-26 (Batch 2):** SQLCipher Room, Release-Keystore-Script, Release NSC ohne Cleartext.
+
 > **Update 2026-08-26 (Batch Ready-to-Go):** Runtime-Endpunkte (Settings), MQTT Auth,
 > BuildConfig-Keys (LORA/YOLO/CKAN/FIND_MY/BACKEND/MQTT_USER), YOLO+LoRa-Gateway-HTTP,
 > Find-My-Proxy, Backend-Sync, Node-RED Flows, Mosquitto Prod-Hinweise, compileSdk 35.
@@ -34,9 +36,9 @@ Legende:
 | Node-RED | ✅ | `flows.json` Telemetrie/Commands/Health |
 | ESP32-Firmware | ⚙️ | PlatformIO + `.ino`; flashen + WiFi/MQTT setzen |
 | Offline-Toolchain | ✅ | `scripts/offline/*` |
-| Release-Signing | ❌ | kein Keystore im Repo (absichtlich) |
-| SQLCipher (DB-Verschlüsselung) | ⏳ | nicht implementiert |
-| Produktiv-TLS / Zertifikate | ❌ | Cleartext für Pilot erlaubt |
+| Release-Signing | ✅/⚙️ | `scripts/create-release-keystore.sh` + CI-Secrets |
+| SQLCipher (DB-Verschlüsselung) | ✅ | sqlcipher-android + KeyStore-Passphrase + Migration |
+| Produktiv-TLS / Zertifikate | ✅/⚙️ | release NSC verbietet Cleartext; MQTT ssl:// ready |
 | Instrumentierte UI-Tests | ❌ | nur 2 Unit-Tests |
 | Verifizierter Gradle-Build (diese Sandbox) | ❌ | kein JDK/SDK/Netz hier – **lokal bauen** |
 
@@ -229,7 +231,7 @@ Ohne Key → Kanal liefert `null`/leer, App bleibt stabil.
 - [ ] Release-Keystore erzeugen und CI-Secrets setzen (`KEYSTORE_*`)
 - [ ] `assembleRelease` signiert bauen
 - [ ] Mosquitto: `allow_anonymous false` + User/Pass + TLS 8883
-- [ ] HTTPS/WSS statt Cleartext; `network_security_config` härten
+- [x] HTTPS/WSS statt Cleartext; `network_security_config` härten (release: cleartext=false)
 - [ ] Node-RED Flows für Dashboard exportieren und versionieren
 - [ ] Backup-Strategie (Geräte + Backend-SQLite)
 
@@ -241,7 +243,7 @@ Ohne Key → Kanal liefert `null`/leer, App bleibt stabil.
 
 | # | Thema | Status | Was fehlt |
 |---|--------|--------|-----------|
-| 1 | **SQLCipher** Room-DB | ⏳ | Dependency, `SupportFactory`, Keystore-Passphrase, Migration |
+| 1 | **SQLCipher** Room-DB | ✅ | `DatabaseKeyManager` + `SqlCipherHelper` + Migration plain→enc |
 | 2 | **`LORA_GATEWAY_URL`** | ✅ | BuildConfig + EndpointConfig + LoraService HTTP |
 | 3 | **`YOLO_SERVER_URL`** | ✅ | OpticalService → POST `/api/v1/detect` (optional) |
 | 4 | **`OPEN_DATA_API_URL`** | ✅ | EndpointConfig → ApiServiceManager CKAN base |
@@ -302,7 +304,7 @@ Ohne Key → Kanal liefert `null`/leer, App bleibt stabil.
 | Temp-Mail/MCP | ✅ | MCP-URL | FastAPI `/api/mcp` | – | URL = Backend |
 | Offline-Karte | ✅ | optional Archiv | Geofabrik | – | Cache/MBTiles |
 | Node-RED UI | 🟡 | – | nodered Image | – | **Flows bauen** |
-| SQLCipher | ⏳ | – | – | – | Phase 2 |
+| SQLCipher | ✅ | auto | – | – | KeyStore-Passphrase |
 
 ---
 
@@ -327,18 +329,18 @@ Danach sind **lokal**: BLE/WiFi/GPS/QR/NFC (Hardware), MQTT/WS/Crowd/MCP (Docker
 
 Priorität hoch → niedrig:
 
-1. ❌ Clean-Build + Release-Signing + CI grün auf eurem Runner  
-2. ❌ MQTT Auth + TLS; HTTPS/WSS Backend  
-3. ❌ Keys nicht nur BuildConfig – Backend-Proxy für WiGle/Google  
-4. ❌ Runtime-Settings für Broker/URLs (ohne Rebuild)  
-5. ❌ `LORA_GATEWAY_URL` / `YOLO_SERVER_URL` / `OPEN_DATA_API_URL` echt verdrahten  
-6. ❌ Asset-Sync App ↔ Backend  
-7. ❌ Node-RED Standard-Dashboard-Flows committen  
-8. ⏳ SQLCipher  
+1. ⚙️ Clean-Build lokal/`./gradlew assembleRelease` + CI grün  
+2. ✅ MQTT Auth + Runtime-URLs + Release NSC (Cleartext aus)  
+3. ⚙️ Keys: BuildConfig + Settings; optional Backend-Proxy für WiGle/Google  
+4. ✅ Runtime-Settings Broker/URLs  
+5. ✅ LORA/YOLO/CKAN/FIND_MY verdrahtet  
+6. ✅ Asset-Sync  
+7. ✅ Node-RED Flows  
+8. ✅ SQLCipher  
 9. ❌ UI-Tests (Agent-Cycle, Login/PIN, Asset-CRUD)  
 10. ❌ Monitoring (Health-Dashboard, Alerting ops)  
 11. ❌ DSGVO: AVV, Löschkonzept UI, Export „Datenauskunft“  
-12. ❌ compileSdk an CI angleichen (34 vs 35)
+12. ✅ compileSdk 35
 
 ---
 
@@ -359,7 +361,7 @@ Priorität hoch → niedrig:
 
 **Code-seitig:** App, Agent, 30 Services, 8 APIs, Backend, Firmware, Offline-Skripte = **weitgehend complete**.  
 
-**Ready-to-go mit allen Diensten:** noch **Build-Umgebung**, **Docker-Backend**, **echte URLs/Keys in `local.properties`**, **Permissions**, optional **ESP32**, und für Prod die Punkte aus Abschnitt 4/7 (TLS, Signing, SQLCipher, YOLO/LoRa-Gateway-URL, Sync, Tests).
+**Ready-to-go mit allen Diensten:** noch **Build-Umgebung**, **Docker-Backend**, **echte URLs/Keys in `local.properties`**, **Permissions**, optional **ESP32**. Batch 1+2 erledigt (Runtime-URLs, MQTT Auth, SQLCipher, Signing-Script, Release-NSC, YOLO/LoRa/CKAN, Asset-Sync). Offen: UI-Tests, Monitoring, DSGVO-UI, Host-Build.
 
 Wenn du willst, können wir als Nächstes **eine** der Lücken gezielt schließen – empfohlen Reihenfolge:  
-`(1) Runtime-URL-Settings + BuildConfig-Keys verdrahten` → `(2) MQTT Auth` → `(3) SQLCipher` → `(4) YOLO/LoRa-Gateway`.
+`Batch 1+2 ✅` → nächster Schritt: **UI/E2E Compose-Tests** → Host `./gradlew assembleRelease` → TLS-Zertifikate ops.

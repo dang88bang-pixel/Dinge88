@@ -2,6 +2,7 @@ package com.secureguard.enterprise.services
 
 import android.content.Context
 import com.secureguard.enterprise.data.local.SecureGuardDatabase
+import com.secureguard.enterprise.data.local.SqlCipherHelper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.FileInputStream
@@ -69,9 +70,8 @@ class BackupManager @Inject constructor(
             ?: emptyList()
 
     private fun isValidSqlite(file: File): Boolean {
-        val header = ByteArray(16)
-        FileInputStream(file).use { it.read(header) }
-        return String(header).startsWith("SQLite format 3")
+        // Plain SQLite ODER SQLCipher (kein Klartext-Header)
+        return SqlCipherHelper.isPlainSqlite(file) || SqlCipherHelper.isSqlCipherDatabase(file)
     }
 
     private fun copyFile(source: File, target: File) {

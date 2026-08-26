@@ -49,3 +49,7 @@ firmware/**/platformio.ini.bak
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Keystore base64 export
+*.b64
+app/secureguard-keystore.*

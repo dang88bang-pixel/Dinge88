@@ -9,12 +9,29 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// Keystore from environment (CI) or local.properties; falls back to the debug
-// keystore so `assembleRelease` always produces an installable signed APK.
-val keystoreFile = rootProject.file("secureguard-keystore.jks")
-val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-val keyAlias = System.getenv("KEY_ALIAS") ?: "secureguard"
-val keyPassword = System.getenv("KEY_PASSWORD") ?: keystorePassword
+// Keystore: CI decodes to app/secureguard-keystore.jks; local may use root.
+// Env KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD or local.properties.
+val keystoreFile = sequenceOf(
+    rootProject.file("app/secureguard-keystore.jks"),
+    rootProject.file("secureguard-keystore.jks"),
+    rootProject.file("release-keystore.jks")
+).firstOrNull { it.exists() } ?: rootProject.file("app/secureguard-keystore.jks")
+
+fun propOrEnv(name: String, env: String = name): String =
+    System.getenv(env)
+        ?: (project.findProperty(name) as? String)
+        ?: run {
+            val lp = rootProject.file("local.properties")
+            if (lp.exists()) {
+                val p = java.util.Properties().apply { lp.inputStream().use { load(it) } }
+                p.getProperty(name)
+            } else null
+        }
+        ?: ""
+
+val keystorePassword = propOrEnv("KEYSTORE_PASSWORD")
+val keyAlias = propOrEnv("KEY_ALIAS").ifBlank { "secureguard" }
+val keyPassword = propOrEnv("KEY_PASSWORD").ifBlank { keystorePassword }
 
 /**
  * Reads an API key from gradle.properties / local.properties / -P args
@@ -164,10 +181,12 @@ dependencies {
     implementation(libs.hilt.work)
     kapt(libs.hilt.work.compiler)
 
-    // Room
+    // Room + SQLCipher (at-rest encryption)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite)
 
     // WorkManager (Hintergrund-Agent)
     implementation(libs.androidx.work.runtime.ktx)

@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Default (wird von src/debug und src/release überschrieben) -->
+<!-- Debug: Cleartext für Emulator (10.0.2.2) und LAN-Backends erlaubt -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>

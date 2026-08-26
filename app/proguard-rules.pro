@@ -28,3 +28,9 @@
 # Hilt / Dagger
 -keep class dagger.hilt.** { *; }
 -keep class javax.inject.** { *; }
+
+# SQLCipher
+-keep class net.zetetic.** { *; }
+-keep class net.sqlcipher.** { *; }
+-dontwarn net.zetetic.**
+-dontwarn net.sqlcipher.**
