@@ -38,8 +38,9 @@ android {
 
     defaultConfig {
         applicationId = "com.secureguard.enterprise"
-        minSdk = 26
-        targetSdk = 35
+        // Vollständiger Support: Android 11 (API 30) bis Android 14 (API 34).
+        minSdk = 30
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
 
