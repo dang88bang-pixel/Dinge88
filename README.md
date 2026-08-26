@@ -734,10 +734,15 @@ services:
 ### GitHub Actions
 
 Workflow `.github/workflows/build-release.yml`:
-- **Trigger:** Push auf `main`/`develop`, Tags `v*`, Pull Requests, manuell
-- **JDK:** 17 · **SDK:** android-34 · **Build-Tools:** 34.0.0 · **Gradle:** 8.9
-- **Artefakte:** `secureguard-pro-debug` (Debug-APK), `secureguard-pro` (Release-APK)
-- **Release-Signing:** Optional via `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
+- **Trigger:** **jedes neue GitHub Release** (`release: created`), Tags `v*`, Push auf `main`, Pull Requests, manuell
+- **JDK:** 17 · **SDK:** android-35 · **Build-Tools:** 35.0.0 · **Gradle:** 8.9
+- **Release-Verhalten:** Bei jedem neuen Release wird die signierte `release.apk` (+ `SHA256SUMS.txt`, `BUILD_INFO.txt`) automatisch an das Release gehängt. Wird per Tag-Push noch kein Release existiert, legt der Workflow es an.
+- **Version:** `versionName`/`versionCode` werden im CI aus dem Release-Tag abgeleitet (z. B. `v1.0.8` → `1.0.8`/`10008`)
+- **Artefakte:** `secureguard-pro` (Release-APK), `secureguard-pro-debug` (Debug-APK)
+- **Release-Signing:** Via Secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` (ohne Secrets: unsignierte APK)
+- **API-Keys:** Optionale Secrets `WIGLE_API_KEY`, `OPEN_CHARGE_MAP_KEY`, `NETATMO_TOKEN`, `GOOGLE_API_KEY`, `MQTT_BROKER_URL`, `WEBSOCKET_URL`, `MCP_SERVER_URL` landen (falls gesetzt) in `BuildConfig`
+
+> ⚠️ `release`-Ereignisse nutzen den Workflow aus dem Head des Default-Branches – dieser Workflow muss daher vor dem ersten Release in `main` gemerged sein.
 
 ### Lokal bauen
 

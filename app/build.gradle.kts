@@ -32,16 +32,26 @@ fun apiKey(name: String): String {
     return ""
 }
 
+// Version: lokal 1.0.0/1. In CI setzt der Workflow RELEASE_TAG (z. B. "v1.0.8")
+// aus Tag/Release – dann werden versionCode/versionName automatisch abgeleitet:
+//   versionName = "1.0.8", versionCode = 1*10000 + 0*100 + 8 = 10008
+val releaseTag = (System.getenv("RELEASE_TAG") ?: "").trim().removePrefix("v")
+val tagParts = releaseTag.split(".")
+val tagIsSemver = tagParts.size == 3 && tagParts.all { it.toIntOrNull() != null }
+val tagVersionCode = (tagParts.getOrNull(0)?.toIntOrNull() ?: 1) * 10000 +
+        (tagParts.getOrNull(1)?.toIntOrNull() ?: 0) * 100 +
+        (tagParts.getOrNull(2)?.toIntOrNull() ?: 0)
+
 android {
     namespace = "com.secureguard.enterprise"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.secureguard.enterprise"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = if (tagIsSemver) tagVersionCode else 1
+        versionName = if (tagIsSemver) releaseTag else "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -122,6 +132,18 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "/META-INF/INDEX.LIST"
             excludes += "/META-INF/io.netty.versions.properties"
+        }
+    }
+}
+
+// Release-APK konsequent als "release.apk" benennen (das Release erwartet
+// genau diese Datei; vorher: app-release.apk / app-release-unsigned.apk).
+androidComponents {
+    onVariants { variant ->
+        if (variant.buildType == "release") {
+            variant.outputs.forEach { output ->
+                output.outputFileName.set("release.apk")
+            }
         }
     }
 }
