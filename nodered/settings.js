@@ -1,21 +1,36 @@
 /**
  * SecureGuard Enterprise – Node-RED Settings
  * ------------------------------------------
- * Wird vom offiziellen Node-RED-Image über /data/settings.js geladen und
- * auch für den lokalen Start verwendet (scripts/start-services.sh).
+ * Admin-Login (echte Berechtigung):
+ *   NODE_RED_ADMIN_USER     – Benutzername
+ *   NODE_RED_ADMIN_PASS_HASH – bcrypt-Hash des Passworts
+ *   (wird von scripts/setup-all.sh generiert; Hash mit
+ *    node -e "console.log(require('bcryptjs').hashSync('pass',10))"
+ *    erzeugen – bcryptjs ist in Node-RED enthalten)
  *
  * Flow-Datei: per FLOWS-Umgebungsvariable wählbar:
- *   - nodered/flows.json        (lokaler Broker: localhost:1883)
- *   - nodered/flows.docker.json (Docker-Broker: mqtt:1883 – in
- *                                docker-compose.yml über FLOWS gesetzt)
+ *   - nodered/flows.json            (lokal: Platzhalter werden durch
+ *                                    start-services.sh ersetzt)
+ *   - nodered/flows.docker.json     (Docker-Broker mqtt:1883)
  */
+const adminUser = process.env.NODE_RED_ADMIN_USER;
+const adminPassHash = process.env.NODE_RED_ADMIN_PASS_HASH;
+
 module.exports = {
     uiPort: process.env.PORT || 1880,
     flowFile: process.env.FLOWS || 'flows.json',
     flowFilePretty: true,
 
-    // Entwicklungsumgebung – für Produktion unbedingt adminAuth setzen!
-    adminAuth: undefined,
+    // Admin-Login – nur wenn Zugangsdaten gesetzt sind
+    adminAuth: (adminUser && adminPassHash)
+        ? {
+            type: 'credentials',
+            users: [
+                { username: adminUser, password: adminPassHash, permissions: '*' }
+            ]
+        }
+        : undefined,
+
     httpAdminRoot: '/',
     httpNodeRoot: '/',
     disableEditor: false,

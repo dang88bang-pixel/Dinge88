@@ -35,20 +35,11 @@
         "collapse": false
     },
     {
-        "id": "sg-grp-demo",
-        "type": "ui_group",
-        "name": "Demo-Steuerung",
-        "tab": "sg-tab",
-        "order": 3,
-        "disp": true,
-        "width": "6",
-        "collapse": false
-    },
-    {
         "id": "sg-broker",
         "type": "mqtt-broker",
         "name": "SecureGuard Broker",
-        "broker": "localhost:1883",
+        "broker": "localhost",
+        "port": "1883",
         "clientid": "nodered-secureguard",
         "usetls": false,
         "compatmode": true,
@@ -76,7 +67,11 @@
         "inputs": 0,
         "x": 140,
         "y": 80,
-        "wires": [["sg-fn-telemetry"]]
+        "wires": [
+            [
+                "sg-fn-telemetry"
+            ]
+        ]
     },
     {
         "id": "sg-fn-telemetry",
@@ -91,7 +86,13 @@
         "libs": [],
         "x": 360,
         "y": 80,
-        "wires": [["sg-gauge-battery", "sg-txt-telemetry", "sg-dbg-telemetry"]]
+        "wires": [
+            [
+                "sg-gauge-battery",
+                "sg-txt-telemetry",
+                "sg-dbg-telemetry"
+            ]
+        ]
     },
     {
         "id": "sg-gauge-battery",
@@ -108,7 +109,11 @@
         "format": "{{value}} %",
         "min": "0",
         "max": "100",
-        "colors": ["#D32F2F", "#F9A825", "#2E7D32"],
+        "colors": [
+            "#D32F2F",
+            "#F9A825",
+            "#2E7D32"
+        ],
         "seg1": "",
         "seg2": "",
         "x": 580,
@@ -159,7 +164,11 @@
         "inputs": 0,
         "x": 140,
         "y": 240,
-        "wires": [["sg-fn-alert"]]
+        "wires": [
+            [
+                "sg-fn-alert"
+            ]
+        ]
     },
     {
         "id": "sg-fn-alert",
@@ -174,7 +183,12 @@
         "libs": [],
         "x": 360,
         "y": 240,
-        "wires": [["sg-txt-alerts", "sg-dbg-alert"]]
+        "wires": [
+            [
+                "sg-txt-alerts",
+                "sg-dbg-alert"
+            ]
+        ]
     },
     {
         "id": "sg-txt-alerts",
@@ -220,7 +234,11 @@
         "inputs": 0,
         "x": 140,
         "y": 360,
-        "wires": [["sg-fn-status"]]
+        "wires": [
+            [
+                "sg-fn-status"
+            ]
+        ]
     },
     {
         "id": "sg-fn-status",
@@ -235,7 +253,12 @@
         "libs": [],
         "x": 360,
         "y": 360,
-        "wires": [["sg-txt-status", "sg-dbg-broadcast"]]
+        "wires": [
+            [
+                "sg-txt-status",
+                "sg-dbg-broadcast"
+            ]
+        ]
     },
     {
         "id": "sg-txt-status",
@@ -267,42 +290,6 @@
         "statusType": "auto",
         "x": 580,
         "y": 410,
-        "wires": []
-    },
-    {
-        "id": "sg-btn-demo",
-        "type": "ui_button",
-        "z": "sg-flow",
-        "name": "Demo-Telemetrie senden",
-        "group": "sg-grp-demo",
-        "order": 1,
-        "width": 0,
-        "height": 0,
-        "passthru": false,
-        "tooltip": "Publiziert eine Beispiel-Telemetrie auf secureguard/demo/telemetry",
-        "color": "",
-        "bgcolor": "",
-        "icon": "",
-        "payload": "{\"type\":\"telemetry\",\"battery\":87,\"wifi_rssi\":-41,\"lora_rssi\":-66,\"uptime\":7200,\"ip\":\"192.168.1.50\",\"device\":\"ESP32_SecureGuard\",\"latitude\":52.5201,\"longitude\":13.4049}",
-        "payloadType": "str",
-        "topic": "secureguard/demo/telemetry",
-        "topicType": "str",
-        "className": "",
-        "x": 220,
-        "y": 480,
-        "wires": [["sg-mqtt-out-demo"]]
-    },
-    {
-        "id": "sg-mqtt-out-demo",
-        "type": "mqtt out",
-        "z": "sg-flow",
-        "name": "Publiziere Demo",
-        "topic": "secureguard/demo/telemetry",
-        "qos": "1",
-        "retain": "false",
-        "broker": "sg-broker",
-        "x": 460,
-        "y": 480,
         "wires": []
     }
 ]

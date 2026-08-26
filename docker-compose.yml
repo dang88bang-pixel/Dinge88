@@ -2,9 +2,15 @@
 #   docker compose up --build
 #
 # Enthält: MQTT-Broker (Mosquitto), FastAPI-Backend, Node-RED-Dashboard
-# und einen einmaligen Seed-Dienst (Demo-Datenbank).
+# (Login via NODE_RED_ADMIN_USER/NODE_RED_ADMIN_PASS_HASH) und einen
+# einmaligen db-init-Dienst (legt nur das Schema an – keine Beispieldaten).
 #
 # Lokal ohne Docker:  scripts/setup-all.sh && scripts/start-services.sh
+#   (lokaler Stack aktiviert MQTT-Authentifizierung automatisch)
+#
+# Produktion: Mosquitto-Auth aktivieren (mosquitto_passwd + allow_anonymous
+# false in mosquitto/config/mosquitto.conf) und Credentials als Secrets
+# für backend (MQTT_USERNAME/MQTT_PASSWORD) und nodered setzen.
 
 services:
   # ============ MQTT-BROKER ============
@@ -54,17 +60,17 @@ services:
       retries: 5
       start_period: 10s
 
-  # ============ DEMO-DATEN (einmalig, dann beendet) ============
-  seed:
+  # ============ DB-SCHEMA (einmalig, dann beendet – keine Beispieldaten) ============
+  db-init:
     build: ./backend
-    container_name: secureguard-seed
+    container_name: secureguard-db-init
     environment:
       - DATABASE_PATH=/data/secureguard.db
     volumes:
       - ./backend:/app
       - ./data:/data
       - ./scripts:/scripts
-    command: python /scripts/seed_backend.py
+    command: python /scripts/db-init.py
     depends_on:
       backend:
         condition: service_healthy
@@ -81,7 +87,7 @@ services:
     environment:
       - TZ=Europe/Berlin
       - FLOWS=flows.docker.json
-      - NODE_RED_CREDENTIAL_SECRET=secureguard-demo
+      - NODE_RED_CREDENTIAL_SECRET=secureguard-secret
     volumes:
       - ./nodered:/data
     depends_on:

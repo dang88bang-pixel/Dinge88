@@ -34,7 +34,7 @@ fun apiKey(name: String): String {
 
 android {
     namespace = "com.secureguard.enterprise"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.secureguard.enterprise"
@@ -58,6 +58,8 @@ android {
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
         buildConfigField("String", "WEBSOCKET_URL", "\"${apiKey("WEBSOCKET_URL")}\"")
         buildConfigField("String", "MCP_SERVER_URL", "\"${apiKey("MCP_SERVER_URL")}\"")
+        buildConfigField("String", "MQTT_USERNAME", "\"${apiKey("MQTT_USERNAME")}\"")
+        buildConfigField("String", "MQTT_PASSWORD", "\"${apiKey("MQTT_PASSWORD")}\"")
     }
 
     val releaseSigning = signingConfigs.create("release") {

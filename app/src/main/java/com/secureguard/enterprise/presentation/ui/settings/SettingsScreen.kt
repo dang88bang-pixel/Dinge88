@@ -160,6 +160,28 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(8.dp))
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.mqttUsername,
+                            onValueChange = { user ->
+                                viewModel.updateEndpointFields(mqttUsername = user)
+                            },
+                            label = { Text("MQTT-Benutzername (Broker-Auth)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.mqttPassword,
+                            onValueChange = { pass ->
+                                viewModel.updateEndpointFields(mqttPassword = pass)
+                            },
+                            label = { Text("MQTT-Passwort") },
+                            singleLine = true,
+                            visualTransformation =
+                                androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
                         androidx.compose.material3.Button(
                             onClick = {
                                 viewModel.applyEndpoints(

@@ -21,6 +21,8 @@ object ServiceEndpoints {
     private const val KEY_MQTT = "endpoint_mqtt_url"
     private const val KEY_WS = "endpoint_ws_url"
     private const val KEY_MCP = "endpoint_mcp_url"
+    private const val KEY_MQTT_USER = "endpoint_mqtt_username"
+    private const val KEY_MQTT_PASS = "endpoint_mqtt_password"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -43,6 +45,16 @@ object ServiceEndpoints {
         pref(context, KEY_MCP)
             ?: BuildConfig.MCP_SERVER_URL.ifBlank { "http://10.0.2.2:8000" }
 
+    /** MQTT-Benutzername (Broker-Auth, optional). */
+    fun mqttUsername(context: Context): String =
+        pref(context, KEY_MQTT_USER)
+            ?: BuildConfig.MQTT_USERNAME
+
+    /** MQTT-Passwort (Broker-Auth, optional). */
+    fun mqttPassword(context: Context): String =
+        pref(context, KEY_MQTT_PASS)
+            ?: BuildConfig.MQTT_PASSWORD
+
     /** HTTP-Basis-URL des Backends, abgeleitet aus der WS-URL. */
     fun backendHttpUrl(context: Context): String {
         val ws = webSocketUrl(context)
@@ -53,12 +65,21 @@ object ServiceEndpoints {
     }
 
     /** Speichert Laufzeit-Overrides (leerer String entfernt den Override). */
-    fun save(context: Context, mqtt: String?, ws: String?, mcp: String?) {
+    fun save(
+        context: Context,
+        mqtt: String?,
+        ws: String?,
+        mcp: String?,
+        mqttUser: String? = null,
+        mqttPass: String? = null
+    ) {
         prefs(context).edit()
             .apply {
                 if (mqtt.isNullOrBlank()) remove(KEY_MQTT) else putString(KEY_MQTT, mqtt.trim())
                 if (ws.isNullOrBlank()) remove(KEY_WS) else putString(KEY_WS, ws.trim())
                 if (mcp.isNullOrBlank()) remove(KEY_MCP) else putString(KEY_MCP, mcp.trim())
+                if (mqttUser.isNullOrBlank()) remove(KEY_MQTT_USER) else putString(KEY_MQTT_USER, mqttUser.trim())
+                if (mqttPass.isNullOrBlank()) remove(KEY_MQTT_PASS) else putString(KEY_MQTT_PASS, mqttPass)
             }
             .apply()
     }

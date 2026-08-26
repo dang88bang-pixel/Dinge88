@@ -82,6 +82,13 @@ class MqttService @Inject constructor(
             isAutomaticReconnect = true
             keepAliveInterval = MqttConfig.KEEP_ALIVE_SECONDS
             connectionTimeout = MqttConfig.CONNECT_TIMEOUT_SECONDS
+            // MQTT-Authentifizierung (falls Broker-Credentials konfiguriert)
+            val user = ServiceEndpoints.mqttUsername(context)
+            val pass = ServiceEndpoints.mqttPassword(context)
+            if (user.isNotBlank()) {
+                userName = user
+                password = pass.toCharArray()
+            }
         }
 
         try {

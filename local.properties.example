@@ -19,6 +19,10 @@ GOOGLE_API_KEY=your_google_key_here
 MQTT_BROKER_URL=tcp://10.0.2.2:1883
 WEBSOCKET_URL=ws://10.0.2.2:8000/ws
 MCP_SERVER_URL=http://10.0.2.2:8000
+# MQTT-Broker-Authentifizierung – Werte werden vom lokalen Setup generiert
+# und in ~/.secureguard-runtime/credentials.env gespeichert (niemals einchecken)
+MQTT_USERNAME=secureguard
+MQTT_PASSWORD=your_mqtt_password_here
 
 # LoRa/Optik/Urban/Crowd-Endpunkte
 LORA_GATEWAY_URL=http://lora-gateway.example.com:8080

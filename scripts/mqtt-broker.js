@@ -29,6 +29,22 @@ const MQTT_PORT = Number(process.env.MQTT_PORT || 1883);
 const MQTT_WS_PORT = Number(process.env.MQTT_WS_PORT || 9001);
 const HOST = process.env.MQTT_HOST || '0.0.0.0';
 
+// ---- Authentifizierung (echte Broker-Berechtigungen) ----
+// Credentials kommen aus SG_MQTT_USERNAME / SG_MQTT_PASSWORD (Umgebung).
+// Ohne Konfiguration bleibt der Broker offen (nur lokale Entwicklung).
+const SG_USER = process.env.SG_MQTT_USERNAME || '';
+const SG_PASS = process.env.SG_MQTT_PASSWORD || '';
+if (SG_USER && SG_PASS) {
+  aedes.authenticate = (client, username, password, done) => {
+    const ok = username === SG_USER && String(password || '') === SG_PASS;
+    if (!ok) console.warn(`[broker] Auth abgelehnt für: ${username}`);
+    done(null, ok);
+  };
+  console.log(`[broker] Authentifizierung AKTIV (Benutzer: ${SG_USER})`);
+} else {
+  console.warn('[broker] Keine SG_MQTT_USERNAME/SG_MQTT_PASSWORD gesetzt – offener Broker (nur lokal)!');
+}
+
 aedes.on('client', (client) => {
   console.log(`[broker] Client verbunden: ${client.id}`);
 });

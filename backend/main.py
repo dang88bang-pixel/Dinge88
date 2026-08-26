@@ -38,6 +38,8 @@ except ImportError:
 
 DB_PATH = os.environ.get("DATABASE_PATH", "secureguard.db")
 MQTT_BROKER = os.environ.get("MQTT_BROKER", "mqtt:1883")
+MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "")
+MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
 
 app = FastAPI(title="SecureGuard API", version="1.0.0")
 
@@ -178,6 +180,8 @@ def get_mqtt_client():
             host, _, port = MQTT_BROKER.partition(":")
             _mqtt_client = mqtt.Client(client_id="secureguard-backend")
             _mqtt_client.reconnect_delay_set(min_delay=1, max_delay=30)
+            if MQTT_USERNAME:
+                _mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
             _mqtt_client.connect(host, int(port or 1883), 60)
             _mqtt_client.loop_start()
         except Exception:

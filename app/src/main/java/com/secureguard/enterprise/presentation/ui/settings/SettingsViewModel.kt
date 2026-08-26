@@ -29,6 +29,8 @@ data class SettingsUiState(
     val mqttUrl: String = "",
     val websocketUrl: String = "",
     val mcpUrl: String = "",
+    val mqttUsername: String = "",
+    val mqttPassword: String = "",
     val statusMessage: String? = null
 )
 
@@ -58,7 +60,9 @@ class SettingsViewModel @Inject constructor(
         organization = prefs.getString(KEY_ORG, "SecureGuard") ?: "SecureGuard",
         mqttUrl = ServiceEndpoints.mqttUrl(context),
         websocketUrl = ServiceEndpoints.webSocketUrl(context),
-        mcpUrl = ServiceEndpoints.mcpUrl(context)
+        mcpUrl = ServiceEndpoints.mcpUrl(context),
+        mqttUsername = ServiceEndpoints.mqttUsername(context),
+        mqttPassword = ServiceEndpoints.mqttPassword(context)
     )
 
     private fun save(transform: (SettingsUiState) -> SettingsUiState) {
@@ -105,28 +109,39 @@ class SettingsViewModel @Inject constructor(
     fun updateEndpointFields(
         mqttUrl: String? = null,
         websocketUrl: String? = null,
-        mcpUrl: String? = null
+        mcpUrl: String? = null,
+        mqttUsername: String? = null,
+        mqttPassword: String? = null
     ) {
         _uiState.update {
             it.copy(
                 mqttUrl = mqttUrl ?: it.mqttUrl,
                 websocketUrl = websocketUrl ?: it.websocketUrl,
-                mcpUrl = mcpUrl ?: it.mcpUrl
+                mcpUrl = mcpUrl ?: it.mcpUrl,
+                mqttUsername = mqttUsername ?: it.mqttUsername,
+                mqttPassword = mqttPassword ?: it.mqttPassword
             )
         }
     }
 
     /** Endpunkt-Werte aus den Textfeldern übernehmen und Verbindungen neu aufbauen. */
     fun applyEndpoints(mqtt: String, ws: String, mcp: String) {
-        ServiceEndpoints.save(context, mqtt, ws, mcp)
+        applyEndpoints(mqtt, ws, mcp, _uiState.value.mqttUsername, _uiState.value.mqttPassword)
+    }
+
+    /** Endpunkt-Werte inkl. MQTT-Credentials übernehmen und Verbindungen neu aufbauen. */
+    fun applyEndpoints(mqtt: String, ws: String, mcp: String, user: String, pass: String) {
+        ServiceEndpoints.save(context, mqtt, ws, mcp, user, pass)
         _uiState.update {
             it.copy(
                 mqttUrl = ServiceEndpoints.mqttUrl(context),
                 websocketUrl = ServiceEndpoints.webSocketUrl(context),
-                mcpUrl = ServiceEndpoints.mcpUrl(context)
+                mcpUrl = ServiceEndpoints.mcpUrl(context),
+                mqttUsername = ServiceEndpoints.mqttUsername(context),
+                mqttPassword = ServiceEndpoints.mqttPassword(context)
             )
         }
-        // Verbindungen mit den neuen URLs neu aufbauen
+        // Verbindungen mit den neuen URLs/Credentials neu aufbauen
         mqttService.disconnect()
         mqttService.connect()
         webSocketService.disconnect()

@@ -1,10 +1,14 @@
 package com.secureguard.enterprise
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.secureguard.enterprise.presentation.navigation.SecureGuardApp
@@ -21,9 +25,19 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var authManager: AuthManager
     @Inject lateinit var nfcService: NfcService
 
+    /**
+     * Runtime-Berechtigungen (BLE/WiFi-Scan, Standort, Benachrichtigungen).
+     * Ohne explizite Erlaubnis funktionieren die Detection-Kanäle nicht –
+     * deshalb werden die fehlenden Berechtigungen beim Start angefragt.
+     */
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* Ergebnis wird bei nächster Aktion erneut geprüft */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestRuntimePermissions()
         setContent {
             SecureGuardTheme {
                 val authState by authManager.state.collectAsState()
@@ -36,6 +50,27 @@ class MainActivity : ComponentActivity() {
                     SecureGuardApp()
                 }
             }
+        }
+    }
+
+    /** Fragt alle für den Multi-Kanal-Suchbetrieb nötigen Runtime-Berechtigungen an. */
+    private fun requestRuntimePermissions() {
+        val needed = buildList {
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(Manifest.permission.BLUETOOTH_SCAN)
+                add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+                add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            }
+        }.filter {
+            checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (needed.isNotEmpty()) {
+            permissionLauncher.launch(needed.toTypedArray())
         }
     }
 

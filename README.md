@@ -20,7 +20,7 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 - [Echtzeit-Kanäle](#-echtzeit-kanäle-3)
 - [Externe APIs (8)](#-externe-apis-8)
 - [Services (30)](#-services-30)
-- [UI-Screens (13)](#-ui-screens-13)
+- [UI-Screens (17)](#-ui-screens-13)
 - [Datenmodelle (8)](#-datenmodelle-8)
 - [Datenbank (Room v2)](#-datenbank-room-v2)
 - [Sicherheit & Berechtigungen](#-sicherheit--berechtigungen)
@@ -370,7 +370,7 @@ secureguard/{MAC}/command  (publish für spezifisches Asset)
 
 ---
 
-## 📱 UI-Screens (13)
+## 📱 UI-Screens (17)
 
 | Screen | ViewModel | Route | Funktionen |
 |--------|-----------|-------|-----------|
@@ -386,6 +386,10 @@ secureguard/{MAC}/command  (publish für spezifisches Asset)
 | **SettingsScreen** | SettingsViewModel | `settings` | Profil (editierbar), Notifications, Verbindungen, DSGVO, Backup/CSV/PDF, ForegroundService |
 | **NodeStatusScreen** | NodeStatusViewModel | `node_status` | 11 Nodes: Status, Toggle, Test-Suche |
 | **TempMailScreen** | TempMailViewModel | `temp_mail` | Inbox erstellen, OTP abrufen, Log |
+| **TerminalScreen** | TerminalViewModel | `terminal` | MQTT/WebSocket-Konsole, Live-Log |
+| **SensorFusionScreen** | SensorFusionViewModel | `sensor_fusion` | Sensorfusion, Kanal-Kombinationen |
+| **SecurityScreen** | SecurityViewModel | `security` | Security & Integrity Center |
+| **Esp32ConfigScreen** | Esp32ConfigViewModel | `esp32_config` | ESP32-Gateway-Konfiguration (NVS via MQTT) |
 | **LockScreen** | – | (Modal) | PIN-Eingabe, Versuchsanzeige |
 
 ---
@@ -437,7 +441,7 @@ getWhitelistedAssets, getAllAssets, getAssetByMac, getAssetById, resolveAsset, u
 
 ## 🔒 Sicherheit & Berechtigungen
 
-### Android-Permissions (21)
+### Android-Permissions (22)
 
 | Permission | Genutzt von | Zweck |
 |-----------|-------------|-------|
@@ -447,6 +451,7 @@ getWhitelistedAssets, getAllAssets, getAssetByMac, getAssetById, resolveAsset, u
 | `BLUETOOTH_ADMIN` (≤API 30) | BleService | BLE-Scan starten |
 | `BLUETOOTH_SCAN` (≥API 31) | BleService | BLE-Scan |
 | `BLUETOOTH_CONNECT` (≥API 31) | TelemetryService | GATT-Verbindung |
+| `NEARBY_WIFI_DEVICES` (≥API 33) | WifiService | WiFi-Scan ohne Standort-Ableitung |
 | `ACCESS_WIFI_STATE` | WifiService | WiFi-Scan-Ergebnisse |
 | `CHANGE_WIFI_STATE` | WifiService | WiFi-Scan starten |
 | `ACCESS_FINE_LOCATION` | BleService, WifiService, SatelliteService | BLE/WiFi-Scan + GPS |
@@ -466,6 +471,19 @@ getWhitelistedAssets, getAllAssets, getAssetByMac, getAssetById, resolveAsset, u
 ### Hardware-Features (optional)
 
 `bluetooth_le`, `camera`, `location.gps`, `nfc`, `usb.host` – alle `required="false"`
+
+### Runtime-Berechtigungen (App-Start)
+
+`MainActivity.requestRuntimePermissions()` fragt beim Start automatisch alle
+funktional nötigen Runtime-Permissions an:
+
+- Standort: `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`
+- BLE (≥API 31): `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`
+- API 33+: `POST_NOTIFICATIONS`, `NEARBY_WIFI_DEVICES`
+
+Ohne diese Erlaubnisse bleiben die betroffenen Detection-Kanäle
+(BLE/WiFi/GPS) inaktiv – die Abfrage stellt die vollständige Funktion
+direkt nach der Installation sicher.
 
 ### Sicherheitsmechanismen
 
@@ -584,36 +602,43 @@ services:
   backend:     # FastAPI + Uvicorn
     ports: 8000
     depends_on: mqtt (healthy)
-  seed:        # befüllt data/secureguard.db mit Demo-Daten (einmalig)
+  db-init:     # legt nur das Schema an (keine Beispieldaten)
   nodered:     # Node-RED + Dashboard (flows.docker.json)
     ports: 1880
 ```
 
-**Start:** `docker compose up --build`
+**Start:** `docker compose up --build` – MQTT-Broker (Mosquitto) und
+Node-RED mit Dashboard. Authentifizierung für den Produktivbetrieb:
+`mosquitto_passwd` + `allow_anonymous false` und Credentials als Secrets
+(`MQTT_USERNAME`/`MQTT_PASSWORD` für backend, `NODE_RED_ADMIN_USER`/
+`NODE_RED_ADMIN_PASS_HASH` für Node-RED).
 
 ### Komplett-Setup ohne Docker (lokaler Pilot-Stack)
 
 ```bash
 # 1. Alle Abhängigkeiten installieren (Python-venv, MQTT-Broker, Node-RED,
-#    Demo-Datenbank → data/secureguard.db)
+#    Datenbank-Schema → data/secureguard.db) + Zugangsdaten generieren
 ./scripts/setup-all.sh
 
-# 2. Dienste starten (Broker 1883/9001, Backend 8000, Node-RED 1880,
-#    Demo-Telemetrie-Simulator)
+# 2. Dienste starten (Broker 1883/9001, Backend 8000, Node-RED 1880)
 ./scripts/start-services.sh
 ```
 
 | Dienst | URL | Zweck |
 |--------|-----|-------|
-| MQTT (TCP) | `tcp://127.0.0.1:1883` | App, ESP32-Gateways, Backend |
+| MQTT (TCP) | `tcp://127.0.0.1:1883` | App, ESP32-Gateways, Backend (**Auth aktiv**) |
 | MQTT (WebSocket) | `ws://127.0.0.1:9001` | Browser-Dashboards |
 | FastAPI | `http://127.0.0.1:8000` | REST + `/docs` + `/api/health` |
-| Node-RED | `http://127.0.0.1:1880/ui` | Live-Dashboard (Telemetrie, Alarme) |
-| Demo-Simulator | – | publiziert alle 15 s Telemetrie |
+| Node-RED | `http://127.0.0.1:1880/ui` | Live-Dashboard (Telemetrie, Alarme, **Login geschützt**) |
 
-Die Beispiel-Telemetrie läuft über `secureguard/+/telemetry` in den Broker,
-das Backend bridged sie an `ws://…/ws` und Node-RED zeigt sie im Dashboard
-(Batterie-Gauge, Alarme, Systemstatus).
+Die Daten fließen ausschließlich von **echten Quellen**: Assets/Gateways
+(ESP32-Firmware, BLE-Adapter, App) publizieren auf `secureguard/+/telemetry`;
+das Backend bridged diese Nachrichten an `ws://…/ws` (App-Echtzeitkanal) und
+Node-RED zeigt sie im Dashboard (Batterie-Gauge, Alarme, Systemstatus).
+Es gibt **keine simulierten oder Demo-Komponenten**.
+
+Zugangsdaten des lokalen Stacks: `~/.secureguard-runtime/credentials.env`
+(von `setup-all.sh` generiert, niemals einchecken).
 
 ---
 
@@ -627,7 +652,7 @@ das Backend bridged sie an `ws://…/ws` und Node-RED zeigt sie im Dashboard
 | Kotlin | 2.0.21 |
 | Gradle | 8.9 |
 | JDK | 17 |
-| compileSdk / targetSdk | 34 |
+| compileSdk / targetSdk | 35 |
 | minSdk | 26 (Android 8) |
 
 ### AndroidX Core
