@@ -7,6 +7,7 @@ import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.model.Detection
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.util.Date
 
 /**
@@ -35,6 +36,9 @@ interface SecureGuardRepository {
         lon: Double? = null
     )
     suspend fun deleteAsset(id: String)
+
+    /** One-shot whitelist snapshot (for sync/export without collecting Flow). */
+    suspend fun snapshotWhitelisted(): List<Asset>
 
     // ---- Detections ----
     fun getDetections(mac: String): Flow<List<Detection>>
@@ -118,6 +122,10 @@ class SecureGuardRepositoryImpl(
         }
         assetDao.deleteById(id)
     }
+
+    override suspend fun snapshotWhitelisted(): List<Asset> =
+        assetDao.observeWhitelisted().first()
+
 
     override fun getDetections(mac: String): Flow<List<Detection>> =
         detectionDao.observeForAsset(mac)

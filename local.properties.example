@@ -1,18 +1,41 @@
-# SecureGuard Enterprise - Backend-Konfiguration
-# Kopiere diese Datei zu local.properties und fülle die Werte aus GitHub Secrets
+# SecureGuard Enterprise - lokale Build-/Backend-Konfiguration
+# Kopiere diese Datei zu local.properties und fülle die Werte aus.
+# local.properties wird NICHT committed (.gitignore).
+#
+# Offline-Setup: ./scripts/offline/install-offline.sh setzt sdk.dir automatisch.
+# Runtime-Overrides: in der App unter Einstellungen → „Backend & Broker".
+# Details: docs/OFFLINE_SETUP.md · docs/READY_TO_GO_CHECKLISTE.md
 
-# API-Keys (aus GitHub Secrets)
+# Android SDK (Gradle) – absolut, Forward-Slashes
+# Linux/macOS Beispiel:
+sdk.dir=/home/USER/.secureguard/android-sdk
+# Windows Beispiel:
+# sdk.dir=C:/Users/USER/.secureguard/android-sdk
+
+# ---- API-Keys (niemals committen) ----
 WIGLE_API_KEY=your_wigle_key_here
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
 NETATMO_TOKEN=your_netatmo_token_here
 GOOGLE_API_KEY=your_google_key_here
-# Backend-Endpunkte (für Pilot)
-MQTT_BROKER_URL=mqtt://broker.example.com:1883
-WEBSOCKET_URL=ws://api.example.com:8000/ws
-MCP_SERVER_URL=http://api.example.com:8000
 
-# LoRa/Optik/Urban/Crowd-Endpunkte
+# ---- Backend / Broker (Build-Defaults; zur Laufzeit in Settings überschreibbar) ----
+# Paho erwartet tcp:// oder ssl:// (mqtt:// wird automatisch normalisiert)
+MQTT_BROKER_URL=tcp://10.0.2.2:1883
+MQTT_USERNAME=
+MQTT_PASSWORD=
+WEBSOCKET_URL=ws://10.0.2.2:8000/ws
+MCP_SERVER_URL=http://10.0.2.2:8000
+# Optional explizit (sonst aus WEBSOCKET_URL abgeleitet):
+BACKEND_BASE_URL=http://10.0.2.2:8000
+
+# ---- Optionale Gateways / Proxies ----
 LORA_GATEWAY_URL=http://lora-gateway.example.com:8080
 YOLO_SERVER_URL=http://yolo-inference.example.com:5000
 OPEN_DATA_API_URL=https://demo.ckan.org/api/3
 FIND_MY_PROXY_URL=https://find-my-proxy.example.com
+
+# ---- Release Signing (optional, von scripts/create-release-keystore.sh) ----
+# Passwörter vom Anwender setzen – Script generiert keine
+# KEYSTORE_PASSWORD=
+# KEY_ALIAS=secureguard
+# KEY_PASSWORD=

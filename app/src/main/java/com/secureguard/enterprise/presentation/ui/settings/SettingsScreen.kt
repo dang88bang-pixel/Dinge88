@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -27,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -120,6 +122,103 @@ fun SettingsScreen(
 
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("🔌 Backend & Broker (Runtime)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Ohne Rebuild änderbar. Speichern reconnectet MQTT/WebSocket.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.mqttBrokerUrl,
+                            onValueChange = viewModel::setMqttBrokerUrl,
+                            label = { Text("MQTT Broker (tcp://host:1883)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.OutlinedTextField(
+                                value = state.mqttUsername,
+                                onValueChange = viewModel::setMqttUsername,
+                                label = { Text("MQTT User") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            androidx.compose.material3.OutlinedTextField(
+                                value = state.mqttPassword,
+                                onValueChange = viewModel::setMqttPassword,
+                                label = { Text("MQTT Pass") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.websocketUrl,
+                            onValueChange = viewModel::setWebsocketUrl,
+                            label = { Text("WebSocket (ws://host:8000/ws)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.backendBaseUrl,
+                            onValueChange = viewModel::setBackendBaseUrl,
+                            label = { Text("Backend HTTP (http://host:8000)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.mcpServerUrl,
+                            onValueChange = viewModel::setMcpServerUrl,
+                            label = { Text("MCP / Temp-Mail Server") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.loraGatewayUrl,
+                            onValueChange = viewModel::setLoraGatewayUrl,
+                            label = { Text("LoRa Gateway URL") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.yoloServerUrl,
+                            onValueChange = viewModel::setYoloServerUrl,
+                            label = { Text("YOLO Server URL") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.openDataApiUrl,
+                            onValueChange = viewModel::setOpenDataApiUrl,
+                            label = { Text("CKAN / Open Data URL") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.findMyProxyUrl,
+                            onValueChange = viewModel::setFindMyProxyUrl,
+                            label = { Text("Find-My Proxy URL") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.Button(
+                                onClick = { viewModel.saveEndpoints() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Endpunkte speichern") }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.syncBackend() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Backend-Sync") }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("🛡️ Datenschutz (DSGVO)",
                             style = MaterialTheme.typography.titleMedium)
@@ -138,10 +237,34 @@ fun SettingsScreen(
                         Text(
                             "Alle Ortungsdaten werden ausschließlich lokal auf dem Gerät " +
                                 "gespeichert. Externe Kanäle (Crowd/Satellit) sind standardmäßig " +
-                                "deaktiviert und bedürfen ausdrücklicher Zustimmung.",
+                                "deaktiviert und bedürfen ausdrücklicher Zustimmung. " +
+                                "Passwörter und PINs legt der Anwender selbst fest.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Löschkonzept: Detektionen/Alerts/Audit standardmäßig 90 Tage. " +
+                                "Datenauskunft (Art. 15) und vollständige Löschung (Art. 17) unten.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.Button(
+                                onClick = { viewModel.exportDataSubjectAccess() },
+                                modifier = Modifier.weight(1f).testTag("privacy_export_button")
+                            ) { Text("Datenauskunft") }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.applyDataRetention() },
+                                modifier = Modifier.weight(1f).testTag("privacy_retention_button")
+                            ) { Text("Retention 90d") }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { viewModel.eraseAllLocalData(alsoClearAuth = false) },
+                            modifier = Modifier.fillMaxWidth().testTag("privacy_erase_button")
+                        ) { Text("Alle lokalen Daten löschen (Art. 17)") }
                     }
                 }
             }
@@ -186,6 +309,15 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
                                 .clickable { navController.navigate(Routes.ESP32_CONFIG) }
+                        )
+                        HorizontalDivider()
+                        Text(
+                            "System-Health / Monitoring",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.HEALTH) }
                         )
                         HorizontalDivider()
                         Spacer(Modifier.height(8.dp))

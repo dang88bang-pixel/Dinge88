@@ -1,27 +1,35 @@
 # SecureGuard Enterprise – Backend-Stack
-#   docker compose up --build
+#   ./scripts/start-stack.sh
+#   docker compose up --build -d
 #
 # Enthält: MQTT-Broker (Mosquitto), FastAPI-Backend, Node-RED-Dashboard.
+# Passwörter/MQTT-Auth: Anwender setzt selbst (siehe mosquitto/config/*.example).
 
 services:
-  # ============ MQTT-BROKER ============
   mqtt:
     image: eclipse-mosquitto:2.0
     container_name: secureguard-mqtt
+    restart: unless-stopped
     ports:
-      - "1883:1883"   # MQTT (App/Gateways)
-      - "9001:9001"   # MQTT over WebSocket (optional)
+      - "1883:1883"
+      - "9001:9001"
     volumes:
       - ./mosquitto/config:/mosquitto/config:ro
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
     networks:
       - secureguard-network
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -i healthcheck -W 3 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
-  # ============ BACKEND-API ============
   backend:
     build: ./backend
     container_name: secureguard-backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
@@ -35,19 +43,34 @@ services:
     networks:
       - secureguard-network
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)\""]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
-  # ============ NODE-RED (DASHBOARD) ============
   nodered:
     image: nodered/node-red:latest
     container_name: secureguard-nodered
+    restart: unless-stopped
     ports:
       - "1880:1880"
     environment:
       - TZ=Europe/Berlin
     volumes:
       - ./nodered:/data
+    depends_on:
+      - mqtt
+      - backend
     networks:
       - secureguard-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:1880/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
 networks:
   secureguard-network:

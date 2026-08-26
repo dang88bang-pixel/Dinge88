@@ -78,8 +78,10 @@ class AuthManager @Inject constructor(
             _state.value = _state.value.copy(locked = false, attemptsRemaining = MAX_ATTEMPTS)
         } else {
             val remaining = (_state.value.attemptsRemaining - 1).coerceAtLeast(0)
+            // Bei falscher PIN bleibt die App IMMER gesperrt.
+            // remaining==0 → zusätzlich Hard-Lock (keine weiteren Versuche bis Neustart/Reset).
             _state.value = _state.value.copy(
-                locked = remaining <= 0,
+                locked = true,
                 attemptsRemaining = remaining
             )
             if (remaining <= 0) {

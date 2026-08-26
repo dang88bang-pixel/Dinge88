@@ -2,6 +2,7 @@ package com.secureguard.enterprise.services
 
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.secureguard.enterprise.config.EndpointConfig
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -19,14 +20,14 @@ import javax.inject.Singleton
 /**
  * MQTT-Client (Paho) für Echtzeit-Kommunikation mit Assets/Gateways.
  *
- * Implementiert mit [MqttAsyncClient] aus `org.eclipse.paho.client.mqttv3`
- * (nicht mit dem veralteten `paho.android.service` – siehe
- * IMPLEMENTIERUNGS_INVENTUR.md „Abweichungen"). Der Client verbindet sich
- * selbstständig, abonniert Telemetrie-/Alert-Themen und emittiert
- * [MqttEvent]s, die vom Agenten gesammelt werden.
+ * Broker-URL und optionale Credentials kommen aus [EndpointConfig]
+ * (Settings zur Laufzeit überschreibbar). Unterstützt User/Pass für
+ * abgesicherte Broker (Mosquitto allow_anonymous false).
  */
 @Singleton
-class MqttService @Inject constructor() {
+class MqttService @Inject constructor(
+    private val endpointConfig: EndpointConfig
+) {
 
     private val gson = Gson()
 
@@ -37,13 +38,20 @@ class MqttService @Inject constructor() {
 
     val isConnected: Boolean get() = client?.isConnected == true
 
+    val currentBrokerUrl: String get() = endpointConfig.mqttBrokerUrl
+
     /** Verbindet mit dem Broker und abonniert die Standard-Themen. */
     @Synchronized
     fun connect() {
         if (client?.isConnected == true) return
+        val broker = endpointConfig.mqttBrokerUrl
+        if (broker.isBlank()) {
+            _events.tryEmit(MqttEvent.Error("Keine MQTT-Broker-URL konfiguriert"))
+            return
+        }
         val clientId = "${MqttConfig.CLIENT_ID_PREFIX}_${System.currentTimeMillis()}"
         val newClient = try {
-            MqttAsyncClient(MqttConfig.BROKER_URL, clientId, MemoryPersistence())
+            MqttAsyncClient(broker, clientId, MemoryPersistence())
         } catch (e: Exception) {
             _events.tryEmit(MqttEvent.Error("MQTT-Client konnte nicht erstellt werden: ${e.message}"))
             return
@@ -72,11 +80,23 @@ class MqttService @Inject constructor() {
             }
         })
 
+        val user = endpointConfig.mqttUsername
+        val pass = endpointConfig.mqttPassword
         val options = MqttConnectOptions().apply {
             isCleanSession = true
             isAutomaticReconnect = true
             keepAliveInterval = MqttConfig.KEEP_ALIVE_SECONDS
             connectionTimeout = MqttConfig.CONNECT_TIMEOUT_SECONDS
+            if (user.isNotBlank()) {
+                userName = user
+                if (pass.isNotEmpty()) {
+                    password = pass.toCharArray()
+                }
+            }
+            // ssl:// Broker → Default JVM Truststore (System-CAs)
+            if (broker.startsWith("ssl://", ignoreCase = true)) {
+                socketFactory = javax.net.ssl.SSLSocketFactory.getDefault()
+            }
         }
 
         try {
@@ -96,6 +116,13 @@ class MqttService @Inject constructor() {
         } catch (e: Exception) {
             _events.tryEmit(MqttEvent.Error("MQTT-connect-Fehler: ${e.message}"))
         }
+    }
+
+    /** Trennt und verbindet neu (nach Settings-Änderung). */
+    @Synchronized
+    fun reconnect() {
+        disconnect()
+        connect()
     }
 
     /** Abonniert ein Topic (QoS siehe [MqttConfig]). */
@@ -131,6 +158,10 @@ class MqttService @Inject constructor() {
     fun disconnect() {
         try {
             client?.disconnect()
+        } catch (_: Exception) {
+        }
+        try {
+            client?.close()
         } catch (_: Exception) {
         }
         client = null

@@ -31,7 +31,7 @@ class LearningEngine @Inject constructor() {
 
     // ============ MUSTERERKENNUNG ============
 
-    fun analyzePatterns(experiences: List<Experience>): List<Pattern> {
+    fun analyzePatterns(experiences: List<Experience> = experienceMemory.toList()): List<Pattern> {
         val patterns = mutableListOf<Pattern>()
         patterns += analyzeTemporalPatterns(experiences)
         patterns += analyzeSpatialPatterns(experiences)

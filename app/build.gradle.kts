@@ -9,12 +9,29 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// Keystore from environment (CI) or local.properties; falls back to the debug
-// keystore so `assembleRelease` always produces an installable signed APK.
-val keystoreFile = rootProject.file("secureguard-keystore.jks")
-val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-val keyAlias = System.getenv("KEY_ALIAS") ?: "secureguard"
-val keyPassword = System.getenv("KEY_PASSWORD") ?: keystorePassword
+// Keystore: CI decodes to app/secureguard-keystore.jks; local may use root.
+// Env KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD or local.properties.
+val keystoreFile = sequenceOf(
+    rootProject.file("app/secureguard-keystore.jks"),
+    rootProject.file("secureguard-keystore.jks"),
+    rootProject.file("release-keystore.jks")
+).firstOrNull { it.exists() } ?: rootProject.file("app/secureguard-keystore.jks")
+
+fun propOrEnv(name: String, env: String = name): String =
+    System.getenv(env)
+        ?: (project.findProperty(name) as? String)
+        ?: run {
+            val lp = rootProject.file("local.properties")
+            if (lp.exists()) {
+                val p = java.util.Properties().apply { lp.inputStream().use { load(it) } }
+                p.getProperty(name)
+            } else null
+        }
+        ?: ""
+
+val keystorePassword = propOrEnv("KEYSTORE_PASSWORD")
+val keyAlias = propOrEnv("KEY_ALIAS").ifBlank { "secureguard" }
+val keyPassword = propOrEnv("KEY_PASSWORD").ifBlank { keystorePassword }
 
 /**
  * Reads an API key from gradle.properties / local.properties / -P args
@@ -34,7 +51,7 @@ fun apiKey(name: String): String {
 
 android {
     namespace = "com.secureguard.enterprise"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.secureguard.enterprise"
@@ -48,16 +65,24 @@ android {
             useSupportLibrary = true
         }
 
-        // ============ EXTERNE API-KEYS (BuildConfig) ============
-        // Werte kommen aus gradle.properties / local.properties (siehe local.properties.example).
-        // Leere Werte sind erlaubt – die zugehörigen API-Aufrufe liefern dann null/leer.
+        // ============ EXTERNE API-KEYS & ENDPUNKTE (BuildConfig) ============
+        // Werte aus gradle.properties / local.properties (siehe local.properties.example).
+        // Leere Werte sind erlaubt – die zugehörigen Aufrufe liefern dann null/leer
+        // bzw. nutzen Runtime-Overrides aus den App-Einstellungen.
         buildConfigField("String", "WIGLE_API_KEY", "\"${apiKey("WIGLE_API_KEY")}\"")
         buildConfigField("String", "OPEN_CHARGE_MAP_KEY", "\"${apiKey("OPEN_CHARGE_MAP_KEY")}\"")
         buildConfigField("String", "NETATMO_TOKEN", "\"${apiKey("NETATMO_TOKEN")}\"")
         buildConfigField("String", "GOOGLE_API_KEY", "\"${apiKey("GOOGLE_API_KEY")}\"")
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
+        buildConfigField("String", "MQTT_USERNAME", "\"${apiKey("MQTT_USERNAME")}\"")
+        buildConfigField("String", "MQTT_PASSWORD", "\"${apiKey("MQTT_PASSWORD")}\"")
         buildConfigField("String", "WEBSOCKET_URL", "\"${apiKey("WEBSOCKET_URL")}\"")
         buildConfigField("String", "MCP_SERVER_URL", "\"${apiKey("MCP_SERVER_URL")}\"")
+        buildConfigField("String", "BACKEND_BASE_URL", "\"${apiKey("BACKEND_BASE_URL")}\"")
+        buildConfigField("String", "LORA_GATEWAY_URL", "\"${apiKey("LORA_GATEWAY_URL")}\"")
+        buildConfigField("String", "YOLO_SERVER_URL", "\"${apiKey("YOLO_SERVER_URL")}\"")
+        buildConfigField("String", "OPEN_DATA_API_URL", "\"${apiKey("OPEN_DATA_API_URL")}\"")
+        buildConfigField("String", "FIND_MY_PROXY_URL", "\"${apiKey("FIND_MY_PROXY_URL")}\"")
     }
 
     val releaseSigning = signingConfigs.create("release") {
@@ -124,6 +149,11 @@ android {
             excludes += "/META-INF/io.netty.versions.properties"
         }
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -156,10 +186,12 @@ dependencies {
     implementation(libs.hilt.work)
     kapt(libs.hilt.work.compiler)
 
-    // Room
+    // Room + SQLCipher (at-rest encryption)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite)
 
     // WorkManager (Hintergrund-Agent)
     implementation(libs.androidx.work.runtime.ktx)
@@ -226,12 +258,22 @@ dependencies {
     // Desugaring
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    // Unit tests
+    // Unit tests (JVM + Robolectric)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.mockk)
+    testImplementation(libs.truth)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.room.testing)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.test.core.ktx)
+    testImplementation(libs.androidx.test.ext.junit)
 
-    // Instrumented tests
+    // Instrumented / Compose UI tests (Gerät oder Emulator)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

@@ -3,12 +3,14 @@ package com.secureguard.enterprise.mcp
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.secureguard.enterprise.BuildConfig
+import com.secureguard.enterprise.config.EndpointConfig
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
@@ -35,14 +37,17 @@ import kotlin.coroutines.resume
  * - QA/E2E-Testkonten
  */
 @Singleton
-class MCPClient @Inject constructor() {
+class MCPClient @Inject constructor(
+    private val endpointConfig: EndpointConfig
+) {
 
     companion object {
         private const val TIMEOUT_MS = 45_000L // 45 Sekunden
         private val gson = Gson()
     }
 
-    private val serverUrl: String = BuildConfig.MCP_SERVER_URL
+    private val serverUrl: String
+        get() = endpointConfig.mcpServerUrl
 
     val isConfigured: Boolean get() = serverUrl.isNotBlank()
 
@@ -117,6 +122,10 @@ class MCPClient @Inject constructor() {
     /** Erstellt eine neue temporäre Inbox (create_inbox). */
     suspend fun createInbox(): InboxResult? {
         if (!isConfigured) return null
+        // REST-Fallback (Backend /api/mcp/*), wenn URL kein WebSocket-Schema hat
+        if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) {
+            return createInboxHttp()
+        }
         connect()
         val id = ++requestId
         val request = JsonObject().apply {
@@ -141,9 +150,35 @@ class MCPClient @Inject constructor() {
         }
     }
 
+    private fun createInboxHttp(): InboxResult? {
+        return try {
+            val base = serverUrl.trimEnd('/')
+            val req = Request.Builder()
+                .url("$base/api/mcp/create_inbox")
+                .post(ByteArray(0).toRequestBody(null))
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
+                val data = gson.fromJson(body, InboxData::class.java)
+                InboxResult(
+                    success = true,
+                    email = data.email,
+                    token = data.token,
+                    inboxId = data.inboxId.ifBlank { UUID.randomUUID().toString() }
+                )
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** Wartet auf eine OTP-E-Mail (wait_for_otp, Long-Polling). */
     suspend fun waitForOTP(inboxToken: String, timeoutMs: Long = TIMEOUT_MS): OTPResult? {
         if (!isConfigured) return null
+        if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) {
+            return waitForOtpHttp(inboxToken, timeoutMs)
+        }
         connect()
         val id = ++requestId
         val request = JsonObject().apply {
@@ -179,6 +214,9 @@ class MCPClient @Inject constructor() {
     /** Extrahiert einen Magic Link aus einer eingegangenen E-Mail. */
     suspend fun extractMagicLink(inboxToken: String): MagicLinkResult? {
         if (!isConfigured) return null
+        if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) {
+            return extractMagicLinkHttp(inboxToken)
+        }
         connect()
         val id = ++requestId
         val request = JsonObject().apply {
@@ -205,6 +243,49 @@ class MCPClient @Inject constructor() {
     }
 
     // ============ HILFSFUNKTIONEN ============
+
+    private fun waitForOtpHttp(inboxToken: String, timeoutMs: Long): OTPResult? {
+        return try {
+            val base = serverUrl.trimEnd('/')
+            val secs = (timeoutMs / 1000L).coerceIn(1, 45)
+            val encoded = java.net.URLEncoder.encode(inboxToken, "UTF-8")
+            val req = Request.Builder()
+                .url("$base/api/mcp/wait_for_otp?token=$encoded&timeout=$secs")
+                .get()
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    return OTPResult(success = false, error = "HTTP ${resp.code}")
+                }
+                val body = resp.body?.string()
+                    ?: return OTPResult(success = false, error = "empty")
+                gson.fromJson(body, OTPResult::class.java)
+            }
+        } catch (e: Exception) {
+            OTPResult(success = false, error = e.message)
+        }
+    }
+
+    private fun extractMagicLinkHttp(inboxToken: String): MagicLinkResult? {
+        return try {
+            val base = serverUrl.trimEnd('/')
+            val encoded = java.net.URLEncoder.encode(inboxToken, "UTF-8")
+            val req = Request.Builder()
+                .url("$base/api/mcp/extract_magic_link?token=$encoded")
+                .get()
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    return MagicLinkResult(success = false, error = "HTTP ${resp.code}")
+                }
+                val body = resp.body?.string()
+                    ?: return MagicLinkResult(success = false, error = "empty")
+                gson.fromJson(body, MagicLinkResult::class.java)
+            }
+        } catch (e: Exception) {
+            MagicLinkResult(success = false, error = e.message)
+        }
+    }
 
     /** Extrahiert das `content[0].text`-Feld einer MCP-Tool-Antwort. */
     private fun extractToolText(response: JsonObject): String? {

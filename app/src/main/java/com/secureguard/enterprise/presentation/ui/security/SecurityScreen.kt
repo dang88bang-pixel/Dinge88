@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -106,6 +107,14 @@ fun SecurityScreen(
                         StatusRow("AndroidKeyStore", true)
                         StatusRow("256-Bit Schlüssel", true)
                         StatusRow("Hardware-gesichert", true)
+                        StatusRow("SQLCipher (Room at-rest)", true)
+                        StatusRow("DB-Key im KeyStore", true)
+                        Text(
+                            "Key-Fingerprint: ${viewModel.dbKeyFingerprint}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace
+                        )
                     }
                 }
             }
@@ -135,7 +144,7 @@ fun SecurityScreen(
                             label = { Text(if (pinConfigured) "Neue PIN" else "PIN setzen (min. 4 Zeichen)") },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("security_pin_field")
                         )
                         Spacer(Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -148,20 +157,23 @@ fun SecurityScreen(
                                     } else {
                                         pinMessage = "Mindestens 4 Zeichen"
                                     }
-                                }
+                                },
+                                modifier = Modifier.testTag("security_pin_set_button")
                             ) { Text(if (pinConfigured) "Ändern" else "Setzen") }
                             if (pinConfigured) {
                                 Button(
                                     onClick = {
                                         viewModel.lockApp()
                                         pinMessage = "App gesperrt"
-                                    }
+                                    },
+                                    modifier = Modifier.testTag("security_pin_lock_button")
                                 ) { Text("Sperren") }
                                 Button(
                                     onClick = {
                                         viewModel.disablePin()
                                         pinMessage = "PIN entfernt"
-                                    }
+                                    },
+                                    modifier = Modifier.testTag("security_pin_disable_button")
                                 ) { Text("Entfernen") }
                             }
                         }

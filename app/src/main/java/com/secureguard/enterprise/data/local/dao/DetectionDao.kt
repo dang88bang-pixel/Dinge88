@@ -27,4 +27,10 @@ interface DetectionDao {
 
     @Query("DELETE FROM detections WHERE timestamp < :cutoff")
     suspend fun deleteOlderThan(cutoff: Long): Int
+
+    @Query("DELETE FROM detections")
+    suspend fun clear()
+
+    @Query("SELECT COUNT(*) FROM detections")
+    suspend fun count(): Int
 }

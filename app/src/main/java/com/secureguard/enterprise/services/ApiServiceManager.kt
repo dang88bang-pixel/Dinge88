@@ -1,5 +1,6 @@
 package com.secureguard.enterprise.services
 
+import com.secureguard.enterprise.config.EndpointConfig
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import com.secureguard.enterprise.services.apis.ChargingStation
@@ -47,7 +48,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class ApiServiceManager @Inject constructor(
-    private val cacheManager: com.secureguard.enterprise.util.CacheManager
+    private val cacheManager: com.secureguard.enterprise.util.CacheManager,
+    private val endpointConfig: EndpointConfig
 ) {
 
     private val httpClient: OkHttpClient by lazy {
@@ -102,7 +104,8 @@ class ApiServiceManager @Inject constructor(
     }
 
     private val ckanApi: CkanOpenDataApi by lazy {
-        retrofitBuilder("https://demo.ckan.org/").build().create(CkanOpenDataApi::class.java)
+        val base = endpointConfig.openDataApiUrl.ifBlank { "https://demo.ckan.org/" }
+        retrofitBuilder(base).build().create(CkanOpenDataApi::class.java)
     }
 
     private val googleGeolocationApi: GoogleGeolocationApi by lazy {

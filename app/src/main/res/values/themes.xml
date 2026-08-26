@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.SecureGuardEnterprise" parent="android:Theme.Material.Light.NoActionBar">
+    <!-- AppCompat-Parent nötig für ZXing CaptureActivity und Material-Komponenten -->
+    <style name="Theme.SecureGuardEnterprise" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="colorPrimary">@color/sg_primary</item>
+        <item name="colorPrimaryVariant">@color/sg_primary_dark</item>
+        <item name="colorSecondary">@color/sg_accent</item>
+        <item name="android:windowBackground">@color/sg_background</item>
     </style>
 </resources>

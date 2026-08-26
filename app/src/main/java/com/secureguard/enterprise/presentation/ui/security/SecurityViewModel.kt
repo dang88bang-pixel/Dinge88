@@ -3,6 +3,7 @@ package com.secureguard.enterprise.presentation.ui.security
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.AuditLog
+import com.secureguard.enterprise.security.DatabaseKeyManager
 import com.secureguard.enterprise.services.AuthManager
 import com.secureguard.enterprise.services.AuditLogService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,34 +19,40 @@ class SecurityViewModel @Inject constructor(
     private val auditLogService: AuditLogService,
     private val encryptionService: com.secureguard.enterprise.services.EncryptionService,
     private val satelliteService: com.secureguard.enterprise.services.SatelliteService,
-    private val nfcService: com.secureguard.enterprise.services.NfcService
+    private val nfcService: com.secureguard.enterprise.services.NfcService,
+    private val databaseKeyManager: DatabaseKeyManager
 ) : ViewModel() {
+
+    val dbKeyFingerprint: String = runCatching { databaseKeyManager.passphraseFingerprint() }.getOrDefault("–")
 
     private val _auditEntries = MutableStateFlow<List<AuditLog>>(emptyList())
     val auditEntries: StateFlow<List<AuditLog>> = _auditEntries.asStateFlow()
 
-    val pinConfigured: StateFlow<Boolean> = MutableStateFlow(authManager.isPinConfigured()).also {
-        viewModelScope.launch { it.value = authManager.isPinConfigured() }
-    }
+    private val _pinConfigured = MutableStateFlow(authManager.isPinConfigured())
+    val pinConfigured: StateFlow<Boolean> = _pinConfigured.asStateFlow()
 
     val authState = authManager.state
 
     fun loadAuditLog() {
         viewModelScope.launch {
             _auditEntries.value = auditLogService.latest(100)
+            _pinConfigured.value = authManager.isPinConfigured()
         }
     }
 
     fun configurePin(pin: String) {
-        authManager.configurePin(pin)
-        viewModelScope.launch {
-            auditLogService.log("PIN_CHANGE", "PIN geändert über Security-Center")
-            loadAuditLog()
+        if (authManager.configurePin(pin)) {
+            _pinConfigured.value = true
+            viewModelScope.launch {
+                auditLogService.log("PIN_CHANGE", "PIN geändert über Security-Center")
+                loadAuditLog()
+            }
         }
     }
 
     fun disablePin() {
         authManager.disablePin()
+        _pinConfigured.value = false
         viewModelScope.launch {
             auditLogService.log("PIN_DISABLE", "PIN entfernt über Security-Center")
             loadAuditLog()
@@ -61,7 +68,7 @@ class SecurityViewModel @Inject constructor(
 
     fun clearAuditLog() {
         viewModelScope.launch {
-            auditLogService.log("AUDIT_CLEAR", "Audit-Log geleert")
+            auditLogService.clear()
             _auditEntries.value = emptyList()
         }
     }
