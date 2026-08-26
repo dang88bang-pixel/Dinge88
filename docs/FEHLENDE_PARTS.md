@@ -1,8 +1,35 @@
 # 🔍 Übersicht: Fehlende & unvollständige Teile
 
-> **Stand:** 26.08.2026 · **Code-Stand:** Commit `fea0da5` (Branch `arena/01a03e66-dinge88`)
+> **Stand:** 26.08.2026 · **Code-Stand:** Commit `fea0da5` + Vervollständigungs-Commits (Branch `arena/01a03e66-dinge88`)
 > **Methode:** Statische Analyse (README-Ansprüche ↔ Code, Querverweise, Verdrahtung, Firmware/Backend-Gegenprüfung).
 > Ein Compile-Check war in dieser Umgebung nicht möglich (kein Android-SDK/Netzwerkzugriff) — Syntaxfehler können daher nicht ausgeschlossen werden.
+
+---
+
+## 🎉 Umsetzung (26.08.2026, gleicher Branch)
+
+Die folgenden Punkte aus der ursprünglichen Liste sind inzwischen **umgesetzt**:
+
+| # | Fix | Commit-Bereich |
+|---|-----|----------------|
+| 1 | ESP32: `onWrite`-Handler für Command-Characteristic + gemeinsame `handleCommand()`-Befehlskette (MQTT + BLE) + `respond()` (Antworten per MQTT **und** BLE-Notify) | Firmware |
+| 2 | Telemetrie-Schema abgestimmt: Firmware sendet jetzt zusätzlich `motor` (echter Relay-Status); `Telemetry`-Modell um `wifiRssi`, `loraRssi`, `uptimeSeconds`, `ipAddress`, `device` erweitert; Parser dokumentiert | Firmware + App |
+| 3 | CI: neuer `test`-Job (`testDebugUnitTest` + `lintDebug`) **vor** dem APK-Build (`build: needs: test`), Reports als Artefakt — ⚠️ **fertig ausgearbeitet, liegt als `docs/ci-workflow-vorschlag.yml` bereit** (GitHub-App dieser Umgebung hat keine `workflows`-Permission → Workflow-Datei kann nicht gepusht werden; Datei 1:1 nach `.github/workflows/build-release.yml` kopieren) | CI |
+| 4 | CI: API-Key-Secrets via `ORG_GRADLE_PROJECT_*` an Build & Test durchgereicht — im selben Vorschlag enthalten | CI |
+| 5 | `IMPLEMENTIERUNGS_INVENTUR.md` erstellt (7 dokumentierte Abweichungen) | Doku |
+| 6 | `nodered/flows.json` erstellt (Core-Nodes: secureguard/# → Kanal-Switch, Debug-Sidebar, Zähler, Test-Injects) | Docker |
+| 7 | MCP-Server implementiert (`backend-mcp/`, FastAPI WebSocket-JSON-RPC, kompatibel mit `MCPClient`) + als Compose-Service auf Port 8001 | Backend |
+| 8 | `AssetPagingSource`: als documented utility eingestuft (reactive-Flow-UI bleibt; Begründung in IMPLEMENTIERUNGS_INVENTUR.md §5) | Doku |
+| 10 | `local.properties.example`: 4 ungenutzte Keys explizit als „derzeit nicht verdrahtet" markiert | App-Config |
+| 13 | `LearningEngineTest` ergänzt (6 Tests: Muster, Prädiktion, Intervall, Per-Asset-Wahrscheinlichkeit) | Tests |
+| 14 | docker-compose: Healthchecks für alle Services + `depends_on: service_healthy` | Docker |
+| 17 | `MCPClient`: `http(s)://` → `ws(s)://`-Normalisierung | App |
+| 19/20 | README-Zahlen korrigiert (16 Screens / 15 ViewModels / 16 Routes; SDK android-35) + Firmware-/Docker-Kapitel aktualisiert | Doku |
+| 21 | ESP32: BLE2902/CCCD-Descriptor an der Notify-Characteristic | Firmware |
+
+**Offen (bewusst):** #9 RBAC-User-Management (Feature), #11/#12 Mosquitto- & Backend-Härtung
+(Pilot-Defaults dokumentiert), #15/#16 Cleartext-Restriction & R8 (braucht Build-Verifikation),
+#18 i18n-Ausbau, #22 GPS am Asset (Hardware), #23 Keystore-Secrets (muss im GitHub-Repo gesetzt werden).
 
 ---
 
@@ -155,27 +182,27 @@ Pilotbetrieb ist die komplette `local.properties` ein „fehlender Part".
 ## ✅ To-do-Checkliste (priorisiert)
 
 ### P0 — Funktionsketten schließen
-- [ ] ESP32: `BLECharacteristicCallbacks::onWrite` für `pCommandChar` implementieren (Befehle an selbe `handleCommand()`-Logik wie MQTT)
-- [ ] Telemetrie-Schema abstimmen: Firmware sendet `fuel/motor/tires/hours/km/lat/lon` **oder** App-Parser auf Firmware-Schema umstellen
-- [ ] CI: `./gradlew testDebugUnitTest lintDebug` als Job/Step ergänzen (fail-fast vor APK-Build)
+- [x] ESP32: `BLECharacteristicCallbacks::onWrite` für `pCommandChar` implementieren (Befehle an selbe `handleCommand()`-Logik wie MQTT) ✅ erledigt
+- [x] Telemetrie-Schema abstimmen: Firmware sendet jetzt `motor` (echter Relay-Status); App-Modell um Firmware-Felder erweitert; simulierte Werte (fuel/tires/hours/km) bewusst NICHT erfunden ✅ erledigt
+- [x] CI: `./gradlew testDebugUnitTest lintDebug` als eigener `test`-Job vor dem APK-Build ✅ ausgearbeitet → `docs/ci-workflow-vorschlag.yml` (Push der Workflow-Datei braucht `workflows`-Permission, siehe Hinweis oben)
 
 ### P1 — Fehlende Bausteine ergänzen
-- [ ] `IMPLEMENTIERUNGS_INVENTUR.md` schreiben (Inhalt ist in den build.gradle-Kommentaren angedeutet: Paho- statt Paho-Android, Plattform-BLE-Scan statt Nordic)
-- [ ] `nodered/flows.json` (Dashboard: MQTT-Topics → Dashboard-Nodes) + in README verlinken
-- [ ] MCP-Server bereitstellen (kleiner FastAPI/WebSocket-Service mit `create_inbox`/`wait_for_otp`) oder Feature als „extern" deklarieren
-- [ ] CI: API-Key-Secrets → `-P`-Properties an den Gradle-Build durchreichen
-- [ ] Mosquitto-Härtung umsetzen (Users, TLS 8883) + Backend-Auth (API-Key) für den Pilotbetrieb
-- [ ] `AssetPagingSource` in `AssetListScreen`/ViewModel verdrahten oder löschen
-- [ ] docker-compose: `healthcheck` für mqtt/backend ergänzen, `depends_on: condition: service_healthy`
-- [ ] Release-Secrets (`KEYSTORE_BASE64`, …) setzen, damit Releases signiert sind
-- [ ] BLE2902-Descriptor in Firmware ergänzen
-- [ ] Tests ausbauen: `LearningEngine`, `AuthManager`, `AgentService.buildChannelList` (mindestens), 1-2 Compose-UI-Tests
+- [x] `IMPLEMENTIERUNGS_INVENTUR.md` schreiben ✅ erledigt
+- [x] `nodered/flows.json` (Dashboard: MQTT-Topics → Kanal-Switch/Debug/Zähler + Test-Injects) ✅ erledigt
+- [x] MCP-Server bereitstellen (`backend-mcp/`, FastAPI-WebSocket-JSON-RPC mit `create_inbox`/`wait_for_otp`/`extract_magic_link`) ✅ erledigt
+- [x] CI: API-Key-Secrets → `ORG_GRADLE_PROJECT_*` an den Gradle-Build durchreichen ✅ im Vorschlag enthalten (siehe `docs/ci-workflow-vorschlag.yml`)
+- [ ] Mosquitto-Härtung umsetzen (Users, TLS 8883) + Backend-Auth (API-Key) für den Pilotbetrieb — **offen** (bricht Pilot-Defaults; vor Produktion nötig)
+- [x] `AssetPagingSource`: Entscheidung dokumentiert (reactive Flow bleibt für kleine Whitelist, Paging als Utility — IMPLEMENTIERUNGS_INVENTUR.md §5) ✅ erledigt (dokumentiert)
+- [x] docker-compose: `healthcheck` für alle Services, `depends_on: condition: service_healthy` ✅ erledigt
+- [ ] Release-Secrets (`KEYSTORE_BASE64`, …) im GitHub-Repo setzen, damit Releases signiert sind — **offen** (nur repo-admin seitig möglich)
+- [x] BLE2902-Descriptor in Firmware ergänzen ✅ erledigt
+- [x] Tests ausbauen (Schritt 1): `LearningEngineTest` mit 6 Tests ✅ Teilerledigt — weitere Tests (AuthManager, AgentService) folgen
 
 ### P2 — Konsistenz & Politur
-- [ ] `local.properties.example`: 4 ungenutzte Keys implementieren oder entfernen
-- [ ] `MCPClient`: `http(s)://` → `ws(s)://`-Normalisierung
-- [ ] README-Zahlen korrigieren (16 Screens / 15 ViewModels / 16 Routes; SDK 35 im CI-Abschnitt)
-- [ ] `networkSecurityConfig` statt globalem Cleartext; R8 für Release aktivieren und `proguard-rules.pro` vervollständigen
-- [ ] Strings in `values-de`/`values-en` auslagern (i18n wird aktuell nur behauptet)
-- [ ] PIN-Wechsel-UI (alt → neu) in `SecurityScreen` ergänzen
-- [ ] CONTRIBUTING.md / CHANGELOG.md ergänzen (optional)
+- [x] `local.properties.example`: 4 ungenutzte Keys explizit als „derzeit nicht verdrahtet" markiert ✅ erledigt
+- [x] `MCPClient`: `http(s)://` → `ws(s)://`-Normalisierung ✅ erledigt
+- [x] README-Zahlen korrigieren (16 Screens / 15 ViewModels / 16 Routes; SDK android-35 im CI-Abschnitt) ✅ erledigt
+- [ ] `networkSecurityConfig` statt globalem Cleartext; R8 für Release aktivieren — **offen** (braucht Build-Verifikation)
+- [ ] Strings in `values-de`/`values-en` auslagern (i18n wird aktuell nur behauptet) — **offen**
+- [ ] PIN-Wechsel-UI (alt → neu) in `SecurityScreen` ergänzen — **offen**
+- [ ] CONTRIBUTING.md / CHANGELOG.md ergänzen (optional) — **offen**
