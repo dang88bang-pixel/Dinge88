@@ -5,13 +5,21 @@
  *   - LoRa (868 MHz) empfangen und als MQTT an den Broker weiterleiten
  *   - BLE-Peripheral mit Telemetrie-Characteristic (für die App)
  *   - MQTT-Befehle empfangen (ALARM, LIGHT, MOTOR_OFF, RESTART, CONFIG)
- *   - Echte Sensor-Daten (ADC-Batterie, WiFi-RSSI, LoRa-RSSI)
+ *   - BLE-Befehle via GATT-Write (Command-Characteristic) – gleiche
+ *     Befehlskette wie MQTT; Antworten gehen per MQTT UND BLE-Notify zurück
+ *   - Echte Sensor-Daten (ADC-Batterie, WiFi-RSSI, LoRa-RSSI, Motor-Relay)
  *   - Konfigurierbar über NVS (Preferences)
  *
  * Benötigte Bibliotheken (Arduino IDE Library Manager):
  *   - MCCI LoRa (oder SandeepMistry/arduino-LoRa)
  *   - ESP32 BLE Arduino
  *   - PubSubClient
+ *
+ * Telemetrie-Schema (Abstimmung mit TelemetryService.kt der App):
+ *   {"type":"telemetry","battery":85,"motor":true,"wifi_rssi":-42,
+ *    "lora_rssi":-67,"uptime":3600,"ip":"192.168.1.50","device":"ESP32_..."}
+ *   Keys ohne Sensor-Hardware (fuel, tires, hours, km, lat, lon) lässt die
+ *   App via opt*()-Defaults einfach weg – sie werden nicht gefälscht.
  *
  * Hardware (Beispiel):
  *   - LoRa-Modul: SS=5, RST=14, DIO0=2 (Ra-02/SX1278, 868 MHz)
@@ -24,6 +32,7 @@
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLE2902.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Preferences.h>
@@ -63,6 +72,22 @@ int batteryPercent = 0;
 int wifiRssi = 0;
 int loraRssi = 0;
 unsigned long uptimeSeconds = 0;
+
+// ============ PROTOTYPEN ============
+void respond(const char* json);
+void handleCommand(String message);
+
+// ============ BLE COMMAND CALLBACKS ============
+// Empfängt GATT-Writes der App auf der Command-Characteristic und führt
+// dieselbe Befehlskette aus wie der MQTT-Callback (ALARM, LIGHT, ...).
+class CommandCallbacks : public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic* pCharacteristic) override {
+        String value = pCharacteristic->getValue();
+        if (value.length() == 0) return;
+        Serial.printf("BLE-Befehl empfangen: %s\n", value.c_str());
+        handleCommand(value);
+    }
+};
 
 // ============ NVS KONFIGURATION ============
 
@@ -138,10 +163,16 @@ void setup() {
         telemetryCharUUID,
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
     );
+    // CCCD-Descriptor (BLE2902): ohne ihn funktionieren Notifications je
+    // nach Client-Stack nicht zuverlässig.
+    pTelemetryChar->addDescriptor(new BLE2902());
     pCommandChar = pService->createCharacteristic(
         commandCharUUID,
         BLECharacteristic::PROPERTY_WRITE
     );
+    // GATT-Writes der App entgegennehmen (fehlte bisher – BLE-Befehle
+    // wurden nie verarbeitet).
+    pCommandChar->setCallbacks(new CommandCallbacks());
 
     pService->start();
     BLEAdvertising* pAdvertising = pServer->getAdvertising();
@@ -174,7 +205,7 @@ void loop() {
     }
     client.loop();
 
-    // --- LoRa empfangen und an MQTT weiterleiten ---
+    // --- LoRa empfangen und an MQTT/BLE weiterleiten ---
     int packetSize = LoRa.parsePacket();
     if (packetSize) {
         String message = "";
@@ -189,9 +220,7 @@ void loop() {
             "{\"raw\":\"%s\",\"lora_rssi\":%d,\"gateway\":\"%s\",\"uptime\":%lu}",
             message.c_str(), loraRssi, device_id, uptimeSeconds);
 
-        char topic[64];
-        snprintf(topic, sizeof(topic), "secureguard/%s/telemetry", device_id);
-        client.publish(topic, payload);
+        respond(payload);
     }
 
     // --- BLE-Telemetrie (alle 5 Sekunden) ---
@@ -202,28 +231,21 @@ void loop() {
         snprintf(telemetry, sizeof(telemetry),
             "{\"type\":\"telemetry\","
             "\"battery\":%d,"
+            "\"motor\":%s,"
             "\"wifi_rssi\":%d,"
             "\"lora_rssi\":%d,"
             "\"uptime\":%lu,"
             "\"ip\":\"%s\","
             "\"device\":\"%s\"}",
             batteryPercent,
+            digitalRead(MOTOR_RELAY_PIN) == HIGH ? "true" : "false",
             wifiRssi,
             loraRssi,
             uptimeSeconds,
             WiFi.localIP().toString().c_str(),
             device_id
         );
-        pTelemetryChar->setValue(telemetry);
-        pTelemetryChar->notify();
-
-        // Auch per MQTT senden
-        if (client.connected()) {
-            char topic[64];
-            snprintf(topic, sizeof(topic), "secureguard/%s/telemetry", device_id);
-            client.publish(topic, telemetry);
-        }
-
+        respond(telemetry);
         lastBLE = millis();
     }
 
@@ -238,6 +260,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
     Serial.printf("MQTT [%s]: %s\n", topic, message.c_str());
 
+    handleCommand(message);
+}
+
+// ============ BEFEHLSKETTE (MQTT + BLE) ============
+// Verarbeitet ALARM, LIGHT, MOTOR_OFF, RESTART, CONFIG, BATTERY,
+// MESSAGE, POSITION, TELEMETRY – egal ob per MQTT oder GATT-Write.
+void handleCommand(String message) {
     if (message.indexOf("ALARM") >= 0) {
         alarmActive = true;
         for (int i = 0; i < 5; i++) {
@@ -266,9 +295,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         snprintf(resp, sizeof(resp),
             "{\"type\":\"battery\",\"percent\":%d,\"voltage\":%.2f}",
             batteryPercent, (analogRead(BATTERY_PIN) / 4095.0) * 3.3 * 2.0);
-        char topic[64];
-        snprintf(topic, sizeof(topic), "secureguard/%s/telemetry", device_id);
-        client.publish(topic, resp);
+        respond(resp);
         Serial.println("BATTERY-Status gesendet");
     } else if (message.indexOf("MESSAGE") >= 0) {
         // Nachricht empfangen: LED 3x kurz blinken als Bestätigung
@@ -285,24 +312,39 @@ void callback(char* topic, byte* payload, unsigned int length) {
         snprintf(resp, sizeof(resp),
             "{\"type\":\"position\",\"ip\":\"%s\",\"wifi_rssi\":%d,\"device\":\"%s\"}",
             WiFi.localIP().toString().c_str(), WiFi.RSSI(), device_id);
-        char topic[64];
-        snprintf(topic, sizeof(topic), "secureguard/%s/telemetry", device_id);
-        client.publish(topic, resp);
+        respond(resp);
         Serial.println("POSITION gesendet");
     } else if (message.indexOf("TELEMETRY") >= 0) {
         // Vollständige Telemetrie sofort senden
         readSensors();
         char resp[256];
         snprintf(resp, sizeof(resp),
-            "{\"type\":\"telemetry\",\"battery\":%d,\"wifi_rssi\":%d,\"lora_rssi\":%d,"
+            "{\"type\":\"telemetry\",\"battery\":%d,\"motor\":%s,\"wifi_rssi\":%d,\"lora_rssi\":%d,"
             "\"uptime\":%lu,\"ip\":\"%s\",\"device\":\"%s\"}",
-            batteryPercent, wifiRssi, loraRssi, uptimeSeconds,
+            batteryPercent,
+            digitalRead(MOTOR_RELAY_PIN) == HIGH ? "true" : "false",
+            wifiRssi, loraRssi, uptimeSeconds,
             WiFi.localIP().toString().c_str(), device_id);
-        char topic[64];
-        snprintf(topic, sizeof(topic), "secureguard/%s/telemetry", device_id);
-        client.publish(topic, resp);
+        respond(resp);
         Serial.println("TELEMETRY gesendet");
     }
+}
+
+// ============ ANTWORT-HELPER ============
+// Sendet eine JSON-Antwort parallel über MQTT (falls verbunden) und
+// BLE-Notify (falls Characteristic vorhanden) – so erhält die App die
+// Antwort auf BATTERY/POSITION/TELEMETRY auch ohne MQTT-Verbindung.
+void respond(const char* json) {
+    if (client.connected()) {
+        char topic[64];
+        snprintf(topic, sizeof(topic), "secureguard/%s/telemetry", device_id);
+        client.publish(topic, json);
+    }
+    if (pTelemetryChar != NULL) {
+        pTelemetryChar->setValue((uint8_t*)json, strlen(json));
+        pTelemetryChar->notify();
+    }
+    Serial.printf("Antwort gesendet: %s\n", json);
 }
 
 // ============ CONFIG PARSING ============
