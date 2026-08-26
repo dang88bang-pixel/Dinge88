@@ -826,3 +826,5 @@ MCP_SERVER_URL=http://api.example.com:8000
 ## 📄 Lizenz
 
 Apache License 2.0 – siehe [LICENSE](LICENSE).
+
+<!-- ci-retest 183252 -->
