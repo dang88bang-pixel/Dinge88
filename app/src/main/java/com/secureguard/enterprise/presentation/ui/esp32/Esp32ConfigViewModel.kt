@@ -61,7 +61,7 @@ class Esp32ConfigViewModel @Inject constructor(
                     details = "CONFIG an $targetMac: $configJson"
                 )
             } else {
-                _lastCommand.value = context.getString(R.string.asset_not_found, targetMac)
+                _lastCommand.value = context.getString(R.string.asset_not_found_mac, targetMac)
             }
         }
     }

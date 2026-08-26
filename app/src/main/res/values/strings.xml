@@ -317,7 +317,7 @@
     <string name="sending_config">Sende CONFIG an %1$s…</string>
     <string name="config_sent">✅ CONFIG gesendet an %1$s</string>
     <string name="config_offline_queued">⚠️ CONFIG in Offline-Queue (keine Verbindung)</string>
-    <string name="asset_not_found">❌ Asset %1$s nicht gefunden</string>
+    <string name="asset_not_found_mac">❌ Asset %1$s nicht gefunden</string>
 
     <!-- Sensor-Fusion -->
     <string name="fusion_status">Fusions-Status</string>
