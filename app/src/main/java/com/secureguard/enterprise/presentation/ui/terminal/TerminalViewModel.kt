@@ -1,7 +1,9 @@
 package com.secureguard.enterprise.presentation.ui.terminal
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.presentation.theme.TerminalAmber
 import com.secureguard.enterprise.presentation.theme.TerminalCyan
 import com.secureguard.enterprise.presentation.theme.TerminalGreen
@@ -9,6 +11,7 @@ import com.secureguard.enterprise.presentation.theme.TerminalRed
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +30,7 @@ data class TerminalEntry(
 
 @HiltViewModel
 class TerminalViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val agentService: AgentService
 ) : ViewModel() {
 
@@ -58,17 +62,17 @@ class TerminalViewModel @Inject constructor(
             }
             "start" -> {
                 agentService.start()
-                addEntry("  [OK] Agent gestartet.", TerminalGreen)
+                addEntry(context.getString(R.string.term_agent_started), TerminalGreen)
             }
             "stop" -> {
                 agentService.stop()
-                addEntry("  [OK] Agent gestoppt.", TerminalAmber)
+                addEntry(context.getString(R.string.term_agent_stopped), TerminalAmber)
             }
             "cycle" -> {
-                addEntry("  [INFO] Manueller Cycle gestartet...", TerminalCyan)
+                addEntry(context.getString(R.string.term_cycle_manual), TerminalCyan)
                 viewModelScope.launch {
                     val result = agentService.runCycle()
-                    addEntry("  [OK] ${result.assetsChecked} Assets | ${result.detections} Treffer", TerminalGreen)
+                    addEntry(context.getString(R.string.term_cycle_result, result.assetsChecked, result.detections), TerminalGreen)
                     result.channelHits.forEach { (channel, count) ->
                         addEntry("    $channel: $count", TerminalCyan)
                     }
@@ -77,25 +81,25 @@ class TerminalViewModel @Inject constructor(
             "flush" -> {
                 viewModelScope.launch {
                     val flushed = agentService.flushOfflineQueue()
-                    addEntry("  [OK] $flushed Aktionen zugestellt.", TerminalGreen)
+                    addEntry(context.getString(R.string.term_flush_result, flushed), TerminalGreen)
                 }
             }
             "help" -> {
-                addEntry("  Befehle:", TerminalCyan)
-                addEntry("    status  - Agent-Status anzeigen", TerminalGreen)
-                addEntry("    start   - Agent starten", TerminalGreen)
-                addEntry("    stop    - Agent stoppen", TerminalGreen)
-                addEntry("    cycle   - Manueller Suchzyklus", TerminalGreen)
-                addEntry("    flush   - Offline-Queue zustellen", TerminalGreen)
-                addEntry("    clear   - Terminal leeren", TerminalGreen)
-                addEntry("    help    - Diese Hilfe", TerminalGreen)
+                addEntry(context.getString(R.string.term_help_header), TerminalCyan)
+                addEntry(context.getString(R.string.term_help_status), TerminalGreen)
+                addEntry(context.getString(R.string.term_help_start), TerminalGreen)
+                addEntry(context.getString(R.string.term_help_stop), TerminalGreen)
+                addEntry(context.getString(R.string.term_help_cycle), TerminalGreen)
+                addEntry(context.getString(R.string.term_help_flush), TerminalGreen)
+                addEntry(context.getString(R.string.term_help_clear), TerminalGreen)
+                addEntry(context.getString(R.string.term_help_self), TerminalGreen)
             }
             "clear" -> {
                 _logEntries.value = emptyList()
             }
             else -> {
-                addEntry("  [ERR] Unbekannter Befehl: $command", TerminalRed)
-                addEntry("  Tippe 'help' für verfügbare Befehle.", TerminalAmber)
+                addEntry(context.getString(R.string.term_unknown_cmd, command), TerminalRed)
+                addEntry(context.getString(R.string.term_hint_help), TerminalAmber)
             }
         }
     }

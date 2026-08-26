@@ -35,9 +35,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.presentation.components.StatCard
 import com.secureguard.enterprise.presentation.navigation.Routes
 
@@ -60,7 +62,7 @@ fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            "🛡️ SecureGuard Dashboard",
+            stringResource(R.string.title_dashboard),
             style = MaterialTheme.typography.headlineSmall
         )
 
@@ -70,27 +72,27 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                if (uiState.agentRunning) "🟢 Agent aktiv" else "🔴 Agent inaktiv",
+                stringResource(if (uiState.agentRunning) R.string.agent_state_active else R.string.agent_state_inactive),
                 style = MaterialTheme.typography.bodyMedium
             )
             Row {
                 IconButton(onClick = { navController.navigate(Routes.TERMINAL) }) {
-                    Icon(Icons.Default.Terminal, contentDescription = "Terminal")
+                    Icon(Icons.Default.Terminal, contentDescription = stringResource(R.string.nav_terminal))
                 }
                 IconButton(onClick = { navController.navigate(Routes.SENSOR_FUSION) }) {
-                    Icon(Icons.Default.Explore, contentDescription = "Sensor-Fusion")
+                    Icon(Icons.Default.Explore, contentDescription = stringResource(R.string.nav_sensor_fusion))
                 }
                 IconButton(onClick = { navController.navigate(Routes.SECURITY) }) {
-                    Icon(Icons.Default.Security, contentDescription = "Security")
+                    Icon(Icons.Default.Security, contentDescription = stringResource(R.string.nav_security))
                 }
                 IconButton(onClick = { navController.navigate(Routes.ESP32_CONFIG) }) {
-                    Icon(Icons.Default.Memory, contentDescription = "ESP32 Config")
+                    Icon(Icons.Default.Memory, contentDescription = stringResource(R.string.nav_esp32_config))
                 }
                 IconButton(onClick = { navController.navigate(Routes.AGENT_CONFIG) }) {
-                    Icon(Icons.Default.SmartToy, contentDescription = "Agent-Konfiguration")
+                    Icon(Icons.Default.SmartToy, contentDescription = stringResource(R.string.title_agent_config))
                 }
                 IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
-                    Icon(Icons.Default.Settings, contentDescription = "Einstellungen")
+                    Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.title_settings))
                 }
             }
         }
@@ -102,14 +104,14 @@ fun DashboardScreen(
             StatCard(
                 modifier = Modifier.weight(1f),
                 value = "$batteryLevel%",
-                label = "Batterie",
+                label = stringResource(R.string.label_battery),
                 icon = Icons.Default.BatteryFull,
                 color = Color(0xFF2E7D32)
             )
             StatCard(
                 modifier = Modifier.weight(1f),
                 value = uiState.totalAssets.toString(),
-                label = "Assets",
+                label = stringResource(R.string.label_assets),
                 icon = Icons.Default.LocationOn,
                 color = Color(0xFF1565C0)
             )
@@ -122,14 +124,14 @@ fun DashboardScreen(
             StatCard(
                 modifier = Modifier.weight(1f),
                 value = uiState.detectionCount.toString(),
-                label = "Detektionen",
+                label = stringResource(R.string.label_detections),
                 icon = Icons.Default.Search,
                 color = Color(0xFF6A1B9A)
             )
             StatCard(
                 modifier = Modifier.weight(1f),
                 value = uiState.alertCount.toString(),
-                label = "Alarme",
+                label = stringResource(R.string.label_alerts),
                 icon = Icons.Default.Warning,
                 color = Color(0xFFC62828)
             )
@@ -147,21 +149,21 @@ fun DashboardScreen(
 
         // Agent-Status
         Text(
-            if (uiState.agentRunning) "🤖 Agent: Läuft" else "🤖 Agent: Gestoppt",
+            stringResource(if (uiState.agentRunning) R.string.agent_state_running else R.string.agent_state_stopped),
             style = MaterialTheme.typography.titleMedium
         )
         Text(
-            "Letzte Sync: ${uiState.lastSyncTime}",
+            stringResource(R.string.last_sync, uiState.lastSyncTime),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { viewModel.toggleAgent() }) {
-                Text(if (uiState.agentRunning) "Agent stoppen" else "Agent starten")
+                Text(stringResource(if (uiState.agentRunning) R.string.btn_stop_agent else R.string.btn_start_agent))
             }
             Button(onClick = { navController.navigate(Routes.ALERTS) }) {
-                Text("Alarme (${uiState.alertCount})")
+                Text(stringResource(R.string.btn_alerts, uiState.alertCount))
             }
             Button(onClick = { viewModel.refresh() }) {
                 Text("🔄")

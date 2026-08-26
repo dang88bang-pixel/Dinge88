@@ -34,9 +34,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.agent.NodeStatus
 
 /**
@@ -56,21 +58,21 @@ fun NodeStatusScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("📡 Abfrageknoten") },
+                title = { Text(stringResource(R.string.title_nodes)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.runFullQuery() }) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Test-Suche")
+                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.cd_test_search))
                     }
                     IconButton(onClick = { viewModel.refreshLoRaGateways() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "LoRa-Gateways")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_lora_gateways))
                     }
                     IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Aktualisieren")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_refresh))
                     }
                 }
             )
@@ -83,8 +85,8 @@ fun NodeStatusScreen(
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                text = "Letzte Aktualisierung: $lastRefresh" +
-                    if (isQuerying) " · Abfrage läuft…" else "",
+                text = stringResource(R.string.last_refresh, lastRefresh) +
+                    if (isQuerying) stringResource(R.string.querying_in_progress) else "",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp)

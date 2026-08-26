@@ -1,11 +1,14 @@
 package com.secureguard.enterprise.presentation.ui.assets
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +30,7 @@ data class AddAssetUiState(
 
 @HiltViewModel
 class AddAssetViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: SecureGuardRepository
 ) : ViewModel() {
 
@@ -42,11 +46,11 @@ class AddAssetViewModel @Inject constructor(
     fun save() {
         val state = _uiState.value
         if (state.name.isBlank() || state.mac.isBlank()) {
-            _uiState.update { it.copy(error = "Name und MAC-Adresse sind erforderlich") }
+            _uiState.update { it.copy(error = context.getString(R.string.error_name_mac_required)) }
             return
         }
         if (!MAC_REGEX.matches(state.mac)) {
-            _uiState.update { it.copy(error = "MAC-Adresse ungültig (AA:BB:CC:DD:EE:FF)") }
+            _uiState.update { it.copy(error = context.getString(R.string.error_mac_invalid)) }
             return
         }
         viewModelScope.launch {

@@ -97,8 +97,8 @@ class SettingsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     statusMessage = result.fold(
-                        onSuccess = { file -> "✅ Backup erstellt: ${file.name}" },
-                        onFailure = { e -> "❌ Backup fehlgeschlagen: ${e.message}" }
+                        onSuccess = { file -> context.getString(com.secureguard.enterprise.R.string.export_backup_success, file.name) },
+                        onFailure = { e -> context.getString(com.secureguard.enterprise.R.string.export_failed, e.message ?: "") }
                     )
                 )
             }
@@ -111,8 +111,8 @@ class SettingsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     statusMessage = result.fold(
-                        onSuccess = { file -> "✅ CSV exportiert: ${file.name}" },
-                        onFailure = { e -> "❌ Export fehlgeschlagen: ${e.message}" }
+                        onSuccess = { file -> context.getString(com.secureguard.enterprise.R.string.export_csv_success, file.name) },
+                        onFailure = { e -> context.getString(com.secureguard.enterprise.R.string.export_failed, e.message ?: "") }
                     )
                 )
             }
@@ -127,8 +127,8 @@ class SettingsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     statusMessage = result.fold(
-                        onSuccess = { file -> "✅ PDF exportiert: ${file.name}" },
-                        onFailure = { e -> "❌ PDF-Export fehlgeschlagen: ${e.message}" }
+                        onSuccess = { file -> context.getString(com.secureguard.enterprise.R.string.export_pdf_success, file.name) },
+                        onFailure = { e -> context.getString(com.secureguard.enterprise.R.string.export_failed, e.message ?: "") }
                     )
                 )
             }
@@ -141,8 +141,8 @@ class SettingsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     statusMessage = result.fold(
-                        onSuccess = { file -> "✅ Detektionen exportiert: ${file.name}" },
-                        onFailure = { e -> "❌ Export fehlgeschlagen: ${e.message}" }
+                        onSuccess = { file -> context.getString(com.secureguard.enterprise.R.string.export_detections_success, file.name) },
+                        onFailure = { e -> context.getString(com.secureguard.enterprise.R.string.export_failed, e.message ?: "") }
                     )
                 )
             }
@@ -155,8 +155,8 @@ class SettingsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     statusMessage = result.fold(
-                        onSuccess = { file -> "✅ Verschlüsselt exportiert: ${file.name}" },
-                        onFailure = { e -> "❌ Export fehlgeschlagen: ${e.message}" }
+                        onSuccess = { file -> context.getString(com.secureguard.enterprise.R.string.export_encrypted_success, file.name) },
+                        onFailure = { e -> context.getString(com.secureguard.enterprise.R.string.export_failed, e.message ?: "") }
                     )
                 )
             }
@@ -177,13 +177,13 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         statusMessage = result.fold(
-                            onSuccess = { ok -> if (ok) "✅ Restore vorbereitet: ${latest.name} (App neu starten)" else "❌ Restore fehlgeschlagen" },
-                            onFailure = { e -> "❌ Restore: ${e.message}" }
+                            onSuccess = { ok -> if (ok) context.getString(com.secureguard.enterprise.R.string.restore_prepared, latest.name) else context.getString(com.secureguard.enterprise.R.string.restore_failed) },
+                            onFailure = { e -> context.getString(com.secureguard.enterprise.R.string.restore_error, e.message ?: "") }
                         )
                     )
                 }
             } else {
-                _uiState.update { it.copy(statusMessage = "⚠️ Keine Backups vorhanden") }
+                _uiState.update { it.copy(statusMessage = context.getString(com.secureguard.enterprise.R.string.no_backups)) }
             }
         }
     }
@@ -194,14 +194,14 @@ class SettingsViewModel @Inject constructor(
         val intent = android.content.Intent(context, AgentForegroundService::class.java)
         intent.action = AgentForegroundService.ACTION_START
         androidx.core.content.ContextCompat.startForegroundService(context, intent)
-        _uiState.update { it.copy(statusMessage = "✅ Agent als Vordergrund-Dienst gestartet") }
+        _uiState.update { it.copy(statusMessage = context.getString(com.secureguard.enterprise.R.string.fg_service_started)) }
     }
 
     fun stopForegroundService() {
         val intent = android.content.Intent(context, AgentForegroundService::class.java)
         intent.action = AgentForegroundService.ACTION_STOP
         context.startService(intent)
-        _uiState.update { it.copy(statusMessage = "⏹ Vordergrund-Dienst gestoppt") }
+        _uiState.update { it.copy(statusMessage = context.getString(com.secureguard.enterprise.R.string.fg_service_stopped)) }
     }
 
     companion object {

@@ -30,9 +30,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.AlertSeverity
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -49,15 +51,15 @@ fun AlertsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("🔔 Alarme") },
+                title = { Text(stringResource(R.string.title_alerts)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.acknowledgeAll() }) {
-                        Icon(Icons.Default.DoneAll, contentDescription = "Alle bestätigen")
+                        Icon(Icons.Default.DoneAll, contentDescription = stringResource(R.string.cd_ack_all))
                     }
                 }
             )
@@ -70,7 +72,7 @@ fun AlertsScreen(
                     .padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Keine Alarme vorhanden",
+                Text(stringResource(R.string.no_alerts),
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
@@ -112,7 +114,7 @@ fun AlertsScreen(
                             Text(alert.message, style = MaterialTheme.typography.bodyMedium)
                             if (!alert.acknowledged) {
                                 TextButton(onClick = { viewModel.acknowledge(alert.id) }) {
-                                    Text("Bestätigen")
+                                    Text(stringResource(R.string.btn_acknowledge))
                                 }
                             }
                         }

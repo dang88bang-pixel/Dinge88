@@ -1,8 +1,426 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    SecureGuard Enterprise – UI-Strings (Basissprache: Deutsch)
+    Englische Übersetzungen: values-en/strings.xml
+-->
 <resources>
+    <!-- App / Channels -->
     <string name="app_name">SecureGuard Pro</string>
     <string name="agent_channel_name">Agent-Status</string>
     <string name="alerts_channel_name">Sicherheitsalarme</string>
     <string name="telemetry_channel_name">Telemetriedaten</string>
     <string name="system_channel_name">Systemmeldungen</string>
+    <string name="agent_channel_desc">Statusmeldungen des selbstlernenden Agenten</string>
+    <string name="alerts_channel_desc">Alarme und sicherheitsrelevante Ereignisse</string>
+    <string name="telemetry_channel_desc">Fahrzeug-/Asset-Telemetrie</string>
+    <string name="system_channel_desc">Systembenachrichtigungen (Backup, Sync, Fehler)</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_assets">Assets</string>
+    <string name="nav_map">Karte</string>
+    <string name="nav_actions">Aktionen</string>
+    <string name="nav_terminal">Terminal</string>
+    <string name="nav_sensor_fusion">Sensor-Fusion</string>
+    <string name="nav_security">Security</string>
+    <string name="nav_esp32_config">ESP32-Config</string>
+
+    <!-- Titel -->
+    <string name="title_dashboard">🛡️ SecureGuard Dashboard</string>
+    <string name="title_settings">⚙️ Einstellungen</string>
+    <string name="title_agent_config">🤖 Agent-Konfiguration</string>
+    <string name="title_temp_mail">📧 Temporäre E-Mail</string>
+    <string name="title_security">Security &amp; Integrity Center</string>
+    <string name="title_esp32_config">ESP32 Gateway Konfiguration</string>
+    <string name="title_scan_qr">📷 QR-Scan</string>
+    <string name="title_add_asset">➕ Asset hinzufügen</string>
+    <string name="title_assets">📦 Assets (%1$d)</string>
+    <string name="title_map">🗺️ Kartenansicht</string>
+    <string name="title_alerts">🔔 Alarme</string>
+    <string name="title_nodes">📡 Abfrageknoten</string>
+    <string name="title_sensor_fusion">Sensordaten-Fusion &amp; Präzisions-Ortung</string>
+    <string name="lock_app_title">🛡️ SecureGuard</string>
+    <string name="lock_app_subtitle">App gesperrt – PIN eingeben</string>
+
+    <!-- Generisch -->
+    <string name="loading">Laden…</string>
+    <string name="fallback_asset">Asset</string>
+    <string name="fallback_action">Aktion</string>
+    <string name="error_fallback">Fehler</string>
+    <string name="btn_start">Starten</string>
+    <string name="btn_stop">Stoppen</string>
+    <string name="btn_clear">Leeren</string>
+    <string name="btn_select">Wählen</string>
+    <string name="btn_apply">Übernehmen</string>
+    <string name="btn_continue">Weiter</string>
+    <string name="btn_change">Ändern</string>
+    <string name="btn_set">Setzen</string>
+    <string name="btn_remove">Entfernen</string>
+    <string name="btn_lock">Sperren</string>
+    <string name="btn_unlock">Entsperren</string>
+    <string name="cd_back">Zurück</string>
+    <string name="cd_save">Speichern</string>
+    <string name="cd_close">Schließen</string>
+    <string name="cd_delete">Löschen</string>
+    <string name="cd_clear">Leeren</string>
+    <string name="cd_clear_log">Log löschen</string>
+    <string name="cd_scan">Scan</string>
+    <string name="cd_add">Hinzufügen</string>
+    <string name="cd_scan_qr">QR scannen</string>
+    <string name="cd_send">Senden</string>
+    <string name="cd_refresh">Aktualisieren</string>
+    <string name="cd_refresh_telemetry">Telemetrie aktualisieren</string>
+    <string name="cd_zoom_in">Vergrößern</string>
+    <string name="cd_zoom_out">Verkleinern</string>
+    <string name="cd_offline_mode">Offline-Modus</string>
+    <string name="cd_ack_all">Alle bestätigen</string>
+    <string name="cd_test_search">Test-Suche</string>
+    <string name="cd_lora_gateways">LoRa-Gateways</string>
+
+    <!-- Dashboard -->
+    <string name="agent_state_active">🟢 Agent aktiv</string>
+    <string name="agent_state_inactive">🔴 Agent inaktiv</string>
+    <string name="agent_state_running">🤖 Agent: Läuft</string>
+    <string name="agent_state_stopped">🤖 Agent: Gestoppt</string>
+    <string name="last_sync">Letzte Sync: %1$s</string>
+    <string name="btn_start_agent">Agent starten</string>
+    <string name="btn_stop_agent">Agent stoppen</string>
+    <string name="btn_alerts">Alarme (%1$d)</string>
+    <string name="label_battery">Batterie</string>
+    <string name="label_assets">Assets</string>
+    <string name="label_detections">Detektionen</string>
+    <string name="label_alerts">Alarme</string>
+
+    <!-- Asset-Liste -->
+    <string name="search_assets_hint">🔍 Asset suchen…</string>
+
+    <!-- Asset-Detail -->
+    <string name="mac_label">MAC: %1$s</string>
+    <string name="vin_label">VIN: %1$s</string>
+    <string name="status_label">Status: %1$s</string>
+    <string name="rssi_label">📶 %1$d dBm</string>
+    <string name="coordinates_format">📍 %1$s, %2$s</string>
+    <string name="position_unknown">📍 Unbekannt</string>
+    <string name="last_seen_label">Zuletzt gesehen: %1$s</string>
+    <string name="rssi_node_label">📶 %1$d dBm · %2$s</string>
+    <string name="battery_badge">🔋 %1$d%%</string>
+    <string name="section_telemetry">📊 Telemetrie</string>
+    <string name="battery_percent">🔋 Batterie: %1$s%%</string>
+    <string name="fuel_percent">⛽ Kraftstoff: %1$s%%</string>
+    <string name="motor_label">🏃 Motor: %1$s</string>
+    <string name="tires_label">🛞 Reifen: %1$s</string>
+    <string name="operating_hours">⏱ Betriebsstunden: %1$s h</string>
+    <string name="kilometers_label">📍 Kilometerstand: %1$s km</string>
+    <string name="telemetry_loading">⏳ Telemetrie wird geladen…</string>
+    <string name="state_ok">✅ OK</string>
+    <string name="state_error">❌ Fehler</string>
+    <string name="state_check_needed">⚠️ Prüfung nötig</string>
+    <string name="section_search">🔍 Suche</string>
+    <string name="searching">Suche läuft…</string>
+    <string name="search_all">Alle</string>
+    <string name="search_crowd">Crowd</string>
+    <string name="search_satellite">Sat</string>
+    <string name="asset_found">✅ Asset gefunden (%1$s)</string>
+    <string name="asset_not_found">❌ Asset nicht gefunden</string>
+    <string name="section_actions">⚡ Aktionen</string>
+    <string name="action_alarm_short">Alarm</string>
+    <string name="action_light_short">Licht</string>
+    <string name="action_motor_short">Motor</string>
+    <string name="action_message_short">Nachricht</string>
+    <string name="detection_history">📋 Detektions-Historie (%1$d)</string>
+
+    <!-- Asset hinzufügen -->
+    <string name="add_asset_hint">Neues geschütztes Asset registrieren</string>
+    <string name="label_name">Name</string>
+    <string name="label_short_name">Kurzname (z. B. Roller #6)</string>
+    <string name="label_mac_format">MAC-Adresse (AA:BB:CC:DD:EE:FF)</string>
+    <string name="label_vin_optional">VIN / Seriennummer (optional)</string>
+    <string name="check_external_allowed">🌍 Externe Crowdsource-Suche erlaubt (DSGVO-Einwilligung)</string>
+    <string name="btn_save_asset">💾 Asset speichern</string>
+    <string name="error_name_mac_required">Name und MAC-Adresse sind erforderlich</string>
+    <string name="error_mac_invalid">MAC-Adresse ungültig (AA:BB:CC:DD:EE:FF)</string>
+
+    <!-- QR-Scan -->
+    <string name="camera_permission_required">Kamera-Berechtigung erforderlich</string>
+    <string name="btn_grant_permission">Berechtigung erteilen</string>
+    <string name="detected_code">Erkannt: %1$s</string>
+    <string name="or_enter_manually">oder manuell eingeben:</string>
+    <string name="label_mac_address">MAC-Adresse</string>
+
+    <!-- Karte -->
+    <string name="legend">Legende:</string>
+    <string name="legend_online">Online</string>
+    <string name="legend_offline">Offline</string>
+    <string name="legend_maintenance">Wartung</string>
+
+    <!-- Aktionen -->
+    <string name="select_asset">🎯 Asset auswählen</string>
+    <string name="select_asset_placeholder">Asset auswählen</string>
+    <string name="please_select_asset">Bitte wähle ein Asset aus</string>
+    <string name="actions_for_asset">🚀 Aktionen für %1$s</string>
+    <string name="asset_status_line">STATUS: %1$s  |  📶 %2$d dBm</string>
+    <string name="ab_alarm">🔔 Alarm</string>
+    <string name="ab_blink">💡 Blinken</string>
+    <string name="ab_motor">🔇 Motor</string>
+    <string name="ab_battery">🔋 Batterie</string>
+    <string name="ab_message">📝 Nachricht</string>
+    <string name="ab_position">📍 Position</string>
+    <string name="ab_restart">🔄 Neustart</string>
+    <string name="ab_telemetry">📊 Telemetrie</string>
+    <string name="executing_action">Aktion wird ausgeführt…</string>
+    <string name="section_settings">⚙️ Einstellungen</string>
+    <string name="check_recover_resend">Recover/Resend aktivieren</string>
+    <string name="check_log_commands">Steuerlog aufzeichnen</string>
+    <string name="check_auto_notify">Automatische Benachrichtigung</string>
+    <string name="command_log">📋 Command Log</string>
+    <string name="no_entries">Keine Einträge</string>
+    <string name="log_no_permission">⛔ Keine Berechtigung für Aktionen</string>
+    <string name="log_command">%1$s → %2$s an %3$s %4$s</string>
+
+    <!-- Agent-Konfiguration -->
+    <string name="agent_active">AKTIV</string>
+    <string name="agent_inactive">INAKTIV</string>
+    <string name="agent_runtime">⏱ Laufzeit: %1$s</string>
+    <string name="agent_progress">📊 Gesamtdauer: %1$d%%</string>
+    <string name="section_duration">📅 Gesamtdauer</string>
+    <string name="duration_1h">1 Std.</string>
+    <string name="duration_6h">6 Std.</string>
+    <string name="duration_24h">24 Std.</string>
+    <string name="duration_1w">1 Woche</string>
+    <string name="duration_unlimited">∞</string>
+    <string name="label_days">Tage</string>
+    <string name="btn_save_check">✔️ Speichern</string>
+    <string name="btn_save_config">💾 Konfiguration speichern</string>
+    <string name="section_interval">⏱ Abfrageintervall</string>
+    <string name="interval_30s">30 Sek.</string>
+    <string name="interval_1m">1 Min.</string>
+    <string name="interval_5m">5 Min.</string>
+    <string name="interval_15m">15 Min.</string>
+    <string name="interval_1h">1 Std.</string>
+    <string name="label_seconds">Sekunden</string>
+    <string name="section_priority">🎯 Priorisierung</string>
+    <string name="priority_high">Hoch</string>
+    <string name="priority_medium">Mittel</string>
+    <string name="priority_low">Niedrig</string>
+    <string name="check_dynamic_priority">⚡ Dynamische Anpassung</string>
+    <string name="check_learning_mode">🔄 Lernmodus (rekursive Verbesserung)</string>
+
+    <!-- Alarme -->
+    <string name="no_alerts">Keine Alarme vorhanden</string>
+    <string name="btn_acknowledge">Bestätigen</string>
+
+    <!-- Einstellungen -->
+    <string name="section_profile">👤 Profil &amp; Sicherheit</string>
+    <string name="label_user">Benutzer</string>
+    <string name="label_organization">Organisation</string>
+    <string name="section_notifications">🔔 Benachrichtigungen</string>
+    <string name="switch_push_notifications">Push-Benachrichtigungen</string>
+    <string name="switch_offline_only">Nur im Offline-Modus arbeiten</string>
+    <string name="section_connections">🌐 Verbindungen</string>
+    <string name="switch_external_crowd">Externe Crowdsource-Suche (Apple/Google)</string>
+    <string name="switch_learning_agent">Selbstlernender Agent</string>
+    <string name="switch_dark_mode">Dunkelmodus</string>
+    <string name="section_privacy">🛡️ Datenschutz (DSGVO)</string>
+    <string name="gdpr_consent">Ich willige in die Verarbeitung meiner Daten gemäß Betriebsvereinbarung ein.</string>
+    <string name="gdpr_note">Alle Ortungsdaten werden ausschließlich lokal auf dem Gerät gespeichert. Externe Kanäle (Crowd/Satellit) sind standardmäßig deaktiviert und bedürfen ausdrücklicher Zustimmung.</string>
+    <string name="section_tools">📡 Erweiterte Werkzeuge</string>
+    <string name="tool_node_status">Abfrageknoten (Status, Ratenlimits, Ein/Aus)</string>
+    <string name="tool_temp_mail">Temporäre E-Mail (OTP für Registrierungen)</string>
+    <string name="tool_security_center">Security &amp; Integrity Center</string>
+    <string name="tool_esp32_config">ESP32 Gateway Konfiguration</string>
+    <string name="section_foreground_service">🤖 Vordergrund-Dienst</string>
+    <string name="foreground_hint">Hält den Agent aktiv, auch wenn die App im Hintergrund ist.</string>
+    <string name="section_data_export">💾 Daten &amp; Export</string>
+    <string name="btn_backup">Backup</string>
+    <string name="btn_csv">CSV</string>
+    <string name="btn_pdf">PDF</string>
+    <string name="btn_detections_csv">Detekt. CSV</string>
+    <string name="btn_csv_encrypted">CSV 🔒</string>
+    <string name="btn_restore">Restore</string>
+    <string name="backups_available">%1$d Backups verfügbar</string>
+    <string name="offline_maps_url">Offline-Karten: %1$s</string>
+    <string name="footer_version">SecureGuard Enterprise v1.0.0 · generisches LoRa/LoRaWAN</string>
+
+    <!-- Temp-Mail -->
+    <string name="tempmail_not_configured">⚠️ Kein MCP-Server konfiguriert.\nSetze MCP_SERVER_URL in local.properties, um temporäre E-Mail-Inboxes zu nutzen.</string>
+    <string name="current_inbox">📨 Aktuelle Inbox</string>
+    <string name="inbox_email">📧 %1$s</string>
+    <string name="inbox_token">🔑 Token: %1$s…</string>
+    <string name="inbox_id">📋 ID: %1$s</string>
+    <string name="no_inbox">Keine Inbox erstellt</string>
+    <string name="btn_new_inbox">📬 Neue Inbox</string>
+    <string name="btn_quick_register">⚡ Quick-Register + OTP</string>
+    <string name="btn_magic_link">🔗 Magic Link abrufen</string>
+    <string name="btn_check_saved_otp">📋 Gespeichertes OTP prüfen</string>
+    <string name="btn_wait_otp">⏳ OTP abrufen</string>
+    <string name="otp_received">✅ OTP empfangen!</string>
+    <string name="otp_none">❌ Kein OTP</string>
+    <string name="otp_value">🔑 OTP: %1$s</string>
+    <string name="otp_from">📧 Von: %1$s</string>
+    <string name="otp_subject">📋 Betreff: %1$s</string>
+    <string name="section_log">📋 Log</string>
+    <string name="register_status_in_progress">Registriere bei %1$s…</string>
+    <string name="register_status_success">✅ Registriert: %1$s (OTP: %2$s)</string>
+    <string name="register_status_error">❌ %1$s</string>
+
+    <!-- Security -->
+    <string name="label_encryption">Verschlüsselung</string>
+    <string name="enc_aes_gcm">AES/GCM/NoPadding</string>
+    <string name="enc_keystore">AndroidKeyStore</string>
+    <string name="enc_256bit">256-Bit Schlüssel</string>
+    <string name="enc_hardware">Hardware-gesichert</string>
+    <string name="label_pin_auth">PIN-Authentifizierung</string>
+    <string name="pin_configured_info">PIN konfiguriert · Auto-Lock: 5 Min · Max. 5 Versuche</string>
+    <string name="pin_not_configured">Keine PIN konfiguriert</string>
+    <string name="label_new_pin">Neue PIN</string>
+    <string name="label_set_pin">PIN setzen (min. 4 Zeichen)</string>
+    <string name="pin_set">PIN gesetzt</string>
+    <string name="pin_min_length">Mindestens 4 Zeichen</string>
+    <string name="pin_message_locked">App gesperrt</string>
+    <string name="pin_message_removed">PIN entfernt</string>
+    <string name="wrong_pin_attempts">Falsche PIN – noch %1$d Versuche</string>
+    <string name="wrong_pin_locked">Falsche PIN – App gesperrt</string>
+    <string name="label_pin">PIN</string>
+    <string name="label_rbac">RBAC Rollenmodell</string>
+    <string name="rbac_admin_desc">Vollzugriff</string>
+    <string name="rbac_manager_desc">Assets + Aktionen</string>
+    <string name="rbac_operator_desc">Eigene Assets</string>
+    <string name="rbac_viewer_desc">Nur Lesen</string>
+    <string name="label_hardware_diag">Hardware-Diagnose</string>
+    <string name="diag_nfc">NFC verfügbar</string>
+    <string name="btn_aes_test">AES Test</string>
+    <string name="btn_gps">GPS</string>
+    <string name="label_audit_log">Audit-Log (%1$d)</string>
+
+    <!-- ESP32-Config -->
+    <string name="label_target_device">Ziel-Gerät</string>
+    <string name="no_assets">Keine Assets vorhanden</string>
+    <string name="label_wifi_config">WiFi Konfiguration</string>
+    <string name="label_ssid">SSID</string>
+    <string name="label_password">Passwort</string>
+    <string name="label_mqtt_broker">MQTT Broker</string>
+    <string name="label_host">Host</string>
+    <string name="label_port">Port</string>
+    <string name="send_config_title">CONFIG-Befehl senden</string>
+    <string name="send_config_hint">Sendet die Konfiguration via MQTT an das ESP32-Gateway. Das Gateway speichert die Werte im NVS und startet neu.</string>
+    <string name="btn_send_to">An %1$s senden</string>
+    <string name="label_usb_serial">USB-Serial Adapter</string>
+    <string name="btn_scan_adapters">Adapter scannen</string>
+    <string name="label_firmware_info">Firmware-Info</string>
+    <string name="info_platform">Plattform</string>
+    <string name="info_lora">LoRa</string>
+    <string name="info_ble_service">BLE Service</string>
+    <string name="info_commands">Befehle</string>
+    <string name="info_nvs_keys">NVS-Keys</string>
+    <string name="info_adc">ADC</string>
+    <string name="no_usb_adapters">Keine USB-Serial-Adapter gefunden</string>
+    <string name="sending_config">Sende CONFIG an %1$s…</string>
+    <string name="config_sent">✅ CONFIG gesendet an %1$s</string>
+    <string name="config_offline_queued">⚠️ CONFIG in Offline-Queue (keine Verbindung)</string>
+    <string name="asset_not_found">❌ Asset %1$s nicht gefunden</string>
+
+    <!-- Sensor-Fusion -->
+    <string name="fusion_status">Fusions-Status</string>
+    <string name="tracked_assets">Getrackte Assets</string>
+    <string name="fusion_node">Knoten %1$s</string>
+    <string name="rssi_unit">%1$d dBm</string>
+    <string name="fusion_signal_strong">Stark</string>
+    <string name="fusion_status_active">Aktiv</string>
+    <string name="fusion_status_standby">Standby</string>
+
+    <!-- Aktionen/Notifications -->
+    <string name="action_executed">%1$s ausgeführt</string>
+    <string name="error_no_permission">Keine Berechtigung</string>
+    <string name="error_delivery_failed">Zustellung fehlgeschlagen (Offline-Queue)</string>
+    <string name="alert_action_message">%1$s: %2$s</string>
+    <string name="notification_action_success">Aktion ausgeführt</string>
+    <string name="notification_action_failed">Aktion fehlgeschlagen</string>
+    <string name="notification_action_body">%1$s · %2$s</string>
+
+    <!-- Einstellungen: Backup/Export/Status -->
+    <string name="export_backup_success">✅ Backup erstellt: %1$s</string>
+    <string name="export_failed">❌ Export fehlgeschlagen: %1$s</string>
+    <string name="export_csv_success">✅ CSV exportiert: %1$s</string>
+    <string name="export_pdf_success">✅ PDF exportiert: %1$s</string>
+    <string name="export_detections_success">✅ Detektionen exportiert: %1$s</string>
+    <string name="export_encrypted_success">✅ Verschlüsselt exportiert: %1$s</string>
+    <string name="restore_prepared">✅ Restore vorbereitet: %1$s (App neu starten)</string>
+    <string name="restore_failed">❌ Restore fehlgeschlagen</string>
+    <string name="restore_error">❌ Restore: %1$s</string>
+    <string name="no_backups">⚠️ Keine Backups vorhanden</string>
+    <string name="fg_service_started">✅ Agent als Vordergrund-Dienst gestartet</string>
+    <string name="fg_service_stopped">⏹ Vordergrund-Dienst gestoppt</string>
+
+    <!-- Asset-Liste -->
+    <string name="no_assets_found">Keine Assets gefunden</string>
+    <string name="add_asset_or_change_filter">Füge ein Asset hinzu oder ändere die Filter</string>
+
+    <!-- Security: GPS-Diagnose -->
+    <string name="gps_location_format">📍 %1$s, %2$s (±%3$sm)</string>
+    <string name="gps_no_fix">❌ Kein GPS-Fix verfügbar</string>
+
+    <!-- Temp-Mail Log -->
+    <string name="tm_creating_inbox">📬 Erstelle neue Inbox…</string>
+    <string name="tm_inbox_created">✅ Inbox erstellt: %1$s</string>
+    <string name="tm_inbox_create_failed">❌ Fehler beim Erstellen der Inbox (MCP-Server konfiguriert?)</string>
+    <string name="tm_waiting_otp">⏳ Warte auf OTP (bis 45 s)…</string>
+    <string name="tm_otp_received">✅ OTP empfangen: %1$s</string>
+    <string name="tm_otp_from_subject">📧 Von: %1$s · Betreff: %2$s</string>
+    <string name="tm_no_otp_timeout">❌ Kein OTP empfangen (Timeout?)</string>
+    <string name="tm_inbox_cleared">🗑️ Inbox geleert</string>
+    <string name="tm_last_otp">📋 Letztes OTP: %1$s (%2$s)</string>
+    <string name="tm_no_saved_otp">ℹ️ Kein gespeichertes OTP vorhanden</string>
+    <string name="tm_waiting_magic_link">⏳ Warte auf Magic Link (45 s)…</string>
+    <string name="tm_magic_link">✅ Magic Link: %1$s…</string>
+    <string name="tm_no_magic_link">❌ Kein Magic Link empfangen</string>
+    <string name="tm_quick_register">🔄 Quick-Register: Inbox + OTP…</string>
+    <string name="tm_otp_is">✅ OTP: %1$s</string>
+    <string name="tm_quick_register_failed">❌ Quick-Register fehlgeschlagen</string>
+    <string name="tm_auto_register">🌐 Auto-Register bei %1$s…</string>
+    <string name="tm_waiting_otp_short">⏳ Warte auf OTP…</string>
+
+    <!-- Karten-/Status-Details -->
+    <string name="maintenance_due">🔧 Wartung fällig</string>
+    <string name="map_status_line">⏱ %1$s | 📍 %2$d sichtbar</string>
+    <string name="last_refresh">Letzte Aktualisierung: %1$s</string>
+    <string name="querying_in_progress">" · Abfrage läuft…"</string>
+
+    <!-- Terminal-Ausgaben (Kommando-Keywords &amp; [OK]/[ERR]-Präfixe bleiben Protokoll-Literale) -->
+    <string name="term_agent_started">"  [OK] Agent gestartet."</string>
+    <string name="term_agent_stopped">"  [OK] Agent gestoppt."</string>
+    <string name="term_cycle_manual">"  [INFO] Manueller Cycle gestartet…"</string>
+    <string name="term_cycle_result">"  [OK] %1$d Assets | %2$d Treffer"</string>
+    <string name="term_flush_result">"  [OK] %1$d Aktionen zugestellt."</string>
+    <string name="term_help_header">"  Befehle:"</string>
+    <string name="term_help_status">"    status  - Agent-Status anzeigen"</string>
+    <string name="term_help_start">"    start   - Agent starten"</string>
+    <string name="term_help_stop">"    stop    - Agent stoppen"</string>
+    <string name="term_help_cycle">"    cycle   - Manueller Suchzyklus"</string>
+    <string name="term_help_flush">"    flush   - Offline-Queue zustellen"</string>
+    <string name="term_help_clear">"    clear   - Terminal leeren"</string>
+    <string name="term_help_self">"    help    - Diese Hilfe"</string>
+    <string name="term_unknown_cmd">"  [ERR] Unbekannter Befehl: %1$s"</string>
+    <string name="term_hint_help">"  Tippe \'help\' für verfügbare Befehle."</string>
+
+    <!-- Sensor-Fusion Labels -->
+    <string name="sf_confidence">Konfidenz</string>
+    <string name="sf_deviation">Abweichung</string>
+    <string name="sf_channels">Kanäle</string>
+    <string name="sf_satellites">Satelliten</string>
+    <string name="sf_signal_strength">Signalstärke</string>
+    <string name="sf_calibrated">Kalibriert</string>
+    <string name="sf_axis_x">X-Achse</string>
+    <string name="sf_axis_y">Y-Achse</string>
+    <string name="sf_axis_z">Z-Achse</string>
+    <string name="sf_compass">Kompass</string>
+    <string name="sf_network_rssi">Netzwerk (RSSI)</string>
+    <string name="sf_nodes_count">%1$d Knoten</string>
+
+    <!-- Security: Audit &amp; Verschlüsselungstest -->
+    <string name="audit_pin_change">PIN geändert über Security-Center</string>
+    <string name="audit_pin_disable">PIN entfernt über Security-Center</string>
+    <string name="audit_app_lock">App manuell gesperrt über Security-Center</string>
+    <string name="audit_cleared">Audit-Log geleert</string>
+    <string name="encryption_ok">✅ AES/GCM Roundtrip OK</string>
+    <string name="encryption_failed">❌ Entschlüsselung fehlgeschlagen</string>
 </resources>

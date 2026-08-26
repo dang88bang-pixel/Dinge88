@@ -1,8 +1,426 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    SecureGuard Enterprise – UI strings (English)
+    Base language (German): values/strings.xml
+-->
 <resources>
+    <!-- App / Channels -->
     <string name="app_name">SecureGuard Pro</string>
     <string name="agent_channel_name">Agent status</string>
     <string name="alerts_channel_name">Security alerts</string>
     <string name="telemetry_channel_name">Telemetry data</string>
     <string name="system_channel_name">System messages</string>
+    <string name="agent_channel_desc">Status messages of the self-learning agent</string>
+    <string name="alerts_channel_desc">Alarms and security-relevant events</string>
+    <string name="telemetry_channel_desc">Vehicle/asset telemetry</string>
+    <string name="system_channel_desc">System notifications (backup, sync, errors)</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_assets">Assets</string>
+    <string name="nav_map">Map</string>
+    <string name="nav_actions">Actions</string>
+    <string name="nav_terminal">Terminal</string>
+    <string name="nav_sensor_fusion">Sensor fusion</string>
+    <string name="nav_security">Security</string>
+    <string name="nav_esp32_config">ESP32 config</string>
+
+    <!-- Titles -->
+    <string name="title_dashboard">🛡️ SecureGuard Dashboard</string>
+    <string name="title_settings">⚙️ Settings</string>
+    <string name="title_agent_config">🤖 Agent configuration</string>
+    <string name="title_temp_mail">📧 Temporary e-mail</string>
+    <string name="title_security">Security &amp; Integrity Center</string>
+    <string name="title_esp32_config">ESP32 Gateway Configuration</string>
+    <string name="title_scan_qr">📷 QR scan</string>
+    <string name="title_add_asset">➕ Add asset</string>
+    <string name="title_assets">📦 Assets (%1$d)</string>
+    <string name="title_map">🗺️ Map view</string>
+    <string name="title_alerts">🔔 Alerts</string>
+    <string name="title_nodes">📡 Query nodes</string>
+    <string name="title_sensor_fusion">Sensor fusion &amp; precision tracking</string>
+    <string name="lock_app_title">🛡️ SecureGuard</string>
+    <string name="lock_app_subtitle">App locked – enter PIN</string>
+
+    <!-- Generic -->
+    <string name="loading">Loading…</string>
+    <string name="fallback_asset">Asset</string>
+    <string name="fallback_action">Action</string>
+    <string name="error_fallback">Error</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop</string>
+    <string name="btn_clear">Clear</string>
+    <string name="btn_select">Select</string>
+    <string name="btn_apply">Apply</string>
+    <string name="btn_continue">Continue</string>
+    <string name="btn_change">Change</string>
+    <string name="btn_set">Set</string>
+    <string name="btn_remove">Remove</string>
+    <string name="btn_lock">Lock</string>
+    <string name="btn_unlock">Unlock</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_save">Save</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_delete">Delete</string>
+    <string name="cd_clear">Clear</string>
+    <string name="cd_clear_log">Clear log</string>
+    <string name="cd_scan">Scan</string>
+    <string name="cd_add">Add</string>
+    <string name="cd_scan_qr">Scan QR</string>
+    <string name="cd_send">Send</string>
+    <string name="cd_refresh">Refresh</string>
+    <string name="cd_refresh_telemetry">Refresh telemetry</string>
+    <string name="cd_zoom_in">Zoom in</string>
+    <string name="cd_zoom_out">Zoom out</string>
+    <string name="cd_offline_mode">Offline mode</string>
+    <string name="cd_ack_all">Acknowledge all</string>
+    <string name="cd_test_search">Test search</string>
+    <string name="cd_lora_gateways">LoRa gateways</string>
+
+    <!-- Dashboard -->
+    <string name="agent_state_active">🟢 Agent active</string>
+    <string name="agent_state_inactive">🔴 Agent inactive</string>
+    <string name="agent_state_running">🤖 Agent: running</string>
+    <string name="agent_state_stopped">🤖 Agent: stopped</string>
+    <string name="last_sync">Last sync: %1$s</string>
+    <string name="btn_start_agent">Start agent</string>
+    <string name="btn_stop_agent">Stop agent</string>
+    <string name="btn_alerts">Alerts (%1$d)</string>
+    <string name="label_battery">Battery</string>
+    <string name="label_assets">Assets</string>
+    <string name="label_detections">Detections</string>
+    <string name="label_alerts">Alerts</string>
+
+    <!-- Asset list -->
+    <string name="search_assets_hint">🔍 Search assets…</string>
+
+    <!-- Asset detail -->
+    <string name="mac_label">MAC: %1$s</string>
+    <string name="vin_label">VIN: %1$s</string>
+    <string name="status_label">Status: %1$s</string>
+    <string name="rssi_label">📶 %1$d dBm</string>
+    <string name="coordinates_format">📍 %1$s, %2$s</string>
+    <string name="position_unknown">📍 Unknown</string>
+    <string name="last_seen_label">Last seen: %1$s</string>
+    <string name="rssi_node_label">📶 %1$d dBm · %2$s</string>
+    <string name="battery_badge">🔋 %1$d%%</string>
+    <string name="section_telemetry">📊 Telemetry</string>
+    <string name="battery_percent">🔋 Battery: %1$s%%</string>
+    <string name="fuel_percent">⛽ Fuel: %1$s%%</string>
+    <string name="motor_label">🏃 Motor: %1$s</string>
+    <string name="tires_label">🛞 Tires: %1$s</string>
+    <string name="operating_hours">⏱ Operating hours: %1$s h</string>
+    <string name="kilometers_label">📍 Mileage: %1$s km</string>
+    <string name="telemetry_loading">⏳ Loading telemetry…</string>
+    <string name="state_ok">✅ OK</string>
+    <string name="state_error">❌ Error</string>
+    <string name="state_check_needed">⚠️ Check needed</string>
+    <string name="section_search">🔍 Search</string>
+    <string name="searching">Searching…</string>
+    <string name="search_all">All</string>
+    <string name="search_crowd">Crowd</string>
+    <string name="search_satellite">Sat</string>
+    <string name="asset_found">✅ Asset found (%1$s)</string>
+    <string name="asset_not_found">❌ Asset not found</string>
+    <string name="section_actions">⚡ Actions</string>
+    <string name="action_alarm_short">Alarm</string>
+    <string name="action_light_short">Light</string>
+    <string name="action_motor_short">Motor</string>
+    <string name="action_message_short">Message</string>
+    <string name="detection_history">📋 Detection history (%1$d)</string>
+
+    <!-- Add asset -->
+    <string name="add_asset_hint">Register a new protected asset</string>
+    <string name="label_name">Name</string>
+    <string name="label_short_name">Short name (e.g. scooter #6)</string>
+    <string name="label_mac_format">MAC address (AA:BB:CC:DD:EE:FF)</string>
+    <string name="label_vin_optional">VIN / serial number (optional)</string>
+    <string name="check_external_allowed">🌍 External crowdsource search allowed (GDPR consent)</string>
+    <string name="btn_save_asset">💾 Save asset</string>
+    <string name="error_name_mac_required">Name and MAC address are required</string>
+    <string name="error_mac_invalid">Invalid MAC address (AA:BB:CC:DD:EE:FF)</string>
+
+    <!-- QR scan -->
+    <string name="camera_permission_required">Camera permission required</string>
+    <string name="btn_grant_permission">Grant permission</string>
+    <string name="detected_code">Detected: %1$s</string>
+    <string name="or_enter_manually">or enter manually:</string>
+    <string name="label_mac_address">MAC address</string>
+
+    <!-- Map -->
+    <string name="legend">Legend:</string>
+    <string name="legend_online">Online</string>
+    <string name="legend_offline">Offline</string>
+    <string name="legend_maintenance">Maintenance</string>
+
+    <!-- Actions -->
+    <string name="select_asset">🎯 Select asset</string>
+    <string name="select_asset_placeholder">Select asset</string>
+    <string name="please_select_asset">Please select an asset</string>
+    <string name="actions_for_asset">🚀 Actions for %1$s</string>
+    <string name="asset_status_line">STATUS: %1$s  |  📶 %2$d dBm</string>
+    <string name="ab_alarm">🔔 Alarm</string>
+    <string name="ab_blink">💡 Blink</string>
+    <string name="ab_motor">🔇 Motor</string>
+    <string name="ab_battery">🔋 Battery</string>
+    <string name="ab_message">📝 Message</string>
+    <string name="ab_position">📍 Position</string>
+    <string name="ab_restart">🔄 Restart</string>
+    <string name="ab_telemetry">📊 Telemetry</string>
+    <string name="executing_action">Executing action…</string>
+    <string name="section_settings">⚙️ Settings</string>
+    <string name="check_recover_resend">Enable recover/resend</string>
+    <string name="check_log_commands">Record control log</string>
+    <string name="check_auto_notify">Automatic notification</string>
+    <string name="command_log">📋 Command log</string>
+    <string name="no_entries">No entries</string>
+    <string name="log_no_permission">⛔ Not authorized to execute actions</string>
+    <string name="log_command">%1$s → %2$s to %3$s %4$s</string>
+
+    <!-- Agent configuration -->
+    <string name="agent_active">ACTIVE</string>
+    <string name="agent_inactive">INACTIVE</string>
+    <string name="agent_runtime">⏱ Runtime: %1$s</string>
+    <string name="agent_progress">📊 Total duration: %1$d%%</string>
+    <string name="section_duration">📅 Total duration</string>
+    <string name="duration_1h">1 h</string>
+    <string name="duration_6h">6 h</string>
+    <string name="duration_24h">24 h</string>
+    <string name="duration_1w">1 week</string>
+    <string name="duration_unlimited">∞</string>
+    <string name="label_days">Days</string>
+    <string name="btn_save_check">✔️ Save</string>
+    <string name="btn_save_config">💾 Save configuration</string>
+    <string name="section_interval">⏱ Query interval</string>
+    <string name="interval_30s">30 s</string>
+    <string name="interval_1m">1 min</string>
+    <string name="interval_5m">5 min</string>
+    <string name="interval_15m">15 min</string>
+    <string name="interval_1h">1 h</string>
+    <string name="label_seconds">Seconds</string>
+    <string name="section_priority">🎯 Prioritization</string>
+    <string name="priority_high">High</string>
+    <string name="priority_medium">Medium</string>
+    <string name="priority_low">Low</string>
+    <string name="check_dynamic_priority">⚡ Dynamic adjustment</string>
+    <string name="check_learning_mode">🔄 Learning mode (recursive improvement)</string>
+
+    <!-- Alerts -->
+    <string name="no_alerts">No alerts available</string>
+    <string name="btn_acknowledge">Acknowledge</string>
+
+    <!-- Settings -->
+    <string name="section_profile">👤 Profile &amp; security</string>
+    <string name="label_user">User</string>
+    <string name="label_organization">Organization</string>
+    <string name="section_notifications">🔔 Notifications</string>
+    <string name="switch_push_notifications">Push notifications</string>
+    <string name="switch_offline_only">Work in offline mode only</string>
+    <string name="section_connections">🌐 Connections</string>
+    <string name="switch_external_crowd">External crowdsource search (Apple/Google)</string>
+    <string name="switch_learning_agent">Self-learning agent</string>
+    <string name="switch_dark_mode">Dark mode</string>
+    <string name="section_privacy">🛡️ Privacy (GDPR)</string>
+    <string name="gdpr_consent">I consent to the processing of my data in accordance with the company agreement.</string>
+    <string name="gdpr_note">All location data is stored exclusively on the device. External channels (crowd/satellite) are disabled by default and require explicit consent.</string>
+    <string name="section_tools">📡 Advanced tools</string>
+    <string name="tool_node_status">Query nodes (status, rate limits, on/off)</string>
+    <string name="tool_temp_mail">Temporary e-mail (OTP for registrations)</string>
+    <string name="tool_security_center">Security &amp; Integrity Center</string>
+    <string name="tool_esp32_config">ESP32 gateway configuration</string>
+    <string name="section_foreground_service">🤖 Foreground service</string>
+    <string name="foreground_hint">Keeps the agent active even when the app is in the background.</string>
+    <string name="section_data_export">💾 Data &amp; export</string>
+    <string name="btn_backup">Backup</string>
+    <string name="btn_csv">CSV</string>
+    <string name="btn_pdf">PDF</string>
+    <string name="btn_detections_csv">Detections CSV</string>
+    <string name="btn_csv_encrypted">CSV 🔒</string>
+    <string name="btn_restore">Restore</string>
+    <string name="backups_available">%1$d backups available</string>
+    <string name="offline_maps_url">Offline maps: %1$s</string>
+    <string name="footer_version">SecureGuard Enterprise v1.0.0 · generic LoRa/LoRaWAN</string>
+
+    <!-- Temp mail -->
+    <string name="tempmail_not_configured">⚠️ No MCP server configured.\nSet MCP_SERVER_URL in local.properties to use temporary e-mail inboxes.</string>
+    <string name="current_inbox">📨 Current inbox</string>
+    <string name="inbox_email">📧 %1$s</string>
+    <string name="inbox_token">🔑 Token: %1$s…</string>
+    <string name="inbox_id">📋 ID: %1$s</string>
+    <string name="no_inbox">No inbox created</string>
+    <string name="btn_new_inbox">📬 New inbox</string>
+    <string name="btn_quick_register">⚡ Quick register + OTP</string>
+    <string name="btn_magic_link">🔗 Get magic link</string>
+    <string name="btn_check_saved_otp">📋 Check saved OTP</string>
+    <string name="btn_wait_otp">⏳ Get OTP</string>
+    <string name="otp_received">✅ OTP received!</string>
+    <string name="otp_none">❌ No OTP</string>
+    <string name="otp_value">🔑 OTP: %1$s</string>
+    <string name="otp_from">📧 From: %1$s</string>
+    <string name="otp_subject">📋 Subject: %1$s</string>
+    <string name="section_log">📋 Log</string>
+    <string name="register_status_in_progress">Registering at %1$s…</string>
+    <string name="register_status_success">✅ Registered: %1$s (OTP: %2$s)</string>
+    <string name="register_status_error">❌ %1$s</string>
+
+    <!-- Security -->
+    <string name="label_encryption">Encryption</string>
+    <string name="enc_aes_gcm">AES/GCM/NoPadding</string>
+    <string name="enc_keystore">AndroidKeyStore</string>
+    <string name="enc_256bit">256-bit key</string>
+    <string name="enc_hardware">Hardware-backed</string>
+    <string name="label_pin_auth">PIN authentication</string>
+    <string name="pin_configured_info">PIN configured · auto-lock: 5 min · max. 5 attempts</string>
+    <string name="pin_not_configured">No PIN configured</string>
+    <string name="label_new_pin">New PIN</string>
+    <string name="label_set_pin">Set PIN (min. 4 characters)</string>
+    <string name="pin_set">PIN set</string>
+    <string name="pin_min_length">At least 4 characters</string>
+    <string name="pin_message_locked">App locked</string>
+    <string name="pin_message_removed">PIN removed</string>
+    <string name="wrong_pin_attempts">Wrong PIN – %1$d attempts remaining</string>
+    <string name="wrong_pin_locked">Wrong PIN – app locked</string>
+    <string name="label_pin">PIN</string>
+    <string name="label_rbac">RBAC role model</string>
+    <string name="rbac_admin_desc">Full access</string>
+    <string name="rbac_manager_desc">Assets + actions</string>
+    <string name="rbac_operator_desc">Own assets</string>
+    <string name="rbac_viewer_desc">Read only</string>
+    <string name="label_hardware_diag">Hardware diagnostics</string>
+    <string name="diag_nfc">NFC available</string>
+    <string name="btn_aes_test">AES test</string>
+    <string name="btn_gps">GPS</string>
+    <string name="label_audit_log">Audit log (%1$d)</string>
+
+    <!-- ESP32 config -->
+    <string name="label_target_device">Target device</string>
+    <string name="no_assets">No assets available</string>
+    <string name="label_wifi_config">WiFi configuration</string>
+    <string name="label_ssid">SSID</string>
+    <string name="label_password">Password</string>
+    <string name="label_mqtt_broker">MQTT broker</string>
+    <string name="label_host">Host</string>
+    <string name="label_port">Port</string>
+    <string name="send_config_title">Send CONFIG command</string>
+    <string name="send_config_hint">Sends the configuration to the ESP32 gateway via MQTT. The gateway stores the values in NVS and restarts.</string>
+    <string name="btn_send_to">Send to %1$s</string>
+    <string name="label_usb_serial">USB serial adapter</string>
+    <string name="btn_scan_adapters">Scan adapters</string>
+    <string name="label_firmware_info">Firmware info</string>
+    <string name="info_platform">Platform</string>
+    <string name="info_lora">LoRa</string>
+    <string name="info_ble_service">BLE service</string>
+    <string name="info_commands">Commands</string>
+    <string name="info_nvs_keys">NVS keys</string>
+    <string name="info_adc">ADC</string>
+    <string name="no_usb_adapters">No USB serial adapters found</string>
+    <string name="sending_config">Sending CONFIG to %1$s…</string>
+    <string name="config_sent">✅ CONFIG sent to %1$s</string>
+    <string name="config_offline_queued">⚠️ CONFIG queued offline (no connection)</string>
+    <string name="asset_not_found">❌ Asset %1$s not found</string>
+
+    <!-- Sensor fusion -->
+    <string name="fusion_status">Fusion status</string>
+    <string name="tracked_assets">Tracked assets</string>
+    <string name="fusion_node">Node %1$s</string>
+    <string name="rssi_unit">%1$d dBm</string>
+    <string name="fusion_signal_strong">Strong</string>
+    <string name="fusion_status_active">Active</string>
+    <string name="fusion_status_standby">Standby</string>
+
+    <!-- Actions/Notifications -->
+    <string name="action_executed">%1$s executed</string>
+    <string name="error_no_permission">Not authorized</string>
+    <string name="error_delivery_failed">Delivery failed (offline queue)</string>
+    <string name="alert_action_message">%1$s: %2$s</string>
+    <string name="notification_action_success">Action executed</string>
+    <string name="notification_action_failed">Action failed</string>
+    <string name="notification_action_body">%1$s · %2$s</string>
+
+    <!-- Settings: backup/export/status -->
+    <string name="export_backup_success">✅ Backup created: %1$s</string>
+    <string name="export_failed">❌ Export failed: %1$s</string>
+    <string name="export_csv_success">✅ CSV exported: %1$s</string>
+    <string name="export_pdf_success">✅ PDF exported: %1$s</string>
+    <string name="export_detections_success">✅ Detections exported: %1$s</string>
+    <string name="export_encrypted_success">✅ Encrypted export: %1$s</string>
+    <string name="restore_prepared">✅ Restore prepared: %1$s (restart the app)</string>
+    <string name="restore_failed">❌ Restore failed</string>
+    <string name="restore_error">❌ Restore: %1$s</string>
+    <string name="no_backups">⚠️ No backups available</string>
+    <string name="fg_service_started">✅ Agent started as foreground service</string>
+    <string name="fg_service_stopped">⏹ Foreground service stopped</string>
+
+    <!-- Asset list -->
+    <string name="no_assets_found">No assets found</string>
+    <string name="add_asset_or_change_filter">Add an asset or change the filters</string>
+
+    <!-- Security: GPS diagnostics -->
+    <string name="gps_location_format">📍 %1$s, %2$s (±%3$sm)</string>
+    <string name="gps_no_fix">❌ No GPS fix available</string>
+
+    <!-- Temp mail log -->
+    <string name="tm_creating_inbox">📬 Creating new inbox…</string>
+    <string name="tm_inbox_created">✅ Inbox created: %1$s</string>
+    <string name="tm_inbox_create_failed">❌ Failed to create inbox (MCP server configured?)</string>
+    <string name="tm_waiting_otp">⏳ Waiting for OTP (up to 45 s)…</string>
+    <string name="tm_otp_received">✅ OTP received: %1$s</string>
+    <string name="tm_otp_from_subject">📧 From: %1$s · Subject: %2$s</string>
+    <string name="tm_no_otp_timeout">❌ No OTP received (timeout?)</string>
+    <string name="tm_inbox_cleared">🗑️ Inbox cleared</string>
+    <string name="tm_last_otp">📋 Last OTP: %1$s (%2$s)</string>
+    <string name="tm_no_saved_otp">ℹ️ No saved OTP available</string>
+    <string name="tm_waiting_magic_link">⏳ Waiting for magic link (45 s)…</string>
+    <string name="tm_magic_link">✅ Magic link: %1$s…</string>
+    <string name="tm_no_magic_link">❌ No magic link received</string>
+    <string name="tm_quick_register">🔄 Quick register: inbox + OTP…</string>
+    <string name="tm_otp_is">✅ OTP: %1$s</string>
+    <string name="tm_quick_register_failed">❌ Quick register failed</string>
+    <string name="tm_auto_register">🌐 Auto register at %1$s…</string>
+    <string name="tm_waiting_otp_short">⏳ Waiting for OTP…</string>
+
+    <!-- Map/status details -->
+    <string name="maintenance_due">🔧 Maintenance due</string>
+    <string name="map_status_line">⏱ %1$s | 📍 %2$d visible</string>
+    <string name="last_refresh">Last refresh: %1$s</string>
+    <string name="querying_in_progress">" · Querying…"</string>
+
+    <!-- Terminal output (command keywords &amp; [OK]/[ERR] prefixes stay protocol literals) -->
+    <string name="term_agent_started">"  [OK] Agent started."</string>
+    <string name="term_agent_stopped">"  [OK] Agent stopped."</string>
+    <string name="term_cycle_manual">"  [INFO] Manual cycle started…"</string>
+    <string name="term_cycle_result">"  [OK] %1$d assets | %2$d detections"</string>
+    <string name="term_flush_result">"  [OK] %1$d actions delivered."</string>
+    <string name="term_help_header">"  Commands:"</string>
+    <string name="term_help_status">"    status  - Show agent status"</string>
+    <string name="term_help_start">"    start   - Start agent"</string>
+    <string name="term_help_stop">"    stop    - Stop agent"</string>
+    <string name="term_help_cycle">"    cycle   - Manual scan cycle"</string>
+    <string name="term_help_flush">"    flush   - Deliver offline queue"</string>
+    <string name="term_help_clear">"    clear   - Clear terminal"</string>
+    <string name="term_help_self">"    help    - This help"</string>
+    <string name="term_unknown_cmd">"  [ERR] Unknown command: %1$s"</string>
+    <string name="term_hint_help">"  Type \'help\' for available commands."</string>
+
+    <!-- Sensor fusion labels -->
+    <string name="sf_confidence">Confidence</string>
+    <string name="sf_deviation">Deviation</string>
+    <string name="sf_channels">Channels</string>
+    <string name="sf_satellites">Satellites</string>
+    <string name="sf_signal_strength">Signal strength</string>
+    <string name="sf_calibrated">Calibrated</string>
+    <string name="sf_axis_x">X-axis</string>
+    <string name="sf_axis_y">Y-axis</string>
+    <string name="sf_axis_z">Z-axis</string>
+    <string name="sf_compass">Compass</string>
+    <string name="sf_network_rssi">Network (RSSI)</string>
+    <string name="sf_nodes_count">%1$d nodes</string>
+
+    <!-- Security: audit &amp; encryption test -->
+    <string name="audit_pin_change">PIN changed via Security Center</string>
+    <string name="audit_pin_disable">PIN removed via Security Center</string>
+    <string name="audit_app_lock">App manually locked via Security Center</string>
+    <string name="audit_cleared">Audit log cleared</string>
+    <string name="encryption_ok">✅ AES/GCM roundtrip OK</string>
+    <string name="encryption_failed">❌ Decryption failed</string>
 </resources>

@@ -39,10 +39,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.navigation.Routes
@@ -70,26 +72,26 @@ fun MapScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("🗺️ Kartenansicht") },
+                title = { Text(stringResource(R.string.title_map)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Aktualisieren")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_refresh))
                     }
                     IconButton(onClick = { viewModel.zoomIn() }) {
-                        Icon(Icons.Default.ZoomIn, contentDescription = "Vergrößern")
+                        Icon(Icons.Default.ZoomIn, contentDescription = stringResource(R.string.cd_zoom_in))
                     }
                     IconButton(onClick = { viewModel.zoomOut() }) {
-                        Icon(Icons.Default.ZoomOut, contentDescription = "Verkleinern")
+                        Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.cd_zoom_out))
                     }
                     IconButton(onClick = { viewModel.toggleOfflineMode() }) {
                         Icon(
                             if (isOffline) Icons.Default.CloudOff else Icons.Default.CloudQueue,
-                            contentDescription = "Offline-Modus"
+                            contentDescription = stringResource(R.string.cd_offline_mode)
                         )
                     }
                 }
@@ -128,7 +130,7 @@ fun MapScreen(
                             position = GeoPoint(asset.latitude!!, asset.longitude!!)
                             icon = markerDrawable(asset)
                             title = asset.shortName
-                            snippet = "📶 ${asset.rssi} dBm"
+                            snippet = context.getString(R.string.rssi_unit, asset.rssi)
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                             setOnMarkerClickListener { _, _ ->
                                 navController.navigate(Routes.assetDetail(asset.id))
@@ -164,22 +166,22 @@ fun MapScreen(
                     modifier = Modifier.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("Legende:", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.legend), style = MaterialTheme.typography.bodySmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         LegendDot(Color(0xFF2E7D32)); Spacer(Modifier.width(6.dp))
-                        Text("Online", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.legend_online), style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.width(12.dp))
                         LegendDot(Color(0xFFC62828)); Spacer(Modifier.width(6.dp))
-                        Text("Offline", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.legend_offline), style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.width(12.dp))
                         LegendDot(Color(0xFFF9A825)); Spacer(Modifier.width(6.dp))
-                        Text("Wartung", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.legend_maintenance), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
 
             Text(
-                text = "⏱ $lastUpdate | 📍 ${assets.count { it.latitude != null }} sichtbar",
+                text = stringResource(R.string.map_status_line, lastUpdate, assets.count { it.latitude != null }),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier

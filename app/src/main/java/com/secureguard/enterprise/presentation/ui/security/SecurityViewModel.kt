@@ -6,7 +6,10 @@ import com.secureguard.enterprise.data.model.AuditLog
 import com.secureguard.enterprise.services.AuthManager
 import com.secureguard.enterprise.services.AuditLogService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import com.secureguard.enterprise.R
 import kotlinx.coroutines.flow.MutableStateFlow
+import android.content.Context
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -14,6 +17,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SecurityViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val authManager: AuthManager,
     private val auditLogService: AuditLogService,
     private val encryptionService: com.secureguard.enterprise.services.EncryptionService,
@@ -39,7 +43,7 @@ class SecurityViewModel @Inject constructor(
     fun configurePin(pin: String) {
         authManager.configurePin(pin)
         viewModelScope.launch {
-            auditLogService.log("PIN_CHANGE", "PIN geändert über Security-Center")
+            auditLogService.log("PIN_CHANGE", context.getString(R.string.audit_pin_change))
             loadAuditLog()
         }
     }
@@ -47,7 +51,7 @@ class SecurityViewModel @Inject constructor(
     fun disablePin() {
         authManager.disablePin()
         viewModelScope.launch {
-            auditLogService.log("PIN_DISABLE", "PIN entfernt über Security-Center")
+            auditLogService.log("PIN_DISABLE", context.getString(R.string.audit_pin_disable))
             loadAuditLog()
         }
     }
@@ -55,13 +59,13 @@ class SecurityViewModel @Inject constructor(
     fun lockApp() {
         authManager.lock()
         viewModelScope.launch {
-            auditLogService.log("APP_LOCK", "App manuell gesperrt über Security-Center")
+            auditLogService.log("APP_LOCK", context.getString(R.string.audit_app_lock))
         }
     }
 
     fun clearAuditLog() {
         viewModelScope.launch {
-            auditLogService.log("AUDIT_CLEAR", "Audit-Log geleert")
+            auditLogService.log("AUDIT_CLEAR", context.getString(R.string.audit_cleared))
             _auditEntries.value = emptyList()
         }
     }
@@ -75,7 +79,7 @@ class SecurityViewModel @Inject constructor(
         val encrypted = encryptionService.encrypt(testData.toByteArray())
         val decrypted = encryptionService.decrypt(encrypted.data, encrypted.iv)
         val match = String(decrypted) == testData
-        _encryptionTestResult.value = if (match) "✅ AES/GCM Roundtrip OK" else "❌ Entschlüsselung fehlgeschlagen"
+        _encryptionTestResult.value = if (match) context.getString(R.string.encryption_ok) else context.getString(R.string.encryption_failed)
     }
 
     // GPS location
@@ -86,9 +90,14 @@ class SecurityViewModel @Inject constructor(
         viewModelScope.launch {
             val location = satelliteService.currentLocation()
             _gpsLocation.value = if (location != null) {
-                "📍 ${"%.5f".format(location.latitude)}, ${"%.5f".format(location.longitude)} (±${"%.0f".format(location.accuracy)}m)"
+                context.getString(
+                    R.string.gps_location_format,
+                    "%.5f".format(location.latitude),
+                    "%.5f".format(location.longitude),
+                    "%.0f".format(location.accuracy)
+                )
             } else {
-                "❌ Kein GPS-Fix verfügbar"
+                context.getString(R.string.gps_no_fix)
             }
         }
     }

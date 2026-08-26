@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -71,15 +73,15 @@ fun SecurityScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Security & Integrity Center") },
+                title = { Text(stringResource(R.string.title_security)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.loadAuditLog() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Aktualisieren")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_refresh))
                     }
                 }
             )
@@ -99,13 +101,13 @@ fun SecurityScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.size(8.dp))
-                            Text("Verschlüsselung", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.label_encryption), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.height(8.dp))
-                        StatusRow("AES/GCM/NoPadding", true)
-                        StatusRow("AndroidKeyStore", true)
-                        StatusRow("256-Bit Schlüssel", true)
-                        StatusRow("Hardware-gesichert", true)
+                        StatusRow(stringResource(R.string.enc_aes_gcm), true)
+                        StatusRow(stringResource(R.string.enc_keystore), true)
+                        StatusRow(stringResource(R.string.enc_256bit), true)
+                        StatusRow(stringResource(R.string.enc_hardware), true)
                     }
                 }
             }
@@ -117,14 +119,13 @@ fun SecurityScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.size(8.dp))
-                            Text("PIN-Authentifizierung", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.label_pin_auth), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.weight(1f))
                             StatusDot(pinConfigured)
                         }
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            if (pinConfigured) "PIN konfiguriert · Auto-Lock: 5 Min · Max. 5 Versuche"
-                            else "Keine PIN konfiguriert",
+                            stringResource(if (pinConfigured) R.string.pin_configured_info else R.string.pin_not_configured),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -132,7 +133,7 @@ fun SecurityScreen(
                         OutlinedTextField(
                             value = newPin,
                             onValueChange = { newPin = it },
-                            label = { Text(if (pinConfigured) "Neue PIN" else "PIN setzen (min. 4 Zeichen)") },
+                            label = { Text(stringResource(if (pinConfigured) R.string.label_new_pin else R.string.label_set_pin)) },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
@@ -143,26 +144,26 @@ fun SecurityScreen(
                                 onClick = {
                                     if (newPin.length >= 4) {
                                         viewModel.configurePin(newPin)
-                                        pinMessage = "PIN gesetzt"
+                                        pinMessage = stringResource(R.string.pin_set)
                                         newPin = ""
                                     } else {
-                                        pinMessage = "Mindestens 4 Zeichen"
+                                        pinMessage = stringResource(R.string.pin_min_length)
                                     }
                                 }
-                            ) { Text(if (pinConfigured) "Ändern" else "Setzen") }
+                            ) { Text(stringResource(if (pinConfigured) R.string.btn_change else R.string.btn_set)) }
                             if (pinConfigured) {
                                 Button(
                                     onClick = {
                                         viewModel.lockApp()
-                                        pinMessage = "App gesperrt"
+                                        pinMessage = stringResource(R.string.pin_message_locked)
                                     }
-                                ) { Text("Sperren") }
+                                ) { Text(stringResource(R.string.btn_lock)) }
                                 Button(
                                     onClick = {
                                         viewModel.disablePin()
-                                        pinMessage = "PIN entfernt"
+                                        pinMessage = stringResource(R.string.pin_message_removed)
                                     }
-                                ) { Text("Entfernen") }
+                                ) { Text(stringResource(R.string.btn_remove)) }
                             }
                         }
                         pinMessage?.let {
@@ -177,12 +178,12 @@ fun SecurityScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("RBAC Rollenmodell", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.label_rbac), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
-                        RoleRow("ADMIN", "Vollzugriff", listOf("VIEW", "EDIT", "DELETE", "EXECUTE", "LOGS", "CONFIG", "USERS"))
-                        RoleRow("MANAGER", "Assets + Aktionen", listOf("VIEW", "EDIT", "EXECUTE", "LOGS"))
-                        RoleRow("OPERATOR", "Eigene Assets", listOf("VIEW", "EXECUTE"))
-                        RoleRow("VIEWER", "Nur Lesen", listOf("VIEW"))
+                        RoleRow("ADMIN", stringResource(R.string.rbac_admin_desc), listOf("VIEW", "EDIT", "DELETE", "EXECUTE", "LOGS", "CONFIG", "USERS"))
+                        RoleRow("MANAGER", stringResource(R.string.rbac_manager_desc), listOf("VIEW", "EDIT", "EXECUTE", "LOGS"))
+                        RoleRow("OPERATOR", stringResource(R.string.rbac_operator_desc), listOf("VIEW", "EXECUTE"))
+                        RoleRow("VIEWER", stringResource(R.string.rbac_viewer_desc), listOf("VIEW"))
                     }
                 }
             }
@@ -191,14 +192,14 @@ fun SecurityScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Hardware-Diagnose", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.label_hardware_diag), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
-                        StatusRow("NFC verfügbar", viewModel.nfcAvailable)
-                        StatusRow("Verschlüsselung", true)
+                        StatusRow(stringResource(R.string.diag_nfc), viewModel.nfcAvailable)
+                        StatusRow(stringResource(R.string.label_encryption), true)
                         Spacer(Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { viewModel.testEncryption() }) { Text("AES Test") }
-                            Button(onClick = { viewModel.fetchGpsLocation() }) { Text("GPS") }
+                            Button(onClick = { viewModel.testEncryption() }) { Text(stringResource(R.string.btn_aes_test)) }
+                            Button(onClick = { viewModel.fetchGpsLocation() }) { Text(stringResource(R.string.btn_gps)) }
                         }
                         encryptionResult?.let {
                             Spacer(Modifier.height(4.dp))
@@ -215,10 +216,10 @@ fun SecurityScreen(
             // Audit Log
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Audit-Log (${auditEntries.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.label_audit_log, auditEntries.size), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = { viewModel.clearAuditLog() }) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = "Löschen")
+                        Icon(Icons.Default.DeleteSweep, contentDescription = stringResource(R.string.cd_delete))
                     }
                 }
             }

@@ -18,6 +18,6 @@ data class ActionResult(
     val message: String
 ) {
     companion object {
-        val Processing = ActionResult(false, "Wird ausgeführt...")
+        val Processing = ActionResult(false, "…")
     }
 }

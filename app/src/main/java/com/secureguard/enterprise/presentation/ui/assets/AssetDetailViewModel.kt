@@ -1,7 +1,9 @@
 package com.secureguard.enterprise.presentation.ui.assets
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.AlertSeverity
 import com.secureguard.enterprise.data.model.AlertType
 import com.secureguard.enterprise.data.model.Asset
@@ -27,6 +29,7 @@ import com.secureguard.enterprise.services.UrbanService
 import com.secureguard.enterprise.services.BleService
 import com.secureguard.enterprise.services.WifiService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +40,7 @@ enum class SearchChannel { ALL, BLE, LORA, WIFI, OPTICAL, URBAN, CROWD, SATELLIT
 
 @HiltViewModel
 class AssetDetailViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: SecureGuardRepository,
     private val telemetryService: TelemetryService,
     private val agentService: AgentService,
@@ -92,15 +96,15 @@ class AssetDetailViewModel @Inject constructor(
             // RBAC permission check
             val user = User(id = "local", name = "Admin", role = Role.ADMIN)
             if (!RoleManager.hasPermission(user, Permission.EXECUTE_ACTIONS)) {
-                _actionResult.value = ActionResult(false, "Keine Berechtigung")
+                _actionResult.value = ActionResult(false, context.getString(R.string.error_no_permission))
                 return@launch
             }
 
             val success = agentService.sendAction(asset, actionType.wireCommand)
             val result = if (success) {
-                ActionResult(true, "${actionType.label} ausgeführt")
+                ActionResult(true, context.getString(R.string.action_executed, actionType.label))
             } else {
-                ActionResult(false, "Zustellung fehlgeschlagen (Offline-Queue)")
+                ActionResult(false, context.getString(R.string.error_delivery_failed))
             }
             _actionResult.value = result
 
@@ -108,7 +112,7 @@ class AssetDetailViewModel @Inject constructor(
                 assetId = asset.id,
                 type = if (success) AlertType.INFO else AlertType.WARNING,
                 severity = if (success) AlertSeverity.INFO else AlertSeverity.WARNING,
-                message = "${actionType.label}: ${result.message}"
+                message = context.getString(R.string.alert_action_message, actionType.label, result.message)
             )
             notificationService.sendActionNotification(asset, actionType, success)
         }

@@ -1,11 +1,14 @@
 package com.secureguard.enterprise.presentation.ui.esp32
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AuditLogService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +18,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class Esp32ConfigViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: SecureGuardRepository,
     private val agentService: AgentService,
     private val auditLogService: AuditLogService,
@@ -33,7 +37,7 @@ class Esp32ConfigViewModel @Inject constructor(
     fun scanUsbDevices() {
         val drivers = usbSerialService.availableDrivers()
         _usbDevices.value = if (drivers.isEmpty()) {
-            "Keine USB-Serial-Adapter gefunden"
+            context.getString(R.string.no_usb_adapters)
         } else {
             drivers.joinToString("\n") { d ->
                 "${d.device.deviceName} (VID:${d.device.vendorId} PID:${d.device.productId}, ${d.ports.size} Ports)"
@@ -43,21 +47,21 @@ class Esp32ConfigViewModel @Inject constructor(
 
     fun sendConfig(targetMac: String, configJson: String) {
         viewModelScope.launch {
-            _lastCommand.value = "Sende CONFIG an $targetMac..."
+            _lastCommand.value = context.getString(R.string.sending_config, targetMac)
             val asset = repository.getAssetByMac(targetMac)
             if (asset != null) {
                 val success = agentService.sendAction(asset, "CONFIG:$configJson")
                 _lastCommand.value = if (success) {
-                    "✅ CONFIG gesendet an $targetMac"
+                    context.getString(R.string.config_sent, targetMac)
                 } else {
-                    "⚠️ CONFIG in Offline-Queue (keine Verbindung)"
+                    context.getString(R.string.config_offline_queued)
                 }
                 auditLogService.log(
                     action = "ESP32_CONFIG",
                     details = "CONFIG an $targetMac: $configJson"
                 )
             } else {
-                _lastCommand.value = "❌ Asset $targetMac nicht gefunden"
+                _lastCommand.value = context.getString(R.string.asset_not_found, targetMac)
             }
         }
     }
