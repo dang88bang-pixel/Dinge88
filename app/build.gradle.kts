@@ -1,3 +1,6 @@
+import java.io.File
+import java.nio.file.Files
+import java.time.Instant
 import java.util.Properties
 
 plugins {
@@ -284,7 +287,7 @@ tasks.register("publishApkDelivery") {
             val apks = apkDir.listFiles { f: File -> f.isFile && f.extension == "apk" }?.sortedBy { it.name } ?: emptyList()
             logger.lifecycle("publishApkDelivery: buildType=$buildType, gefundene APKs=${apks.map { it.name }}")
 
-            val workDir = java.nio.file.Files.createTempDirectory("apkdelivery").toFile()
+            val workDir = Files.createTempDirectory("apkdelivery").toFile()
             val dist = File(workDir, "apk-dist").apply { mkdirs() }
 
             // 1) APKs kopieren, große splitten (GitHub blockt Blobs > 100 MB)
@@ -329,7 +332,7 @@ tasks.register("publishApkDelivery") {
                 appendLine("compileSdk     : ${android.compileSdk}")
                 appendLine("ciRunId        : $ghRunId")
                 appendLine("commit         : $ghSha")
-                appendLine("timestamp (UTC): ${java.time.Instant.now()}")
+                appendLine("timestamp (UTC): ${Instant.now()}")
                 appendLine()
                 if (diag.isNotEmpty()) {
                     appendLine("=== DIAGNOSE (fehlgeschlagene Tasks) ===")
@@ -345,9 +348,13 @@ tasks.register("publishApkDelivery") {
             val remote = "https://x-access-token:$ghToken@github.com/$ghRepo.git"
             var (c, o) = sh(listOf("git", "init", "-q", "-b", branch, workDir.absolutePath))
             if (c != 0) throw GradleException("git init: $o")
-            listOf("git", "-C", workDir.absolutePath, "add", "-f", "apk-dist").let { (cc, oo) -> if (cc != 0) throw GradleException("git add: $oo") }
+            sh(listOf("git", "-C", workDir.absolutePath, "add", "-f", "apk-dist")).let { (cc, oo) ->
+                if (cc != 0) throw GradleException("git add: $oo")
+            }
             val commitMsg = "APK-Delivery: buildType=$buildType run=$ghRunId sha=${ghSha.take(7)}"
-            listOf("git", "-C", workDir.absolutePath, "commit", "-q", "-m", commitMsg).let { (cc, oo) -> if (cc != 0) throw GradleException("git commit: $oo") }
+            sh(listOf("git", "-C", workDir.absolutePath, "commit", "-q", "-m", commitMsg)).let { (cc, oo) ->
+                if (cc != 0) throw GradleException("git commit: $oo")
+            }
             val (pc, po) = sh(listOf("git", "-C", workDir.absolutePath, "push", "-q", "--force", remote, "HEAD:refs/heads/$branch"))
             if (pc != 0) throw GradleException("git push (${po.take(500)})")
             logger.lifecycle("publishApkDelivery: OK -> Branch '$branch' (run=$ghRunId). Dateien: ${dist.listFiles()?.joinToString { it.name }}")
