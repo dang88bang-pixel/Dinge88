@@ -730,17 +730,24 @@ services:
 
 ### Testing
 
-| Library | Version |
-|---------|---------|
+Siehe [docs/TESTING.md](docs/TESTING.md). **Passwörter/PINs setzt der Anwender selbst.**
+
+```bash
+./gradlew :app:testDebugUnitTest
+./gradlew :app:connectedDebugAndroidTest   # Emulator/Gerät
+```
+
+| Abhängigkeit | Version |
+|--------------|---------|
 | junit | 4.13.2 |
+| robolectric | 4.14.1 |
+| mockk | 1.13.13 |
+| truth | 1.4.4 |
 | androidx-test-ext-junit | 1.1.5 |
 | espresso-core | 3.5.1 |
 | compose-ui-test-junit4 | (BOM) |
 | compose-ui-test-manifest | (BOM) |
 
----
-
-## 🔨 Build & CI
 
 ### GitHub Actions
 

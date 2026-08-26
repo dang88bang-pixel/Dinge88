@@ -29,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -96,21 +97,21 @@ fun AddAssetScreen(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
                 label = { Text("Name") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("asset_name_field"),
                 singleLine = true
             )
             OutlinedTextField(
                 value = state.shortName,
                 onValueChange = viewModel::onShortNameChange,
                 label = { Text("Kurzname (z.B. Roller #6)") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("asset_short_name_field"),
                 singleLine = true
             )
             OutlinedTextField(
                 value = state.mac,
                 onValueChange = viewModel::onMacChange,
                 label = { Text("MAC-Adresse (AA:BB:CC:DD:EE:FF)") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("asset_mac_field"),
                 singleLine = true,
                 trailingIcon = {
                     IconButton(onClick = { navController.navigate("scan_qr") }) {
@@ -141,7 +142,7 @@ fun AddAssetScreen(
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = { viewModel.save() },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().testTag("asset_save_button")
             ) {
                 Text("💾 Asset speichern")
             }

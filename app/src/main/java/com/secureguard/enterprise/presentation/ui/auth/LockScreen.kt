@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 
@@ -54,7 +55,8 @@ fun LockScreen(
             onValueChange = { pin = it },
             label = { Text("PIN") },
             visualTransformation = PasswordVisualTransformation(),
-            singleLine = true
+            singleLine = true,
+            modifier = Modifier.testTag("lock_pin_field")
         )
         error?.let {
             Spacer(Modifier.height(8.dp))
@@ -78,7 +80,8 @@ fun LockScreen(
                         "Falsche PIN – App gesperrt"
                     }
                 }
-            }
+            },
+            modifier = Modifier.testTag("lock_unlock_button")
         ) {
             Text("Entsperren")
         }

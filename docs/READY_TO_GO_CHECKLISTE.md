@@ -3,6 +3,8 @@
 Stand: 2026-08-26 · Branch `arena/01a03c79-dinge88`  
 Ziel: **vollständige App mit allen Diensten angebunden und einsatzbereit**.
 
+> **Update 2026-08-26 (Batch 3):** UI/Unit-Tests (PIN, Asset-CRUD, Agent-Cycle); Keystore-Passwörter nur vom Anwender.
+
 > **Update 2026-08-26 (Batch 2):** SQLCipher Room, Release-Keystore-Script, Release NSC ohne Cleartext.
 
 > **Update 2026-08-26 (Batch Ready-to-Go):** Runtime-Endpunkte (Settings), MQTT Auth,
@@ -39,7 +41,7 @@ Legende:
 | Release-Signing | ✅/⚙️ | `scripts/create-release-keystore.sh` + CI-Secrets |
 | SQLCipher (DB-Verschlüsselung) | ✅ | sqlcipher-android + KeyStore-Passphrase + Migration |
 | Produktiv-TLS / Zertifikate | ✅/⚙️ | release NSC verbietet Cleartext; MQTT ssl:// ready |
-| Instrumentierte UI-Tests | ❌ | nur 2 Unit-Tests |
+| Instrumentierte UI-Tests | ✅/⚙️ | Compose Lock+Asset + Unit Auth/CRUD/Agent (lokal/CI) |
 | Verifizierter Gradle-Build (diese Sandbox) | ❌ | kein JDK/SDK/Netz hier – **lokal bauen** |
 
 **Fazit:** Die App ist **feature-complete im Code**.  
@@ -253,7 +255,7 @@ Ohne Key → Kanal liefert `null`/leer, App bleibt stabil.
 | 8 | **Node-RED Flows** | ✅ | `nodered/flows.json` Telemetrie/Commands/Health |
 | 9 | **Mipmap-PNG Fallbacks** | 🟡 | nur adaptive icons (API 26+); minSdk 26 → OK, aber keine mdpi-WebP |
 | 10 | **compileSdk 34 vs CI 35** | ✅ | compileSdk = targetSdk = 35 |
-| 11 | **Instrumented Tests / E2E** | ❌ | keine Espresso/Compose-UI-Tests mit Hilt |
+| 11 | **Instrumented Tests / E2E** | ✅/⚙️ | LockScreen + AddAsset Compose; Unit Auth/Asset/Agent |
 | 12 | **Multi-User / Server-RBAC** | 🟡 | `RoleManager` lokal vorbereitet, kein Login-Server |
 | 13 | **MQTT Auth (User/Pass)** | ✅ | EndpointConfig + MqttConnectOptions; ssl:// SocketFactory |
 | 14 | **Play Integrity / SafetyNet** | ❌ | nicht vorgesehen |
@@ -337,7 +339,7 @@ Priorität hoch → niedrig:
 6. ✅ Asset-Sync  
 7. ✅ Node-RED Flows  
 8. ✅ SQLCipher  
-9. ❌ UI-Tests (Agent-Cycle, Login/PIN, Asset-CRUD)  
+9. ✅/⚙️ UI-Tests (Agent-Cycle-Logik, Login/PIN, Asset-CRUD) – lokal `./gradlew testDebugUnitTest` / `connectedDebugAndroidTest`  
 10. ❌ Monitoring (Health-Dashboard, Alerting ops)  
 11. ❌ DSGVO: AVV, Löschkonzept UI, Export „Datenauskunft“  
 12. ✅ compileSdk 35
@@ -361,7 +363,7 @@ Priorität hoch → niedrig:
 
 **Code-seitig:** App, Agent, 30 Services, 8 APIs, Backend, Firmware, Offline-Skripte = **weitgehend complete**.  
 
-**Ready-to-go mit allen Diensten:** noch **Build-Umgebung**, **Docker-Backend**, **echte URLs/Keys in `local.properties`**, **Permissions**, optional **ESP32**. Batch 1+2 erledigt (Runtime-URLs, MQTT Auth, SQLCipher, Signing-Script, Release-NSC, YOLO/LoRa/CKAN, Asset-Sync). Offen: UI-Tests, Monitoring, DSGVO-UI, Host-Build.
+**Ready-to-go mit allen Diensten:** noch **Build-Umgebung**, **Docker-Backend**, **echte URLs/Keys in `local.properties`**, **Permissions**, optional **ESP32**. Batch 1–3 erledigt (Runtime-URLs, MQTT Auth, SQLCipher, Signing-Script, Release-NSC, YOLO/LoRa/CKAN, Asset-Sync, UI/Unit-Tests). Offen: Monitoring, DSGVO-UI, Host-Build/CI grün. **Passwörter/PINs setzt der Anwender selbst.**
 
 Wenn du willst, können wir als Nächstes **eine** der Lücken gezielt schließen – empfohlen Reihenfolge:  
-`Batch 1+2 ✅` → nächster Schritt: **UI/E2E Compose-Tests** → Host `./gradlew assembleRelease` → TLS-Zertifikate ops.
+`Batch 1+2+3 ✅` → nächster Schritt: Host `./gradlew testDebugUnitTest assembleRelease` → TLS-Zertifikate ops → Monitoring/DSGVO-UI.

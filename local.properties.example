@@ -35,6 +35,7 @@ OPEN_DATA_API_URL=https://demo.ckan.org/api/3
 FIND_MY_PROXY_URL=https://find-my-proxy.example.com
 
 # ---- Release Signing (optional, von scripts/create-release-keystore.sh) ----
+# Passwörter vom Anwender setzen – Script generiert keine
 # KEYSTORE_PASSWORD=
 # KEY_ALIAS=secureguard
 # KEY_PASSWORD=

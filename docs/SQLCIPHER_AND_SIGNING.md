@@ -24,9 +24,14 @@ DB-Datei löschen (Datenverlust).
 
 ## Release-Keystore
 
+**Passwörter legt der Anwender selbst fest** – das Script generiert keine.
+
 ```bash
+export KEYSTORE_PASSWORD='…dein starkes Passwort…'
+export KEY_PASSWORD='…dein Key-Passwort…'   # optional, default = KEYSTORE_PASSWORD
+export KEY_ALIAS=secureguard                # optional
 ./scripts/create-release-keystore.sh
-# oder direkt Secrets pushen:
+# optional Secrets interaktiv:
 ./scripts/create-release-keystore.sh --repo OWNER/NAME
 ```
 
@@ -34,7 +39,7 @@ Erzeugt:
 
 - `app/secureguard-keystore.jks` (gitignored)
 - `app/secureguard-keystore.b64` (für `KEYSTORE_BASE64`)
-- optional Einträge in `local.properties`
+- Hinweise in `local.properties` (ohne Klartext-Passwort)
 
 Lokal:
 
@@ -44,7 +49,7 @@ export KEYSTORE_PASSWORD=... KEY_ALIAS=secureguard KEY_PASSWORD=...
 ```
 
 CI: Secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
-(siehe `.github/workflows/build-release.yml`).
+(siehe `.github/workflows/build-release.yml`) – Werte vom Anwender.
 
 ## Network Security
 
