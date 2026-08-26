@@ -23,7 +23,7 @@ import javax.inject.Inject
 class MapViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: SecureGuardRepository,
-    private val offlineMapService: com.secureguard.enterprise.services.OfflineMapService
+    offlineMapService: OfflineMapService
 ) : ViewModel() {
 
     init {
@@ -57,12 +57,4 @@ class MapViewModel @Inject constructor(
 
     fun zoomIn() { _zoom.value = (_zoom.value + 1f).coerceAtMost(19.0) }
     fun zoomOut() { _zoom.value = (_zoom.value - 1f).coerceAtLeast(3.0) }
-
-    private val _isOffline = MutableStateFlow(false)
-    val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
-
-    fun toggleOfflineMode(mapView: org.osmdroid.views.MapView? = null) {
-        _isOffline.value = !_isOffline.value
-        mapView?.let { offlineMapService.setOfflineMode(it, _isOffline.value) }
-    }
 }

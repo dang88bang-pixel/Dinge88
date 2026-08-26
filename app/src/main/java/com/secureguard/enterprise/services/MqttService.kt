@@ -20,8 +20,7 @@ import javax.inject.Singleton
  * MQTT-Client (Paho) für Echtzeit-Kommunikation mit Assets/Gateways.
  *
  * Implementiert mit [MqttAsyncClient] aus `org.eclipse.paho.client.mqttv3`
- * (nicht mit dem veralteten `paho.android.service` – siehe
- * IMPLEMENTIERUNGS_INVENTUR.md „Abweichungen"). Der Client verbindet sich
+ * (nicht mit dem veralteten `paho.android.service`). Der Client verbindet sich
  * selbstständig, abonniert Telemetrie-/Alert-Themen und emittiert
  * [MqttEvent]s, die vom Agenten gesammelt werden.
  */

@@ -1,8 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SecureGuard Pro</string>
-    <string name="agent_channel_name">Agent-Status</string>
-    <string name="alerts_channel_name">Sicherheitsalarme</string>
-    <string name="telemetry_channel_name">Telemetriedaten</string>
-    <string name="system_channel_name">Systemmeldungen</string>
 </resources>

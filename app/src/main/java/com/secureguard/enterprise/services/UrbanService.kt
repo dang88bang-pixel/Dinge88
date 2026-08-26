@@ -5,81 +5,41 @@ import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.random.Random
 
 /**
  * Urban infrastructure channel: smart-city sensors, public transport hubs,
- * charging stations and partner networks.
- *
- * Queries OpenChargeMap (charging stations), DHL (pack stations) and CKAN
- * (smart-city datasets) near the asset's last known position. A detection
- * is generated when infrastructure nodes are found nearby.
- *
- * Returns null when no urban infrastructure is found near the asset.
+ * charging stations and ANPR cameras operated by partner networks.
  */
 @Singleton
 class UrbanService @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val apiServiceManager: ApiServiceManager
+    @ApplicationContext private val context: Context
 ) : DetectionCapable() {
 
+    private val nodes = listOf(
+        Triple("hub-hbf", 52.5255, 13.3695),
+        Triple("hub-ostkreuz", 52.5040, 13.4680),
+        Triple("charger-mitte", 52.5260, 13.3920),
+        Triple("anpr-auerstr", 52.4980, 13.4040)
+    )
+
     suspend fun searchAsset(asset: Asset): Detection? {
-        val lat = asset.latitude ?: return null
-        val lon = asset.longitude ?: return null
-
-        // 1. Check charging stations nearby
-        val stations = apiServiceManager.searchViaOpenChargeMap(lat, lon)
-        if (stations.isNotEmpty()) {
-            val nearest = stations.first()
-            return Detection(
-                assetMac = asset.mac,
-                sourceType = DetectionSource.URBAN,
-                nodeId = "charger-${nearest.id}",
-                rssi = -75,
-                latitude = nearest.latitude ?: lat,
-                longitude = nearest.longitude ?: lon,
-                accuracyMeters = 50f,
-                message = "Ladesäule: ${nearest.operator ?: nearest.title ?: "Unbekannt"}",
-                timestamp = Date()
-            ).also { emit(it) }
-        }
-
-        // 2. Check DHL pack stations nearby
-        val packstations = apiServiceManager.searchViaDHL(lat, lon)
-        if (packstations.isNotEmpty()) {
-            val nearest = packstations.first()
-            return Detection(
-                assetMac = asset.mac,
-                sourceType = DetectionSource.URBAN,
-                nodeId = "dhl-${nearest.id ?: "unknown"}",
-                rssi = -80,
-                latitude = nearest.latitude ?: lat,
-                longitude = nearest.longitude ?: lon,
-                accuracyMeters = 80f,
-                message = "Packstation: ${nearest.name ?: nearest.id ?: "?"}",
-                timestamp = Date()
-            ).also { emit(it) }
-        }
-
-        // 3. Check CKAN smart-city datasets
-        val datasets = apiServiceManager.searchViaCKAN(asset.mac)
-        if (datasets.isNotEmpty()) {
-            val ds = datasets.first()
-            return Detection(
-                assetMac = asset.mac,
-                sourceType = DetectionSource.URBAN,
-                nodeId = "ckan-${ds.id ?: "unknown"}",
-                rssi = 0,
-                latitude = lat,
-                longitude = lon,
-                accuracyMeters = 100f,
-                message = "Smart-City: ${ds.title ?: "Datensatz gefunden"}",
-                timestamp = Date()
-            ).also { emit(it) }
-        }
-
-        return null
+        delay(250)
+        if (Random.nextFloat() > 0.45f) return null
+        val node = nodes.random()
+        return Detection(
+            assetMac = asset.mac,
+            sourceType = DetectionSource.URBAN,
+            nodeId = node.first,
+            rssi = -70 - Random.nextInt(0, 20),
+            latitude = node.second + Random.nextDouble(-0.002, 0.002),
+            longitude = node.third + Random.nextDouble(-0.002, 0.002),
+            accuracyMeters = 40f,
+            timestamp = Date()
+        ).also { emit(it) }
     }
 }

@@ -20,14 +20,6 @@ class AgentForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_STOP -> {
-                agentService.stop()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
-                return START_NOT_STICKY
-            }
-        }
         startForeground(
             NotificationService.AGENT_NOTIFICATION_ID,
             notificationService.buildAgentNotification("Agent wird initialisiert …")

@@ -38,6 +38,7 @@ except ImportError:
 
 DB_PATH = os.environ.get("DATABASE_PATH", "secureguard.db")
 MQTT_BROKER = os.environ.get("MQTT_BROKER", "mqtt:1883")
+SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
 
 app = FastAPI(title="SecureGuard API", version="1.0.0")
 
@@ -101,57 +102,61 @@ def get_db() -> sqlite3.Connection:
 
 def init_db() -> None:
     conn = get_db()
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS assets (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            mac TEXT UNIQUE,
-            short_name TEXT,
-            status TEXT,
-            latitude REAL,
-            longitude REAL,
-            rssi INTEGER,
-            last_seen TIMESTAMP
-        );
-        CREATE TABLE IF NOT EXISTS detections (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            asset_mac TEXT,
-            source_type TEXT,
-            node_id TEXT,
-            rssi INTEGER,
-            latitude REAL,
-            longitude REAL,
-            timestamp TIMESTAMP
-        );
-        CREATE TABLE IF NOT EXISTS alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            asset_id TEXT,
-            type TEXT,
-            severity TEXT,
-            message TEXT,
-            timestamp TIMESTAMP,
-            resolved INTEGER DEFAULT 0
-        );
-        CREATE TABLE IF NOT EXISTS commands (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            asset_id TEXT,
-            command TEXT,
-            status TEXT,
-            timestamp TIMESTAMP
-        );
-        CREATE TABLE IF NOT EXISTS crowd_sightings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mac TEXT,
-            reporter_id TEXT,
-            rssi INTEGER,
-            latitude REAL,
-            longitude REAL,
-            timestamp TIMESTAMP
-        );
-        CREATE INDEX IF NOT EXISTS idx_crowd_mac ON crowd_sightings(mac);
-        """
-    )
+    if os.path.exists(SCHEMA_PATH):
+        with open(SCHEMA_PATH, "r", encoding="utf-8") as schema:
+            conn.executescript(schema.read())
+    else:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS assets (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                mac TEXT UNIQUE,
+                short_name TEXT,
+                status TEXT,
+                latitude REAL,
+                longitude REAL,
+                rssi INTEGER,
+                last_seen TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS detections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                asset_mac TEXT,
+                source_type TEXT,
+                node_id TEXT,
+                rssi INTEGER,
+                latitude REAL,
+                longitude REAL,
+                timestamp TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                asset_id TEXT,
+                type TEXT,
+                severity TEXT,
+                message TEXT,
+                timestamp TIMESTAMP,
+                resolved INTEGER DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS commands (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                asset_id TEXT,
+                command TEXT,
+                status TEXT,
+                timestamp TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS crowd_sightings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mac TEXT,
+                reporter_id TEXT,
+                rssi INTEGER,
+                latitude REAL,
+                longitude REAL,
+                timestamp TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_crowd_mac ON crowd_sightings(mac);
+            """
+        )
     conn.commit()
     conn.close()
 

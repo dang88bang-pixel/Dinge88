@@ -407,6 +407,8 @@ secureguard/{MAC}/command  (publish für spezifisches Asset)
 
 ## 🗄️ Datenbank (Room v2)
 
+Details zu App- und Backend-Tabellen: [docs/databases.md](docs/databases.md).
+
 ### Schema
 
 ```sql
@@ -602,7 +604,7 @@ services:
 | Kotlin | 2.0.21 |
 | Gradle | 8.9 |
 | JDK | 17 |
-| compileSdk / targetSdk | 34 |
+| compileSdk / targetSdk | 35 |
 | minSdk | 26 (Android 8) |
 
 ### AndroidX Core
@@ -734,9 +736,10 @@ services:
 ### GitHub Actions
 
 Workflow `.github/workflows/build-release.yml`:
-- **Trigger:** Push auf `main`/`develop`, Tags `v*`, Pull Requests, manuell
-- **JDK:** 17 · **SDK:** android-34 · **Build-Tools:** 34.0.0 · **Gradle:** 8.9
-- **Artefakte:** `secureguard-pro-debug` (Debug-APK), `secureguard-pro` (Release-APK)
+- **Trigger:** Push auf `main`/`develop`/`arena/**`, Tags `v*`, Pull Requests, manuell
+- **JDK:** 17 · **SDK:** android-35 · **Build-Tools:** 35.0.0 · **Gradle:** 8.9
+- **Artefakte:** `release.apk` (Release), `app-debug.apk` (Debug)
+- **GitHub Release:** Tag `v1.0.6` mit Datei `release.apk`
 - **Release-Signing:** Optional via `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
 
 ### Lokal bauen
@@ -801,7 +804,10 @@ MCP_SERVER_URL=http://api.example.com:8000
 
 ## 📲 Installation
 
-1. **Debug-APK** aus GitHub Actions laden → `adb install secureguard-pro-debug.apk`
+**Release-APK:** [release.apk](https://github.com/dang88bang-pixel/Dinge88/releases/latest/download/release.apk)
+(GitHub → Releases → `v1.0.6`)
+
+1. APK herunterladen und auf dem Gerät installieren (`adb install release.apk`)
 2. Berechtigungen erteilen: Standort, Bluetooth, Kamera, Benachrichtigungen
 3. Einstellungen → Backend-Endpunkte konfigurieren
 4. Optional: Foreground-Dienst starten für dauerhaften Betrieb
