@@ -14,7 +14,7 @@ Die folgenden Punkte aus der ursprünglichen Liste sind inzwischen **umgesetzt**
 |---|-----|----------------|
 | 1 | ESP32: `onWrite`-Handler für Command-Characteristic + gemeinsame `handleCommand()`-Befehlskette (MQTT + BLE) + `respond()` (Antworten per MQTT **und** BLE-Notify) | Firmware |
 | 2 | Telemetrie-Schema abgestimmt: Firmware sendet jetzt zusätzlich `motor` (echter Relay-Status); `Telemetry`-Modell um `wifiRssi`, `loraRssi`, `uptimeSeconds`, `ipAddress`, `device` erweitert; Parser dokumentiert | Firmware + App |
-| 3 | CI: neuer `test`-Job (`testDebugUnitTest` + `lintDebug`) **vor** dem APK-Build (`build: needs: test`), Reports als Artefakt — ⚠️ **fertig ausgearbeitet, liegt als `docs/ci-workflow-vorschlag.yml` bereit** (GitHub-App dieser Umgebung hat keine `workflows`-Permission → Workflow-Datei kann nicht gepusht werden; Datei 1:1 nach `.github/workflows/build-release.yml` kopieren) | CI |
+| 3 | CI: neuer `test`-Job (`testDebugUnitTest` + `lintDebug`) **vor** dem APK-Build (`build: needs: test`), Reports als Artefakt — ✅ **aktiv in `.github/workflows/build-release.yml`** | CI |
 | 4 | CI: API-Key-Secrets via `ORG_GRADLE_PROJECT_*` an Build & Test durchgereicht — im selben Vorschlag enthalten | CI |
 | 5 | `IMPLEMENTIERUNGS_INVENTUR.md` erstellt (7 dokumentierte Abweichungen) | Doku |
 | 6 | `nodered/flows.json` erstellt (Core-Nodes: secureguard/# → Kanal-Switch, Debug-Sidebar, Zähler, Test-Injects) | Docker |
@@ -184,13 +184,13 @@ Pilotbetrieb ist die komplette `local.properties` ein „fehlender Part".
 ### P0 — Funktionsketten schließen
 - [x] ESP32: `BLECharacteristicCallbacks::onWrite` für `pCommandChar` implementieren (Befehle an selbe `handleCommand()`-Logik wie MQTT) ✅ erledigt
 - [x] Telemetrie-Schema abstimmen: Firmware sendet jetzt `motor` (echter Relay-Status); App-Modell um Firmware-Felder erweitert; simulierte Werte (fuel/tires/hours/km) bewusst NICHT erfunden ✅ erledigt
-- [x] CI: `./gradlew testDebugUnitTest lintDebug` als eigener `test`-Job vor dem APK-Build ✅ ausgearbeitet → `docs/ci-workflow-vorschlag.yml` (Push der Workflow-Datei braucht `workflows`-Permission, siehe Hinweis oben)
+- [x] CI: `./gradlew testDebugUnitTest lintDebug` als eigener `test`-Job vor dem APK-Build ✅ aktiv in `.github/workflows/build-release.yml`
 
 ### P1 — Fehlende Bausteine ergänzen
 - [x] `IMPLEMENTIERUNGS_INVENTUR.md` schreiben ✅ erledigt
 - [x] `nodered/flows.json` (Dashboard: MQTT-Topics → Kanal-Switch/Debug/Zähler + Test-Injects) ✅ erledigt
 - [x] MCP-Server bereitstellen (`backend-mcp/`, FastAPI-WebSocket-JSON-RPC mit `create_inbox`/`wait_for_otp`/`extract_magic_link`) ✅ erledigt
-- [x] CI: API-Key-Secrets → `ORG_GRADLE_PROJECT_*` an den Gradle-Build durchreichen ✅ im Vorschlag enthalten (siehe `docs/ci-workflow-vorschlag.yml`)
+- [x] CI: API-Key-Secrets → `ORG_GRADLE_PROJECT_*` an den Gradle-Build durchreichen ✅ aktiv in `.github/workflows/build-release.yml`
 - [ ] Mosquitto-Härtung umsetzen (Users, TLS 8883) + Backend-Auth (API-Key) für den Pilotbetrieb — **offen** (bricht Pilot-Defaults; vor Produktion nötig)
 - [x] `AssetPagingSource`: Entscheidung dokumentiert (reactive Flow bleibt für kleine Whitelist, Paging als Utility — IMPLEMENTIERUNGS_INVENTUR.md §5) ✅ erledigt (dokumentiert)
 - [x] docker-compose: `healthcheck` für alle Services, `depends_on: condition: service_healthy` ✅ erledigt

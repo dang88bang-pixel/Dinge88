@@ -758,7 +758,7 @@ für Testbefehle an den ESP32.
 Workflow `.github/workflows/build-release.yml`:
 - **Trigger:** Push auf `main`/`develop`, Tags `v*`, Pull Requests, manuell
 - **JDK:** 17 · **SDK:** android-35 · **Build-Tools:** 35.0.0 · **Gradle:** 8.9
-- **Test-Job:** `testDebugUnitTest` + `lintDebug` laufen **vor** dem APK-Build (`build: needs: test`), Reports als Artefakt *(Update liegt als `docs/ci-workflow-vorschlag.yml` bereit — 1:1 nach `.github/workflows/build-release.yml` übernehmen)*
+- **Test-Job:** `testDebugUnitTest` + `lintDebug` laufen **vor** dem APK-Build (`build: needs: test`), Reports als Artefakt *(aktiv in `.github/workflows/build-release.yml`)*
 - **API-Keys:** optionale Repo-Secrets (`WIGLE_API_KEY`, …) werden via `ORG_GRADLE_PROJECT_*` an den Build durchgereicht
 - **Artefakte:** `secureguard-pro-debug` (Debug-APK), `secureguard-pro` (Release-APK)
 - **Release-Signing:** Optional via `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
