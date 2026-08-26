@@ -23,9 +23,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.Date
 import java.util.concurrent.TimeUnit
@@ -72,7 +72,8 @@ class AgentService @Inject constructor(
     private val nfcService: NfcService,
     private val usbSerialService: UsbSerialService,
     private val alertSoundManager: AlertSoundManager,
-    private val errorHandler: com.secureguard.enterprise.util.ErrorHandler
+    private val errorHandler: com.secureguard.enterprise.util.ErrorHandler,
+    private val backendSyncService: BackendSyncService
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -228,42 +229,40 @@ class AgentService @Inject constructor(
         runCatching { readUsbSerial() }
             .onFailure { errorHandler.handleError(it, "UsbSerial") }
 
-            // Use LearningEngine predictions to inform search strategy
-            if (settings.learningMode && snapshot.isNotEmpty()) {
-                val prediction = learningEngine.predictNextLocation()
-                if (prediction != null) {
+        // LearningEngine: Vorhersagen & Muster in den Suchzyklus einbeziehen
+        if (settings.learningMode && snapshot.isNotEmpty()) {
+            val prediction = learningEngine.predictNextLocation()
+            if (prediction != null) {
+                auditLogService.log(
+                    action = "PREDICTION",
+                    details = "Naechster Standort: ${"%.4f".format(prediction.first)}, ${"%.4f".format(prediction.second)}"
+                )
+            }
+            if (cycleCount.get() % 10 == 0L) {
+                val patterns = learningEngine.patterns.value
+                if (patterns.isNotEmpty()) {
                     auditLogService.log(
-                        action = "PREDICTION",
-                        details = "Naechster Standort: ${"%.4f".format(prediction.first)}, ${"%.4f".format(prediction.second)}"
+                        action = "PATTERNS",
+                        details = "${patterns.size} Muster erkannt (Konfidenz ${"%.0f".format(learningEngine.confidence.value * 100)}%)"
                     )
-                }
-                // Periodic pattern analysis every 10 cycles
-                if (cycleCount.get() % 10 == 0L) {
-                    val patterns = learningEngine.analyzePatterns(emptyList())
-                    if (patterns.isNotEmpty()) {
-                        auditLogService.log(
-                            action = "PATTERNS",
-                            details = "${patterns.size} Muster erkannt"
-                        )
-                    }
-                }
-                // Check if external sources should be used based on confidence
-                if (learningEngine.shouldUseExternalSources() && !settings.externalSources) {
-                    auditLogService.log(
-                        action = "SUGGEST_EXTERNAL",
-                        details = "LearningEngine empfiehlt externe Quellen (niedrige Konfidenz)"
-                    )
-                }
-                snapshot.forEach { asset ->
-                    val probability = learningEngine.getSuccessProbability(asset.id)
-                    if (probability < 0.2f) {
-                        auditLogService.log(
-                            action = "LOW_PROBABILITY",
-                            details = "${asset.shortName}: Erfolgswahrscheinlichkeit ${"%.0f".format(probability * 100)}%"
-                        )
-                    }
                 }
             }
+            if (learningEngine.shouldUseExternalSources() && !settings.externalSources) {
+                auditLogService.log(
+                    action = "SUGGEST_EXTERNAL",
+                    details = "LearningEngine empfiehlt externe Quellen (niedrige Konfidenz)"
+                )
+            }
+            snapshot.forEach { asset ->
+                val probability = learningEngine.getSuccessProbability(asset.id)
+                if (probability < 0.2f) {
+                    auditLogService.log(
+                        action = "LOW_PROBABILITY",
+                        details = "${asset.shortName}: Erfolgswahrscheinlichkeit ${"%.0f".format(probability * 100)}%"
+                    )
+                }
+            }
+        }
 
         // Flush offline queue when MQTT is connected
         if (mqttService.isConnected) {
@@ -274,6 +273,20 @@ class AgentService @Inject constructor(
                     details = "$flushed Aktionen aus Offline-Queue zugestellt"
                 )
             }
+        }
+
+        // Periodischer Backend-Sync (alle 20 Zyklen, nur wenn Online-Kanäle erlaubt)
+        if (!settings.offlineOnly && backendSyncService.isConfigured && cycleCount.get() % 20L == 0L) {
+            runCatching { backendSyncService.syncAll() }
+                .onSuccess { r ->
+                    if (r.pulled + r.pushed > 0) {
+                        auditLogService.log(
+                            action = "BACKEND_SYNC",
+                            details = "pull=${r.pulled} push=${r.pushed}"
+                        )
+                    }
+                }
+                .onFailure { errorHandler.handleError(it, "BackendSync") }
         }
 
         return AgentCycleResult(
@@ -644,10 +657,7 @@ class AgentService @Inject constructor(
                 .build()
 
             val payload = JSONObject(data.toMutableMap().apply { put("email", email) })
-            val body = RequestBody.create(
-                MediaType.parse("application/json"),
-                payload.toString()
-            )
+            val body = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
             val request = okhttp3.Request.Builder()
                 .url(url)
                 .post(body)
@@ -658,7 +668,7 @@ class AgentService @Inject constructor(
 
             auditLogService.log(
                 action = "REGISTER_HTTP",
-                details = "$serviceName: HTTP ${response.code()} (${if (success) "OK" else "FEHLER"})"
+                details = "$serviceName: HTTP ${response.code} (${if (success) "OK" else "FEHLER"})"
             )
 
             response.close()

@@ -34,7 +34,7 @@ fun apiKey(name: String): String {
 
 android {
     namespace = "com.secureguard.enterprise"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.secureguard.enterprise"
@@ -48,16 +48,24 @@ android {
             useSupportLibrary = true
         }
 
-        // ============ EXTERNE API-KEYS (BuildConfig) ============
-        // Werte kommen aus gradle.properties / local.properties (siehe local.properties.example).
-        // Leere Werte sind erlaubt – die zugehörigen API-Aufrufe liefern dann null/leer.
+        // ============ EXTERNE API-KEYS & ENDPUNKTE (BuildConfig) ============
+        // Werte aus gradle.properties / local.properties (siehe local.properties.example).
+        // Leere Werte sind erlaubt – die zugehörigen Aufrufe liefern dann null/leer
+        // bzw. nutzen Runtime-Overrides aus den App-Einstellungen.
         buildConfigField("String", "WIGLE_API_KEY", "\"${apiKey("WIGLE_API_KEY")}\"")
         buildConfigField("String", "OPEN_CHARGE_MAP_KEY", "\"${apiKey("OPEN_CHARGE_MAP_KEY")}\"")
         buildConfigField("String", "NETATMO_TOKEN", "\"${apiKey("NETATMO_TOKEN")}\"")
         buildConfigField("String", "GOOGLE_API_KEY", "\"${apiKey("GOOGLE_API_KEY")}\"")
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
+        buildConfigField("String", "MQTT_USERNAME", "\"${apiKey("MQTT_USERNAME")}\"")
+        buildConfigField("String", "MQTT_PASSWORD", "\"${apiKey("MQTT_PASSWORD")}\"")
         buildConfigField("String", "WEBSOCKET_URL", "\"${apiKey("WEBSOCKET_URL")}\"")
         buildConfigField("String", "MCP_SERVER_URL", "\"${apiKey("MCP_SERVER_URL")}\"")
+        buildConfigField("String", "BACKEND_BASE_URL", "\"${apiKey("BACKEND_BASE_URL")}\"")
+        buildConfigField("String", "LORA_GATEWAY_URL", "\"${apiKey("LORA_GATEWAY_URL")}\"")
+        buildConfigField("String", "YOLO_SERVER_URL", "\"${apiKey("YOLO_SERVER_URL")}\"")
+        buildConfigField("String", "OPEN_DATA_API_URL", "\"${apiKey("OPEN_DATA_API_URL")}\"")
+        buildConfigField("String", "FIND_MY_PROXY_URL", "\"${apiKey("FIND_MY_PROXY_URL")}\"")
     }
 
     val releaseSigning = signingConfigs.create("release") {

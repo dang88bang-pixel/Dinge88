@@ -70,12 +70,35 @@ class ExportService @Inject constructor(
         return file
     }
 
+    suspend fun exportAlertsCsv(): File {
+        val alerts = repository.getAlerts().first()
+        val file = newFile("alerts_export")
+        file.writeText(buildString {
+            appendLine("Timestamp;AssetID;Type;Severity;Message;Acknowledged")
+            alerts.forEach { a ->
+                appendLine(
+                    listOf(
+                        dateFormat.format(a.timestamp),
+                        a.assetId,
+                        a.type.name,
+                        a.severity.name,
+                        a.message.replace(';', ','),
+                        a.acknowledged.toString()
+                    ).joinToString(";")
+                )
+            }
+        })
+        return file
+    }
+
     /** CSV-Export mit AES/GCM-Verschlüsselung (Datei endet auf .enc). */
     suspend fun exportAssetsCsvEncrypted(): File {
         val plain = exportAssetsCsv()
         val encrypted = encryptionService.encrypt(plain.readBytes())
         val file = File(plain.parentFile, "${plain.name}.enc")
+        // Format: [1 byte ivLen][iv][ciphertext]
         file.outputStream().use { out ->
+            require(encrypted.iv.size in 1..255) { "IV-Länge ungültig" }
             out.write(encrypted.iv.size)
             out.write(encrypted.iv)
             out.write(encrypted.data)
@@ -84,15 +107,34 @@ class ExportService @Inject constructor(
         return file
     }
 
+    /** Entschlüsselt eine zuvor mit [exportAssetsCsvEncrypted] erzeugte Datei. */
+    fun decryptExport(encFile: File): ByteArray {
+        val raw = encFile.readBytes()
+        require(raw.isNotEmpty()) { "Leere Datei" }
+        val ivLen = raw[0].toInt() and 0xFF
+        require(raw.size > 1 + ivLen) { "Datei zu kurz" }
+        val iv = raw.copyOfRange(1, 1 + ivLen)
+        val cipher = raw.copyOfRange(1 + ivLen, raw.size)
+        return encryptionService.decrypt(cipher, iv)
+    }
+
     // ============ PDF ============
 
-    /** Erzeugt einen PDF-Bericht mit Asset-Übersicht und letzter Detektion. */
-    suspend fun exportPdfReport(assets: List<Asset>, detections: List<Detection>): File {
+    /** PDF-Bericht mit aktuellen Assets + Detektionen aus der DB. */
+    suspend fun exportPdfReport(
+        assets: List<Asset> = emptyList(),
+        detections: List<Detection> = emptyList()
+    ): File {
+        val assetList = assets.ifEmpty { repository.getAllAssets().first() }
+        val detectionList = detections.ifEmpty {
+            repository.getAllDetections().first().takeLast(100)
+        }
+
         val file = newFile("secureguard_report", ".pdf")
         val document = PdfDocument()
         val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4
-        val page = document.startPage(pageInfo)
-        val canvas = page.canvas
+        var page = document.startPage(pageInfo)
+        var canvas = page.canvas
 
         val title = Paint().apply {
             color = Color.DKGRAY
@@ -109,28 +151,37 @@ class ExportService @Inject constructor(
             textSize = 10f
         }
 
+        fun newPageIfNeeded(y: Float): Float {
+            if (y < 800f) return y
+            document.finishPage(page)
+            page = document.startPage(pageInfo)
+            canvas = page.canvas
+            return 50f
+        }
+
         canvas.drawText("SecureGuard Enterprise – Bericht", 40f, 50f, title)
         canvas.drawText("Erstellt: ${dateFormat.format(Date())}", 40f, 75f, body)
 
         var y = 120f
-        canvas.drawText("Assets (${assets.size})", 40f, y, header)
+        canvas.drawText("Assets (${assetList.size})", 40f, y, header)
         y += 20f
-        assets.forEach { a ->
-            val last = detections.lastOrNull { it.assetMac.equals(a.mac, ignoreCase = true) }
-            canvas.drawText(
-                "${a.shortName} · ${a.status.name} · RSSI ${a.rssi}" +
-                    (last?.let { " · zuletzt: ${dateFormat.format(it.timestamp)}" } ?: ""),
-                40f, y, body
-            )
+        assetList.forEach { a ->
+            y = newPageIfNeeded(y)
+            val last = detectionList.lastOrNull { it.assetMac.equals(a.mac, ignoreCase = true) }
+            val line = "${a.shortName} · ${a.status.name} · RSSI ${a.rssi}" +
+                (last?.let { " · zuletzt: ${dateFormat.format(it.timestamp)}" } ?: "")
+            canvas.drawText(line.take(90), 40f, y, body)
             y += 16f
         }
 
         y += 10f
-        canvas.drawText("Letzte Detektionen (${detections.size})", 40f, y, header)
+        y = newPageIfNeeded(y)
+        canvas.drawText("Letzte Detektionen (${detectionList.size})", 40f, y, header)
         y += 20f
-        detections.takeLast(50).forEach { d ->
+        detectionList.takeLast(50).forEach { d ->
+            y = newPageIfNeeded(y)
             canvas.drawText(
-                "${dateFormat.format(d.timestamp)} · ${d.assetMac} · ${d.sourceType.name} · RSSI ${d.rssi}",
+                "${dateFormat.format(d.timestamp)} · ${d.assetMac} · ${d.sourceType.name} · RSSI ${d.rssi}".take(95),
                 40f, y, body
             )
             y += 14f

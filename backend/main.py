@@ -436,6 +436,91 @@ async def search_crowd_sightings(mac: str, hours: int = 24):
     return [dict(r) for r in rows]
 
 
+# ============ MCP / TEMP-MAIL (Test-Fallback) ============
+# Einfacher In-Memory-MCP-ähnlicher Dienst für QA/Pilot ohne externen Server.
+# Die App spricht standardmäßig WebSocket (MCPClient); zusätzlich REST.
+
+_temp_inboxes: dict = {}
+_temp_messages: dict = {}
+
+
+class TempInboxCreate(BaseModel):
+    prefix: Optional[str] = None
+
+
+class TempMessageIn(BaseModel):
+    token: str
+    subject: str = "OTP"
+    body: str
+    from_addr: str = "noreply@example.com"
+
+
+@app.post("/api/mcp/create_inbox")
+async def mcp_create_inbox(body: Optional[TempInboxCreate] = None):
+    import secrets
+    import uuid
+    body = body or TempInboxCreate()
+    token = secrets.token_urlsafe(16)
+    email = f"{body.prefix or 'sg'}-{token[:8]}@temp.secureguard.local"
+    inbox_id = str(uuid.uuid4())
+    _temp_inboxes[token] = {"email": email, "inbox_id": inbox_id, "created": datetime.now().isoformat()}
+    _temp_messages[token] = []
+    return {"email": email, "token": token, "inboxId": inbox_id}
+
+
+@app.post("/api/mcp/inject_message")
+async def mcp_inject_message(msg: TempMessageIn):
+    """Test-Helfer: legt eine Nachricht (z. B. OTP) in die Inbox."""
+    if msg.token not in _temp_inboxes:
+        return {"status": "error", "message": "unknown token"}
+    _temp_messages.setdefault(msg.token, []).append({
+        "subject": msg.subject,
+        "body": msg.body,
+        "from": msg.from_addr,
+        "received": datetime.now().isoformat(),
+    })
+    return {"status": "ok", "count": len(_temp_messages[msg.token])}
+
+
+@app.get("/api/mcp/wait_for_otp")
+async def mcp_wait_for_otp(token: str, timeout: int = 5):
+    """Long-Poll: wartet kurz auf eine Nachricht und extrahiert eine 4–8-stellige OTP."""
+    import re
+    if token not in _temp_inboxes:
+        return {"success": False, "error": "unknown token"}
+    deadline = asyncio.get_event_loop().time() + max(1, min(timeout, 45))
+    while asyncio.get_event_loop().time() < deadline:
+        for m in _temp_messages.get(token, []):
+            match = re.search(r"\b(\d{4,8})\b", m.get("body", ""))
+            if match:
+                inbox = _temp_inboxes[token]
+                return {
+                    "success": True,
+                    "otp": match.group(1),
+                    "email": inbox["email"],
+                    "from": m.get("from", ""),
+                    "subject": m.get("subject", ""),
+                }
+        await asyncio.sleep(0.5)
+    return {"success": False, "error": "timeout"}
+
+
+@app.get("/api/mcp/extract_magic_link")
+async def mcp_extract_magic_link(token: str):
+    import re
+    if token not in _temp_inboxes:
+        return {"success": False, "error": "unknown token"}
+    for m in reversed(_temp_messages.get(token, [])):
+        match = re.search(r"https?://\S+", m.get("body", ""))
+        if match:
+            return {
+                "success": True,
+                "magicLink": match.group(0).rstrip(".,)"),
+                "email": _temp_inboxes[token]["email"],
+            }
+    return {"success": False, "error": "no magic link"}
+
+
 # ============ WEBSOCKET ============
 
 @app.websocket("/ws")

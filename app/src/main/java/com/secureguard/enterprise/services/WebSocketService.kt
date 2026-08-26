@@ -2,6 +2,7 @@ package com.secureguard.enterprise.services
 
 import com.google.gson.Gson
 import com.secureguard.enterprise.BuildConfig
+import com.secureguard.enterprise.config.EndpointConfig
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -17,13 +18,12 @@ import javax.inject.Singleton
 
 /**
  * WebSocket-Integration (OkHttp) für Echtzeit-Updates von der SecureGuard-
- * Fleet-Instanz (Telemetrie, Alerts, Asset-Updates, System-Status).
- *
- * Die Server-URL kommt aus `WEBSOCKET_URL` (gradle.properties /
- * local.properties); ohne Konfiguration wird keine Verbindung aufgebaut.
+ * Fleet-Instanz. URL kommt aus [EndpointConfig] (Settings zur Laufzeit).
  */
 @Singleton
-class WebSocketService @Inject constructor() {
+class WebSocketService @Inject constructor(
+    private val endpointConfig: EndpointConfig
+) {
 
     private val gson = Gson()
 
@@ -47,15 +47,14 @@ class WebSocketService @Inject constructor() {
     private val _events = MutableSharedFlow<WebSocketEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<WebSocketEvent> = _events.asSharedFlow()
 
-    /** Standard-Endpunkt (Fleet-Instanz); leer → keine Verbindung. */
-    private val serverUrl: String = BuildConfig.WEBSOCKET_URL
+    val isConfigured: Boolean get() = endpointConfig.websocketUrl.isNotBlank()
 
-    val isConfigured: Boolean get() = serverUrl.isNotBlank()
+    val currentUrl: String get() = endpointConfig.websocketUrl
 
     /** Baut die WebSocket-Verbindung auf. */
-    fun connect(url: String = serverUrl) {
+    fun connect(url: String = endpointConfig.websocketUrl) {
         if (url.isBlank()) {
-            _events.tryEmit(WebSocketEvent.Error("Keine WebSocket-URL konfiguriert (WEBSOCKET_URL)"))
+            _events.tryEmit(WebSocketEvent.Error("Keine WebSocket-URL konfiguriert (WEBSOCKET_URL / Settings)"))
             return
         }
         disconnect()
@@ -94,7 +93,11 @@ class WebSocketService @Inject constructor() {
         })
     }
 
-    /** Sendet eine Nachricht als JSON. */
+    fun reconnect() {
+        disconnect()
+        if (isConfigured) connect()
+    }
+
     fun sendMessage(data: Any) {
         try {
             webSocket?.send(gson.toJson(data))
@@ -103,7 +106,6 @@ class WebSocketService @Inject constructor() {
         }
     }
 
-    /** Sendet einen Befehl an ein Asset. */
     fun sendCommand(assetId: String, action: String) {
         sendMessage(
             mapOf(
@@ -123,7 +125,6 @@ class WebSocketService @Inject constructor() {
     }
 }
 
-/** Ereignisse der WebSocket-Verbindung. */
 sealed class WebSocketEvent {
     object Connected : WebSocketEvent()
     data class Disconnected(val reason: String?) : WebSocketEvent()
@@ -135,7 +136,6 @@ sealed class WebSocketEvent {
     data class Error(val message: String) : WebSocketEvent()
 }
 
-/** Roh-Nachricht über die Leitung (type + data). */
 data class WebSocketMessage(
     val type: String? = null,
     val data: Map<String, Any>? = null

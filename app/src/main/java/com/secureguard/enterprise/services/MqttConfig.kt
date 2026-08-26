@@ -1,18 +1,15 @@
 package com.secureguard.enterprise.services
 
-import com.secureguard.enterprise.BuildConfig
+import com.secureguard.enterprise.config.EndpointConfig
 
 /**
- * Zentrale MQTT-Konfiguration (Broker, Topics, QoS).
+ * MQTT-Themen und QoS-Konstanten.
  *
- * Der Broker kann über `MQTT_BROKER_URL` in gradle.properties /
- * local.properties gesetzt werden; ohne Eintrag gilt die lokale
- * Standard-URL (z. B. für den Docker-Compose-Broker aus `docker-compose.yml`).
+ * Die Broker-URL und Credentials kommen zur Laufzeit aus [EndpointConfig]
+ * (Settings-UI → SharedPreferences → BuildConfig/local.properties).
+ * [MqttService] liest die Werte bei jedem [MqttService.connect].
  */
 object MqttConfig {
-
-    val BROKER_URL: String = BuildConfig.MQTT_BROKER_URL
-        .ifBlank { "tcp://10.0.2.2:1883" } // 10.0.2.2 = Host-Rechner im Android-Emulator
 
     const val CLIENT_ID_PREFIX = "secureguard"
 
@@ -34,4 +31,16 @@ object MqttConfig {
     fun commandTopic(assetMac: String) = "secureguard/${assetMac.uppercase()}/command"
     fun telemetryTopic(assetMac: String) = "secureguard/${assetMac.uppercase()}/telemetry"
     fun alertTopic(assetMac: String) = "secureguard/${assetMac.uppercase()}/alert"
+}
+
+/**
+ * Snapshot der MQTT-Verbindungsparameter (aus [EndpointConfig]).
+ * Wird von [MqttService] beim Connect gelesen.
+ */
+data class MqttConnectionParams(
+    val brokerUrl: String,
+    val username: String = "",
+    val password: String = ""
+) {
+    val hasAuth: Boolean get() = username.isNotBlank()
 }

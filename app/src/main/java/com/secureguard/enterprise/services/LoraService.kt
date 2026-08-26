@@ -1,6 +1,9 @@
 package com.secureguard.enterprise.services
 
 import android.content.Context
+import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
+import com.secureguard.enterprise.config.EndpointConfig
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
@@ -9,6 +12,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.Date
@@ -17,30 +21,32 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Generic LoRa / LoRaWAN service — replaces the former Meshtastic dependency.
- *
- * Uses the Helium Network API to discover LoRaWAN hotspots near the asset's
- * last known position. Commands are sent via MQTT to the ESP32 gateway which
- * relays them over LoRa to the asset.
- *
- * Returns null when no hotspots are found near the asset or the API is
- * unreachable. No simulated data is ever generated.
+ * LoRa / LoRaWAN-Kanal:
+ * 1) lokales LoRa-Gateway (`LORA_GATEWAY_URL`) – Sightings per HTTP
+ * 2) Helium Network API (Fallback, braucht Lat/Lon)
+ * 3) Befehle weiterhin per MQTT an ESP32-Gateway
  */
 @Singleton
 class LoraService @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val mqttService: MqttService
+    private val mqttService: MqttService,
+    private val endpointConfig: EndpointConfig
 ) : DetectionCapable() {
 
-    private val heliumApi: HeliumNetworkApi by lazy {
-        val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-        val client = OkHttpClient.Builder()
+    private val gson = Gson()
+
+    private val httpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .build()
+    }
+
+    private val heliumApi: HeliumNetworkApi by lazy {
+        val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
         Retrofit.Builder()
             .baseUrl("https://api.helium.io/")
-            .client(client)
+            .client(httpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(HeliumNetworkApi::class.java)
@@ -51,15 +57,61 @@ class LoraService @Inject constructor(
         private set
 
     suspend fun searchAsset(asset: Asset): Detection? {
+        // 1) Eigenes LoRa-Gateway
+        searchLocalGateway(asset)?.let { return it }
+
+        // 2) Helium
+        return searchHelium(asset)
+    }
+
+    private fun searchLocalGateway(asset: Asset): Detection? {
+        val base = endpointConfig.loraGatewayUrl
+        if (base.isBlank()) return null
+        return try {
+            val mac = java.net.URLEncoder.encode(asset.mac, "UTF-8")
+            val url = "$base/api/v1/sightings?mac=$mac"
+            val request = Request.Builder().url(url).get().build()
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                val body = response.body?.string() ?: return null
+                val hits = gson.fromJson(body, Array<LoraGatewaySighting>::class.java)
+                    ?: return null
+                if (hits.isEmpty()) return null
+                val best = hits.maxByOrNull { it.rssi ?: -999 } ?: return null
+                gateways = hits.map {
+                    Gateway(
+                        id = it.gatewayId ?: "lora-gw",
+                        rssi = it.rssi ?: -80,
+                        latitude = it.latitude ?: asset.latitude ?: 0.0,
+                        longitude = it.longitude ?: asset.longitude ?: 0.0,
+                        seenMacs = listOf(asset.mac)
+                    )
+                }
+                Detection(
+                    assetMac = asset.mac,
+                    sourceType = DetectionSource.LORA,
+                    nodeId = best.gatewayId ?: "lora-gateway",
+                    rssi = best.rssi ?: -75,
+                    latitude = best.latitude ?: asset.latitude,
+                    longitude = best.longitude ?: asset.longitude,
+                    accuracyMeters = best.accuracy ?: 100f,
+                    message = "LoRa-Gateway: ${best.gatewayId ?: base}",
+                    timestamp = Date()
+                ).also { emit(it) }
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private suspend fun searchHelium(asset: Asset): Detection? {
         val lat = asset.latitude ?: return null
         val lon = asset.longitude ?: return null
-
         val hotspots = try {
             heliumApi.getHotspots(lat, lon, limit = 10).data
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
-
         gateways = hotspots.map { hs ->
             Gateway(
                 id = hs.address ?: hs.name ?: "unknown",
@@ -69,15 +121,12 @@ class LoraService @Inject constructor(
                 seenMacs = emptyList()
             )
         }
-
         if (hotspots.isEmpty()) return null
-
         val nearest = hotspots.minByOrNull { hs ->
             val dLat = hs.lat - lat
             val dLon = hs.lng - lon
             dLat * dLat + dLon * dLon
         } ?: return null
-
         return Detection(
             assetMac = asset.mac,
             sourceType = DetectionSource.LORA,
@@ -91,29 +140,30 @@ class LoraService @Inject constructor(
         ).also { emit(it) }
     }
 
-    /**
-     * Sends a command to an asset via MQTT. The ESP32 gateway receives the
-     * MQTT message and relays it over LoRa to the asset.
-     */
     suspend fun sendCommand(mac: String, command: String): Boolean {
         return try {
             mqttService.sendCommand(mac, command)
             mqttService.isConnected
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
 
-    suspend fun refreshGateways(): List<Gateway> {
-        return gateways
-    }
+    suspend fun refreshGateways(): List<Gateway> = gateways
 }
 
-/** A LoRa gateway that recently reported sightings. */
 data class Gateway(
     val id: String,
     val rssi: Int,
     val latitude: Double,
     val longitude: Double,
     val seenMacs: List<String>
+)
+
+data class LoraGatewaySighting(
+    @SerializedName("gateway_id") val gatewayId: String? = null,
+    @SerializedName("rssi") val rssi: Int? = null,
+    @SerializedName("latitude") val latitude: Double? = null,
+    @SerializedName("longitude") val longitude: Double? = null,
+    @SerializedName("accuracy") val accuracy: Float? = null
 )

@@ -3,6 +3,12 @@
 Stand: 2026-08-26 · Branch `arena/01a03c79-dinge88`  
 Ziel: **vollständige App mit allen Diensten angebunden und einsatzbereit**.
 
+> **Update 2026-08-26 (Batch Ready-to-Go):** Runtime-Endpunkte (Settings), MQTT Auth,
+> BuildConfig-Keys (LORA/YOLO/CKAN/FIND_MY/BACKEND/MQTT_USER), YOLO+LoRa-Gateway-HTTP,
+> Find-My-Proxy, Backend-Sync, Node-RED Flows, Mosquitto Prod-Hinweise, compileSdk 35.
+
+
+
 Legende:
 
 | Symbol | Bedeutung |
@@ -21,11 +27,11 @@ Legende:
 |---------|--------|------|
 | Android-App (UI + Navigation) | ✅ | 17 Screens, Bottom-Nav, Hilt |
 | Agent + 9 Detection-Kanäle | ✅/⚙️ | Code fertig; externe Kanäle brauchen Keys/Consent |
-| MQTT / WebSocket / NFC realtime | ⚙️ | Code fertig; Broker/Backend-URL setzen |
-| 8 externe REST-APIs | ⚙️ | Retrofit da; API-Keys in `local.properties` |
+| MQTT / WebSocket / NFC realtime | ✅/⚙️ | Runtime-Settings + MQTT Auth; Broker-URL setzen |
+| 8 externe REST-APIs + Gateways | ✅/⚙️ | Keys optional; LORA/YOLO/CKAN/Find-My verdrahtet |
 | Backend FastAPI + Crowd + MCP-REST | ✅ | Docker-ready |
-| Mosquitto MQTT | 🟡 | läuft anonym (Pilot) – Prod braucht Auth/TLS |
-| Node-RED | 🟡 | Image da, **keine** vorgefertigten Flows im Repo |
+| Mosquitto MQTT | ✅/🟡 | Pilot anonym; passwd/acl/TLS-Beispiele im Repo |
+| Node-RED | ✅ | `flows.json` Telemetrie/Commands/Health |
 | ESP32-Firmware | ⚙️ | PlatformIO + `.ino`; flashen + WiFi/MQTT setzen |
 | Offline-Toolchain | ✅ | `scripts/offline/*` |
 | Release-Signing | ❌ | kein Keystore im Repo (absichtlich) |
@@ -236,18 +242,18 @@ Ohne Key → Kanal liefert `null`/leer, App bleibt stabil.
 | # | Thema | Status | Was fehlt |
 |---|--------|--------|-----------|
 | 1 | **SQLCipher** Room-DB | ⏳ | Dependency, `SupportFactory`, Keystore-Passphrase, Migration |
-| 2 | **`LORA_GATEWAY_URL`** | ❌ | steht in `local.properties.example`, **nicht** in BuildConfig/Code verdrahtet |
-| 3 | **`YOLO_SERVER_URL`** | ❌ | optische Erkennung ist nur QR-Match, **kein** YOLO-HTTP |
-| 4 | **`OPEN_DATA_API_URL`** | ❌ | CKAN-URL hardcoded in ApiServiceManager, nicht aus Properties |
-| 5 | **`FIND_MY_PROXY_URL`** | ❌ | kein eigener Find-My-Proxy-Client; Crowd geht über Backend |
-| 6 | **Runtime-Config UI** | 🟡 | MQTT/WS/MCP nur zur **Build-Zeit** – keine Settings-Felder zum Live-Ändern |
-| 7 | **App ↔ Backend Asset-Sync** | 🟡 | App nutzt lokale Room-DB; kein periodischer REST-Sync der Asset-Liste |
-| 8 | **Node-RED Flows** | ❌ | leeres/minimales `nodered/`-Volume, keine fertigen Flows |
+| 2 | **`LORA_GATEWAY_URL`** | ✅ | BuildConfig + EndpointConfig + LoraService HTTP |
+| 3 | **`YOLO_SERVER_URL`** | ✅ | OpticalService → POST `/api/v1/detect` (optional) |
+| 4 | **`OPEN_DATA_API_URL`** | ✅ | EndpointConfig → ApiServiceManager CKAN base |
+| 5 | **`FIND_MY_PROXY_URL`** | ✅ | CrowdService Fallback Find-My-Proxy |
+| 6 | **Runtime-Config UI** | ✅ | Settings → Backend & Broker + reconnect |
+| 7 | **App ↔ Backend Asset-Sync** | ✅ | BackendSyncService + Settings-Button + Agent alle 20 Zyklen |
+| 8 | **Node-RED Flows** | ✅ | `nodered/flows.json` Telemetrie/Commands/Health |
 | 9 | **Mipmap-PNG Fallbacks** | 🟡 | nur adaptive icons (API 26+); minSdk 26 → OK, aber keine mdpi-WebP |
-| 10 | **compileSdk 34 vs CI 35** | 🟡 | `compileSdk=34`, `targetSdk=35`, CI installiert 35 – angleichen empfohlen |
+| 10 | **compileSdk 34 vs CI 35** | ✅ | compileSdk = targetSdk = 35 |
 | 11 | **Instrumented Tests / E2E** | ❌ | keine Espresso/Compose-UI-Tests mit Hilt |
 | 12 | **Multi-User / Server-RBAC** | 🟡 | `RoleManager` lokal vorbereitet, kein Login-Server |
-| 13 | **MQTT Auth (User/Pass)** | ❌ | Connect-Options ohne Username/Password/TLS |
+| 13 | **MQTT Auth (User/Pass)** | ✅ | EndpointConfig + MqttConnectOptions; ssl:// SocketFactory |
 | 14 | **Play Integrity / SafetyNet** | ❌ | nicht vorgesehen |
 | 15 | **Crash-Reporting** (Sentry/Firebase) | ❌ | nur Logcat + AuditLog |
 | 16 | **Push (FCM)** | ❌ | nur lokale Notifications |
@@ -277,9 +283,9 @@ Ohne Key → Kanal liefert `null`/leer, App bleibt stabil.
 | WiFi-Scan | ✅ | Permission | – | WiFi | Location an (≤11) |
 | BLE-GATT Telemetrie | ✅ | – | – | kompatibles Asset | UUID match Firmware |
 | LoRa via Helium API | ✅ | Netz | Helium | – | Asset-Lat/Lon gesetzt |
-| LoRa via ESP32 | ✅ | MQTT | Mosquitto | ESP32+SX1278 | Firmware + Topics |
+| LoRa via ESP32 / Gateway | ✅ | MQTT + LORA_GATEWAY_URL | Mosquitto / HTTP-GW | ESP32+SX1278 | Firmware oder Gateway-URL |
 | Optisch (QR) | ✅ | Kamera | – | Kamera | ScanQr → OpticalService |
-| Optisch (YOLO) | ❌ | – | YOLO-Server | Kamera | **neu bauen** |
+| Optisch (YOLO) | ✅ | YOLO_SERVER_URL | YOLO-Server | Kamera | Server erreichbar + Bild |
 | Urban OCM | ✅ | OCM-Key | OpenChargeMap | – | Key + Lat/Lon |
 | Urban DHL | ✅ | Netz | DHL-API | – | Lat/Lon |
 | Urban CKAN | ✅ | Netz | CKAN | – | URL erreichbar |

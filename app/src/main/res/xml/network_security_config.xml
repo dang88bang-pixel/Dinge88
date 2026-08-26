@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pilot: Cleartext (HTTP/MQTT tcp) für lokale Backend-/Gateway-IPs erlaubt.
+     Für Produktion auf certificate pinning / HTTPS umstellen. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

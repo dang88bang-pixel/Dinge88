@@ -32,3 +32,20 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Offline toolchain transfer artifacts (USB mirror – can be multi-GB)
+offline_repo/
+secureguard-offline-repo-*.tar
+secureguard-offline-repo-*.tar.gz
+*.tar.partial
+
+# PlatformIO build output
+firmware/**/.pio/
+firmware/**/platformio.ini.bak
+
+# Local SecureGuard toolchain install markers (home-dir copies stay outside repo)
+.secureguard/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/

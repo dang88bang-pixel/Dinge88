@@ -46,6 +46,9 @@ services:
       - TZ=Europe/Berlin
     volumes:
       - ./nodered:/data
+    depends_on:
+      - mqtt
+      - backend
     networks:
       - secureguard-network
 

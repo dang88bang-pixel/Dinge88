@@ -30,6 +30,7 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 - [Abhängigkeiten (48 Libraries)](#-abhängigkeiten-48-libraries)
 - [Build & CI](#-build--ci)
 - [Konfiguration](#️-konfiguration)
+- [Offline-Setup (air-gapped)](#-offline-setup-air-gapped)
 - [Honeywell CT45P XON](#-honeywell-ct45p-xon)
 - [Installation](#-installation)
 - [Datenschutz](#️-datenschutz)
@@ -512,14 +513,24 @@ Das Backend abonniert `secureguard/+/telemetry`, `+/alert`, `+/status` und forwa
 
 ## 📟 Firmware (ESP32)
 
+Pfad: `firmware/secureguard_esp32/`  
+Build: **PlatformIO** (`platformio.ini`) oder Arduino IDE (`.ino`).
+
+```bash
+cd firmware/secureguard_esp32
+pio run                 # firmware bauen
+pio run -t upload       # flashen
+pio device monitor      # 115200 baud
+```
+
 ### Hardware
 
 | Komponente | Pin/Anschluss | Bibliothek |
 |-----------|---------------|-----------|
-| LoRa SX1278 | SS=5, RST=14, DIO0=2 (868 MHz) | MCCI LoRa |
+| LoRa SX1278 | SS=5, RST=14, DIO0=2 (868 MHz) | sandeepmistry/LoRa |
 | BLE | Integrated | ESP32 BLE Arduino |
 | WiFi | Integrated | WiFi.h |
-| MQTT | WiFi → Broker | PubSubClient |
+| MQTT | WiFi → Broker | knolleary/PubSubClient |
 | LED/Buzzer | GPIO2 | – |
 | Motor-Relay | GPIO4 | – |
 | Batterie-ADC | GPIO34 (Spannungsteiler 100k/100k) | analogRead |
@@ -602,7 +613,7 @@ services:
 | Kotlin | 2.0.21 |
 | Gradle | 8.9 |
 | JDK | 17 |
-| compileSdk / targetSdk | 34 |
+| compileSdk / targetSdk | 35 |
 | minSdk | 26 (Android 8) |
 
 ### AndroidX Core
@@ -735,16 +746,16 @@ services:
 
 Workflow `.github/workflows/build-release.yml`:
 - **Trigger:** Push auf `main`/`develop`, Tags `v*`, Pull Requests, manuell
-- **JDK:** 17 · **SDK:** android-34 · **Build-Tools:** 34.0.0 · **Gradle:** 8.9
+- **JDK:** 17 · **SDK:** android-35 · **Build-Tools:** 35.0.0 · **Gradle:** 8.9
 - **Artefakte:** `secureguard-pro-debug` (Debug-APK), `secureguard-pro` (Release-APK)
 - **Release-Signing:** Optional via `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
 
 ### Lokal bauen
 
 ```bash
-# 1. API-Keys konfigurieren
+# 1. API-Keys + SDK-Pfad konfigurieren
 cp local.properties.example local.properties
-# local.properties editieren
+# local.properties editieren (sdk.dir, Keys)
 
 # 2. Debug-APK bauen
 ./gradlew :app:assembleDebug
@@ -752,6 +763,8 @@ cp local.properties.example local.properties
 # 3. Release-APK bauen (unsiginiert ohne Keystore)
 ./gradlew :app:assembleRelease
 ```
+
+Ohne Internetzugang: siehe [Offline-Setup](#-offline-setup-air-gapped) und `docs/OFFLINE_SETUP.md`.
 
 ### BuildConfig-Felder
 
@@ -772,6 +785,7 @@ cp local.properties.example local.properties
 ### local.properties.example
 
 ```properties
+sdk.dir=/home/USER/.secureguard/android-sdk
 WIGLE_API_KEY=your_wigle_key_here
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
 NETATMO_TOKEN=your_netatmo_token_here
@@ -780,6 +794,46 @@ MQTT_BROKER_URL=mqtt://broker.example.com:1883
 WEBSOCKET_URL=ws://api.example.com:8000/ws
 MCP_SERVER_URL=http://api.example.com:8000
 ```
+
+---
+
+## 📦 Offline-Setup (air-gapped)
+
+Wenn `dl.google.com`, Maven Central, Adoptium oder die PlatformIO-Registry
+blockiert sind: Abhängigkeiten auf einem Online-PC spiegeln, per USB übertragen,
+auf dem Zielrechner lokal installieren.
+
+```bash
+# Online-PC
+./scripts/offline/download-all.sh
+# → offline_repo/  (+ optional secureguard-offline-repo-*.tar)
+
+# Transfer per USB/SMB …
+
+# Offline-PC
+export OFFLINE_REPO=/mnt/usb/offline_repo   # falls nicht ./offline_repo
+./scripts/offline/install-offline.sh
+source ~/.secureguard/env.sh
+
+# Keys ergänzen (sdk.dir ist gesetzt)
+nano local.properties
+
+./gradlew :app:assembleDebug --offline
+cd firmware/secureguard_esp32 && pio run
+```
+
+| Komponente | Download-Skript | Install-Skript |
+|------------|-----------------|----------------|
+| JDK 17 (Temurin) | `download-jdk.sh` | `install-jdk.sh` |
+| Android SDK 34/35 | `download-android-sdk.sh` | `install-android-sdk.sh` |
+| Gradle-Cache | `download-gradle-deps.sh` | `install-gradle-cache.sh` |
+| PlatformIO ESP32 | `download-platformio.sh` | `install-platformio.sh` |
+
+**Phase 2 (bewusst später):** SQLCipher-Umstellung der Room-DB und produktive
+API-Keys – erst wenn der Offline-Android-Build verifiziert ist.
+
+Vollständige Anleitung, manuelle Befehle und Troubleshooting:
+**[docs/OFFLINE_SETUP.md](docs/OFFLINE_SETUP.md)**
 
 ---
 
@@ -801,10 +855,12 @@ MCP_SERVER_URL=http://api.example.com:8000
 
 ## 📲 Installation
 
-1. **Debug-APK** aus GitHub Actions laden → `adb install secureguard-pro-debug.apk`
+1. **Debug-APK** aus GitHub Actions laden → `adb install secureguard-pro-debug.apk`  
+   *oder lokal:* `./gradlew :app:assembleDebug` (ggf. [Offline-Setup](#-offline-setup-air-gapped))
 2. Berechtigungen erteilen: Standort, Bluetooth, Kamera, Benachrichtigungen
-3. Einstellungen → Backend-Endpunkte konfigurieren
+3. Einstellungen → Backend-Endpunkte konfigurieren (oder `local.properties` vor dem Build)
 4. Optional: Foreground-Dienst starten für dauerhaften Betrieb
+5. Optional ESP32-Gateway: `cd firmware/secureguard_esp32 && pio run -t upload`
 
 ---
 

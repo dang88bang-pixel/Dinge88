@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#0D47A1</color>
+    <color name="sg_primary">#0A1628</color>
+    <color name="sg_primary_dark">#061018</color>
+    <color name="sg_accent">#00C853</color>
+    <color name="sg_background">#F8FAFC</color>
+    <color name="sg_surface">#FFFFFF</color>
+    <color name="sg_error">#BA1A1A</color>
+    <color name="sg_warning">#F9A825</color>
 </resources>

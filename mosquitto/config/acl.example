@@ -1,0 +1,7 @@
+# Mosquitto ACL example (acl_file /mosquitto/config/acl)
+#
+# user secureguard
+# topic readwrite secureguard/#
+#
+# user readonly
+# topic read secureguard/#

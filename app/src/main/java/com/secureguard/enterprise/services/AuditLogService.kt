@@ -38,4 +38,9 @@ class AuditLogService @Inject constructor(
 
     suspend fun latest(limit: Int = 100): List<AuditLog> =
         database.auditLogDao().latest(limit)
+
+    /** Löscht das gesamte Audit-Log (nach expliziter Nutzeraktion). */
+    suspend fun clear() {
+        database.auditLogDao().clear()
+    }
 }
