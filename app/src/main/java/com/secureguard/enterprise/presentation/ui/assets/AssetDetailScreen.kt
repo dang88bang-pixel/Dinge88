@@ -119,7 +119,7 @@ fun AssetDetailScreen(
                                 color = statusColor,
                                 fontWeight = FontWeight.SemiBold
                             )
-                            Text("📶 ${asset?.rssi ?: 0} dBm")
+                            Text(if (asset?.rssi == 0 || asset?.rssi == null) "📶 –" else "📶 ${asset.rssi} dBm")
                         }
                         asset?.let { a ->
                             if (a.latitude != null && a.longitude != null) {
@@ -286,7 +286,7 @@ fun AssetDetailScreen(
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }
-                            Text("📶 ${detection.rssi} dBm · ${detection.nodeId ?: "–"}")
+                            Text("${if (detection.rssi == 0) "📶 –" else "📶 ${detection.rssi} dBm"} · ${detection.nodeId ?: "–"}")
                             detection.latitude?.let { lat ->
                                 detection.longitude?.let { lon ->
                                     Text("📍 ${"%.5f".format(lat)}, ${"%.5f".format(lon)}",

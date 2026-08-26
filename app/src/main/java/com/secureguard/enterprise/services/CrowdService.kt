@@ -38,6 +38,10 @@ class CrowdService @Inject constructor(
 
     private val backendUrl: String
         get() {
+            val configured = BuildConfig.BACKEND_API_URL.trim()
+            if (configured.isNotEmpty()) {
+                return configured.removeSuffix("/").trimEnd('/')
+            }
             val ws = BuildConfig.WEBSOCKET_URL
             return ws.replace("ws://", "http://")
                 .replace("wss://", "https://")
@@ -71,12 +75,14 @@ class CrowdService @Inject constructor(
                 assetMac = asset.mac,
                 sourceType = DetectionSource.CROWD,
                 nodeId = latest.reporterId ?: "crowd-unknown",
-                rssi = latest.rssi ?: -85,
+                rssi = latest.rssi ?: 0,
                 latitude = latest.latitude,
                 longitude = latest.longitude,
-                accuracyMeters = 80f,
+                accuracyMeters = null,
                 message = "Crowd-Sichtung: ${latest.reporterId ?: "anonym"}",
-                timestamp = Date()
+                timestamp = latest.timestamp?.let {
+                    runCatching { Date.from(java.time.Instant.parse(it)) }.getOrNull()
+                } ?: Date()
             ).also { emit(it) }
         } catch (e: Exception) {
             null

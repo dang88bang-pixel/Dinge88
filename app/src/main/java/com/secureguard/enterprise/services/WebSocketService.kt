@@ -77,6 +77,12 @@ class WebSocketService @Inject constructor() {
                         "alert" -> _events.tryEmit(WebSocketEvent.Alert(data))
                         "asset_update" -> _events.tryEmit(WebSocketEvent.AssetUpdate(data))
                         "system_status" -> _events.tryEmit(WebSocketEvent.SystemStatus(data))
+                        "search_result", "search_response" -> {
+                            val enriched = if (message.mac != null) {
+                                data.toMutableMap().apply { put("mac", message.mac) }
+                            } else data
+                            _events.tryEmit(WebSocketEvent.SearchResult(enriched))
+                        }
                         else -> _events.tryEmit(WebSocketEvent.Unknown(message.type, data))
                     }
                 } catch (e: Exception) {
@@ -114,6 +120,18 @@ class WebSocketService @Inject constructor() {
         )
     }
 
+    /** Sendet eine asynchrone Suchanfrage an die Fleet-Instanz. */
+    fun sendSearchRequest(assetMac: String) {
+        if (!isConfigured) return
+        sendMessage(
+            mapOf(
+                "type" to "search",
+                "mac" to assetMac.uppercase(),
+                "requestedAt" to System.currentTimeMillis()
+            )
+        )
+    }
+
     fun disconnect() {
         try {
             webSocket?.close(1000, "Normal closure")
@@ -131,6 +149,10 @@ sealed class WebSocketEvent {
     data class Alert(val data: Map<String, Any>) : WebSocketEvent()
     data class AssetUpdate(val data: Map<String, Any>) : WebSocketEvent()
     data class SystemStatus(val data: Map<String, Any>) : WebSocketEvent()
+
+    /** Antwort auf eine zuvor gesendete [WebSocketService.sendSearchRequest]. */
+    data class SearchResult(val data: Map<String, Any>) : WebSocketEvent()
+
     data class Unknown(val type: String?, val data: Map<String, Any>) : WebSocketEvent()
     data class Error(val message: String) : WebSocketEvent()
 }
@@ -138,5 +160,6 @@ sealed class WebSocketEvent {
 /** Roh-Nachricht über die Leitung (type + data). */
 data class WebSocketMessage(
     val type: String? = null,
+    val mac: String? = null,
     val data: Map<String, Any>? = null
 )

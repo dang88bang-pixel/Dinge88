@@ -1,18 +1,50 @@
-# SecureGuard Enterprise - Backend-Konfiguration
-# Kopiere diese Datei zu local.properties und fülle die Werte aus GitHub Secrets
+# ══════════════════════════════════════════════════════════════════════════
+# SecureGuard Enterprise – lokale Konfiguration
+# Kopiere diese Datei zu local.properties:  cp local.properties.example local.properties
+# local.properties wird von .gitignore ausgeschlossen und NICHT eingecheckt.
+# Pfade werden von scripts/install-android-sdk.sh automatisch gesetzt.
+# ══════════════════════════════════════════════════════════════════════════
 
-# API-Keys (aus GitHub Secrets)
+# --- Android SDK ----------------------------------------------------------
+sdk.dir=/home/USER/android-sdk
+ANDROID_HOME=/home/USER/android-sdk
+ANDROID_SDK_ROOT=/home/USER/android-sdk
+
+# --- API-Keys (aus GitHub Secrets / persönlichen Zugängen) ----------------
 WIGLE_API_KEY=your_wigle_key_here
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
-NETATMO_TOKEN=your_netatmo_token_here
 GOOGLE_API_KEY=your_google_key_here
-# Backend-Endpunkte (für Pilot)
+NETATMO_TOKEN=your_netatmo_token_here
+
+# --- Backend / Echtzeit (Pilot) -------------------------------------------
+# MQTT: mqtt://, mqtts:// oder tcp://host:port
 MQTT_BROKER_URL=mqtt://broker.example.com:1883
+# Optional: Login + TLS (Android BuildConfig, Noch kein Certificate-Pinning)
+MQTT_USERNAME=
+MQTT_PASSWORD=
+MQTT_TLS=false
+
+# WebSocket der Fleet-Instanz (ws:// oder wss://)
 WEBSOCKET_URL=ws://api.example.com:8000/ws
+# REST-/Crowd-Basis-URL (gleiche Instanz wie WebSocket, ohne /ws)
+BACKEND_API_URL=http://api.example.com:8000
 MCP_SERVER_URL=http://api.example.com:8000
 
-# LoRa/Optik/Urban/Crowd-Endpunkte
+# --- LoRa/optisch/urban/crowd --------------------------------------------
 LORA_GATEWAY_URL=http://lora-gateway.example.com:8080
 YOLO_SERVER_URL=http://yolo-inference.example.com:5000
+CROWD_API_URL=http://api.example.com:8000/api/crowd
 OPEN_DATA_API_URL=https://demo.ckan.org/api/3
 FIND_MY_PROXY_URL=https://find-my-proxy.example.com
+
+# --- Backend-Umgebung (werden in Backend/.env bzw. docker-compose env verwendet)
+# CORS_ORIGINS ist eine kommagetrennte Liste erlaubter Origins.
+CORS_ORIGINS=http://localhost:3000,http://localhost:8000
+API_TOKEN=change-me-in-production
+MQTT_BROKER=branch.example.com:8883
+MQTT_USER=
+MQTT_PASSWORD=
+MQTT_TLS_CA=/etc/ssl/certs/ca-certificates.crt
+
+# --- Platzhalter, die NICHT verschoben werden ----------------------------
+# Alle leeren Werte sind erlaubt. Die zugehörigen Kanäle bleiben dann inaktiv.

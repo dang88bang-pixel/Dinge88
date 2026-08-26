@@ -24,7 +24,7 @@ import com.secureguard.enterprise.data.model.PendingAction
         AuditLog::class,
         PendingAction::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -70,6 +70,30 @@ abstract class SecureGuardDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        /**
+         * v2 → v3: Historien-Kennzeichnung für Detektionen. Positionen aus
+         * „letzter bekannter Standort" werden damit von echten Live-Fixes
+         * unterschieden (DSGVO-/Datenqualitäts-Anforderung).
+         */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val columns = db.query("PRAGMA table_info(detections)")
+                val hasHistorical = columns.use { cursor ->
+                    var found = false
+                    while (cursor.moveToNext()) {
+                        if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "isHistorical") {
+                            found = true
+                            break
+                        }
+                    }
+                    found
+                }
+                if (!hasHistorical) {
+                    db.execSQL("ALTER TABLE `detections` ADD COLUMN `isHistorical` INTEGER NOT NULL DEFAULT 0")
+                }
             }
         }
     }

@@ -27,7 +27,10 @@ object AppModule {
             SecureGuardDatabase::class.java,
             SecureGuardDatabase.DATABASE_NAME
         )
-            .addMigrations(SecureGuardDatabase.MIGRATION_1_2)
+            .addMigrations(
+                SecureGuardDatabase.MIGRATION_1_2,
+                SecureGuardDatabase.MIGRATION_2_3
+            )
             .build()
 
     @Provides

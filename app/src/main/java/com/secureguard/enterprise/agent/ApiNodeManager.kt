@@ -229,10 +229,9 @@ class ApiNodeManager @Inject constructor(
     }
 
     private suspend fun searchViaOpenChargeMap(context: SearchContext): List<Detection> {
-        val stations = apiServiceManager.searchViaOpenChargeMap(
-            context.latitude ?: 52.52,
-            context.longitude ?: 13.40
-        )
+        val lat = context.latitude ?: return emptyList()
+        val lon = context.longitude ?: return emptyList()
+        val stations = apiServiceManager.searchViaOpenChargeMap(lat, lon)
         return stations.map { s ->
             Detection(
                 assetMac = context.mac,
@@ -241,7 +240,7 @@ class ApiNodeManager @Inject constructor(
                 rssi = 0,
                 latitude = s.latitude,
                 longitude = s.longitude,
-                accuracyMeters = 50f,
+                accuracyMeters = null,
                 message = "Ladesäule: ${s.operator ?: "Unbekannt"} · ${s.status ?: "?"}",
                 timestamp = Date()
             )
@@ -249,10 +248,9 @@ class ApiNodeManager @Inject constructor(
     }
 
     private suspend fun searchViaDHL(context: SearchContext): List<Detection> {
-        val stations = apiServiceManager.searchViaDHL(
-            context.latitude ?: 52.52,
-            context.longitude ?: 13.40
-        )
+        val lat = context.latitude ?: return emptyList()
+        val lon = context.longitude ?: return emptyList()
+        val stations = apiServiceManager.searchViaDHL(lat, lon)
         return stations.map { s ->
             Detection(
                 assetMac = context.mac,
@@ -261,7 +259,7 @@ class ApiNodeManager @Inject constructor(
                 rssi = 0,
                 latitude = s.latitude,
                 longitude = s.longitude,
-                accuracyMeters = 80f,
+                accuracyMeters = null,
                 message = "Packstation: ${s.name ?: s.id ?: "?"} · frei: ${s.boxesAvailable}",
                 timestamp = Date()
             )
@@ -286,7 +284,7 @@ class ApiNodeManager @Inject constructor(
         val accessPoints = listOf(
             com.secureguard.enterprise.services.apis.WifiAccessPoint(
                 macAddress = context.mac,
-                signalStrength = -45
+                signalStrength = 0
             )
         )
         val location = apiServiceManager.searchViaGoogleGeolocation(accessPoints) ?: return emptyList()
@@ -298,7 +296,7 @@ class ApiNodeManager @Inject constructor(
                 rssi = 0,
                 latitude = location.lat,
                 longitude = location.lng,
-                accuracyMeters = 30f,
+                accuracyMeters = null,
                 message = "Google Geolocation",
                 timestamp = Date()
             )
@@ -315,7 +313,7 @@ class ApiNodeManager @Inject constructor(
                 rssi = 0,
                 latitude = d.place?.latitude,
                 longitude = d.place?.longitude,
-                accuracyMeters = 500f,
+                accuracyMeters = null,
                 message = "Wetterstation: ${d.stationName ?: d.id ?: "?"}" +
                     d.dashboardData?.temperature?.let { " · ${it}°C" }.orEmpty(),
                 timestamp = Date()
@@ -324,10 +322,9 @@ class ApiNodeManager @Inject constructor(
     }
 
     private suspend fun searchViaHelium(context: SearchContext): List<Detection> {
-        val hotspots = apiServiceManager.searchViaHelium(
-            context.latitude ?: 52.52,
-            context.longitude ?: 13.40
-        )
+        val lat = context.latitude ?: return emptyList()
+        val lon = context.longitude ?: return emptyList()
+        val hotspots = apiServiceManager.searchViaHelium(lat, lon)
         return hotspots.map { h ->
             Detection(
                 assetMac = context.mac,
@@ -336,7 +333,7 @@ class ApiNodeManager @Inject constructor(
                 rssi = 0,
                 latitude = h.lat,
                 longitude = h.lng,
-                accuracyMeters = 100f,
+                accuracyMeters = null,
                 message = "LoRaWAN-Hotspot: ${h.name ?: h.address ?: "?"} · ${h.status ?: "?"}",
                 timestamp = Date()
             )

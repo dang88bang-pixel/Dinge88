@@ -60,10 +60,13 @@ class LoraService @Inject constructor(
             emptyList()
         }
 
+        // Helium-API liefert nur Hotspot-Positionen, keinen RSSI- oder
+        // Genauigkeitswert des gesuchten Assets. Dementsprechend bleiben beide
+        // leer bzw. UNKNOWN (rssi=0, accuracy=null) statt künstlicher Werte.
         gateways = hotspots.map { hs ->
             Gateway(
                 id = hs.address ?: hs.name ?: "unknown",
-                rssi = -70,
+                rssi = 0,
                 latitude = hs.lat,
                 longitude = hs.lng,
                 seenMacs = emptyList()
@@ -82,10 +85,10 @@ class LoraService @Inject constructor(
             assetMac = asset.mac,
             sourceType = DetectionSource.LORA,
             nodeId = nearest.address ?: "helium-hotspot",
-            rssi = -70,
+            rssi = 0,
             latitude = nearest.lat,
             longitude = nearest.lng,
-            accuracyMeters = 200f,
+            accuracyMeters = null,
             message = "Helium Hotspot: ${nearest.name ?: nearest.address}",
             timestamp = Date()
         ).also { emit(it) }

@@ -43,7 +43,7 @@ class SatelliteService @Inject constructor(
                 assetMac = asset.mac,
                 sourceType = DetectionSource.SATELLITE,
                 nodeId = "gps-fix",
-                rssi = -100,
+                rssi = 0,
                 latitude = location.latitude,
                 longitude = location.longitude,
                 accuracyMeters = location.accuracy.coerceAtLeast(1f),
@@ -52,17 +52,19 @@ class SatelliteService @Inject constructor(
             ).also { emit(it) }
         }
 
-        // No GPS fix: use the asset's last known position as a coarse fallback
+        // No GPS fix: use the asset's last known position, ausdrücklich als
+        // historisch markiert (kein Live-Fix, keine erfundene Genauigkeit).
         if (asset.latitude != null && asset.longitude != null) {
             return Detection(
                 assetMac = asset.mac,
                 sourceType = DetectionSource.SATELLITE,
                 nodeId = "last-known",
-                rssi = -100,
+                rssi = 0,
                 latitude = asset.latitude,
                 longitude = asset.longitude,
-                accuracyMeters = 500f,
-                message = "Letzte bekannte Position (kein GPS-Fix)",
+                accuracyMeters = null,
+                isHistorical = true,
+                message = "Letzte bekannte Position (kein GPS-Fix, historisch)",
                 timestamp = Date()
             ).also { emit(it) }
         }

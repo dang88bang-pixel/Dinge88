@@ -294,18 +294,32 @@ class AgentService @Inject constructor(
     ): SearchResult = coroutineScope {
         val channels = buildChannelList(asset, settings)
 
+        // Asynchrone Echtzeit-Suchanfragen (MQTT/WebSocket) anstoßen. Die
+        // Antworten laufen über die jeweiligen Event-Flows ein.
+        if (mqttService.isConnected) mqttService.sendSearchRequest(asset.mac)
+        if (webSocketService.isConfigured) webSocketService.sendSearchRequest(asset.mac)
+
+        val providerErrors = java.util.concurrent.ConcurrentHashMap<DetectionSource, String>()
         val results = channels.map { (source, block) ->
             async {
-                runCatching { block() }.getOrNull()?.also { detection ->
-                    persist(detection)
-                    if (settings.learningMode) {
-                        learningMemory[asset.mac.uppercase()] = source
+                try {
+                    block()?.also { detection ->
+                        persist(detection)
+                        if (settings.learningMode) {
+                            learningMemory[asset.mac.uppercase()] = source
+                        }
                     }
+                } catch (e: Exception) {
+                    // Provider-Fehler (Netz/HTTP/Parse) vs. „keine Ergebnisse"
+                    providerErrors[source] = e.message ?: e.javaClass.simpleName
+                    null
                 }
             }
         }.awaitAll()
 
-        val best = results.filterNotNull().minByOrNull { it.rssi }
+        // rssi==0 bedeutet „unbekannt"; bekannte Messwerte (negativ) gewinnen.
+        val best = results.filterNotNull()
+            .minByOrNull { if (it.rssi == 0) Int.MAX_VALUE else it.rssi }
         if (best != null) {
             // Geofence check: alert if asset found >5km from last known position
             if (asset.latitude != null && asset.longitude != null &&
@@ -325,10 +339,15 @@ class AgentService @Inject constructor(
                 }
             }
             applyDetectionToAsset(asset, best)
-            SearchResult(found = true, detection = best, accuracy = best.rssi)
+            SearchResult(
+                found = true,
+                detection = best,
+                accuracy = if (best.rssi == 0) Int.MAX_VALUE else best.rssi,
+                providerErrors = providerErrors
+            )
         } else {
             markOffline(asset)
-            SearchResult.NotFound
+            SearchResult(found = false, providerErrors = providerErrors)
         }
     }
 
@@ -417,9 +436,26 @@ class AgentService @Inject constructor(
                     rssi = event.rssi,
                     latitude = event.latitude,
                     longitude = event.longitude,
-                    accuracyMeters = 30f,
+                    accuracyMeters = null,
                     message = event.payload.take(120),
                     timestamp = Date()
+                )
+                persist(detection)
+                updateAssetIfKnown(detection)
+            }
+
+            is MqttEvent.SearchResponse -> {
+                val detection = Detection(
+                    assetMac = event.assetMac,
+                    sourceType = DetectionSource.MQTT,
+                    nodeId = "mqtt-search",
+                    rssi = event.rssi,
+                    latitude = event.latitude,
+                    longitude = event.longitude,
+                    accuracyMeters = event.accuracyMeters,
+                    message = event.payload.take(120),
+                    timestamp = Date(),
+                    isHistorical = event.isHistorical
                 )
                 persist(detection)
                 updateAssetIfKnown(detection)
@@ -455,7 +491,35 @@ class AgentService @Inject constructor(
                         rssi = (event.data["rssi"] as? Number)?.toInt() ?: 0,
                         latitude = (event.data["lat"] as? Number)?.toDouble(),
                         longitude = (event.data["lng"] as? Number)?.toDouble(),
-                        accuracyMeters = 50f,
+                        accuracyMeters = (event.data["accuracyMeters"] as? Number)?.toFloat()
+                            ?: (event.data["accuracy_meters"] as? Number)?.toFloat(),
+                        timestamp = Date()
+                    )
+                    persist(detection)
+                    updateAssetIfKnown(detection)
+                }
+            }
+
+            is WebSocketEvent.SearchResult -> {
+                val mac = event.data["mac"] as? String ?: event.data["assetMac"] as? String
+                if (mac != null) {
+                    val sightings = (event.data["sightings"] as? List<*>) ?: emptyList<Any>()
+                    val detections = (event.data["detections"] as? List<*>) ?: emptyList<Any>()
+                    val source = (sightings.firstOrNull() ?: detections.firstOrNull()) as? Map<*, *>
+                    val detection = Detection(
+                        assetMac = mac.uppercase(),
+                        sourceType = DetectionSource.WEBSOCKET,
+                        nodeId = "fleet-ws-search",
+                        rssi = (source?.get("rssi") as? Number)?.toInt() ?: 0,
+                        latitude = (source?.get("latitude") as? Number)?.toDouble()
+                            ?: (source?.get("lat") as? Number)?.toDouble(),
+                        longitude = (source?.get("longitude") as? Number)?.toDouble()
+                            ?: (source?.get("lng") as? Number)?.toDouble(),
+                        accuracyMeters = (source?.get("accuracy_meters") as? Number)?.toFloat()
+                            ?: (source?.get("accuracyMeters") as? Number)?.toFloat(),
+                        isHistorical = (source?.get("is_historical") as? Number)?.toInt() == 1
+                            || source?.get("isHistorical") == true,
+                        message = "WebSocket-Suchergebnis für $mac",
                         timestamp = Date()
                     )
                     persist(detection)

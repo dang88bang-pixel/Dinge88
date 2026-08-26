@@ -2,6 +2,7 @@
 #   docker compose up --build
 #
 # Enthält: MQTT-Broker (Mosquitto), FastAPI-Backend, Node-RED-Dashboard.
+# Werte aus .env (siehe .env.example) werden automatisch interpoliert.
 
 services:
   # ============ MQTT-BROKER ============
@@ -11,10 +12,12 @@ services:
     ports:
       - "1883:1883"   # MQTT (App/Gateways)
       - "9001:9001"   # MQTT over WebSocket (optional)
+      - "${MOSQUITTO_TLS_PORT:-8883}:8883" # MQTT over TLS (optional)
     volumes:
       - ./mosquitto/config:/mosquitto/config:ro
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
+      - ./mosquitto/certs:/mosquitto/certs:ro
     networks:
       - secureguard-network
 
@@ -23,10 +26,16 @@ services:
     build: ./backend
     container_name: secureguard-backend
     ports:
-      - "8000:8000"
+      - "${UVICORN_PORT:-8000}:8000"
     environment:
       - DATABASE_PATH=/data/secureguard.db
-      - MQTT_BROKER=mqtt:1883
+      - MQTT_BROKER=${MQTT_BROKER:-mqtt:1883}
+      - MQTT_USERNAME=${MQTT_USERNAME:-}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-}
+      - MQTT_USE_TLS=${MQTT_USE_TLS:-false}
+      - MQTT_TLS_CA=${MQTT_TLS_CA:-}
+      - API_TOKEN=${API_TOKEN:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
     volumes:
       - ./backend:/app
       - ./data:/data
@@ -34,7 +43,7 @@ services:
       - mqtt
     networks:
       - secureguard-network
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn main:app --host ${UVICORN_HOST:-0.0.0.0} --port ${UVICORN_PORT:-8000} --reload
 
   # ============ NODE-RED (DASHBOARD) ============
   nodered:

@@ -729,28 +729,41 @@ services:
 
 ---
 
-## 🔨 Build & CI
+## 🔨 Lokale Build-Umgebung
 
-### GitHub Actions
+### Schnellstart (JDK 17 + Android SDK + PlatformIO + Backend)
+
+```bash
+# Alles lokal Installierbare installieren und anschließend prüfen
+./scripts/setup-local-env.sh --all
+
+# Alternativ einzeln:
+./scripts/install-jdk17.sh          # Temurin JDK 17 + JAVA_HOME
+./scripts/install-android-sdk.sh    # cmdline-tools, Platform 35, Build-Tools 35.0.0, platform-tools
+./scripts/setup-platformio.sh       # Python/PlatformIO + ESP32 + LoRa/PubSubClient
+./scripts/setup-backend.sh          # venv + FastAPI + Migrationen + Backend-Tests
+./scripts/validate-local-env.sh     # Statusprüfung
+
+# Alle Tests:
+./scripts/test-all.sh
+```
+
+Am Ende der Skripte: `source ~/.secureguard-env.sh`.
+
+### Build & CI
 
 Workflow `.github/workflows/build-release.yml`:
 - **Trigger:** Push auf `main`/`develop`, Tags `v*`, Pull Requests, manuell
-- **JDK:** 17 · **SDK:** android-34 · **Build-Tools:** 34.0.0 · **Gradle:** 8.9
+- **JDK:** 17 · **SDK:** android-35 · **Build-Tools:** 35.0.0 · **Gradle:** 8.9
 - **Artefakte:** `secureguard-pro-debug` (Debug-APK), `secureguard-pro` (Release-APK)
 - **Release-Signing:** Optional via `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
 
 ### Lokal bauen
 
 ```bash
-# 1. API-Keys konfigurieren
-cp local.properties.example local.properties
-# local.properties editieren
-
-# 2. Debug-APK bauen
+cp local.properties.example local.properties   # local.properties editieren
 ./gradlew :app:assembleDebug
-
-# 3. Release-APK bauen (unsiginiert ohne Keystore)
-./gradlew :app:assembleRelease
+./gradlew :app:assembleRelease                  # ohne Keystore: unsigned
 ```
 
 ### BuildConfig-Felder
@@ -762,8 +775,15 @@ cp local.properties.example local.properties
 | `NETATMO_TOKEN` | local.properties | ApiServiceManager |
 | `GOOGLE_API_KEY` | local.properties | ApiServiceManager |
 | `MQTT_BROKER_URL` | local.properties | MqttConfig |
+| `MQTT_USERNAME` / `MQTT_PASSWORD` | local.properties | MqttConfig |
+| `MQTT_TLS` | local.properties | MqttConfig (TLS) |
 | `WEBSOCKET_URL` | local.properties | WebSocketService |
+| `BACKEND_API_URL` / `CROWD_API_URL` | local.properties | CrowdService/REST |
 | `MCP_SERVER_URL` | local.properties | MCPClient |
+| `LORA_GATEWAY_URL` | local.properties | LoRa-Gateway |
+| `YOLO_SERVER_URL` | local.properties | Optical/YOLO |
+| `OPEN_DATA_API_URL` | local.properties | CKAN/Urban |
+| `FIND_MY_PROXY_URL` | local.properties | Crowd/Find-My |
 
 ---
 
@@ -772,14 +792,34 @@ cp local.properties.example local.properties
 ### local.properties.example
 
 ```properties
+sdk.dir=/pfad/zum/android-sdk
+ANDROID_HOME=/pfad/zum/android-sdk
 WIGLE_API_KEY=your_wigle_key_here
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
 NETATMO_TOKEN=your_netatmo_token_here
 GOOGLE_API_KEY=your_google_key_here
 MQTT_BROKER_URL=mqtt://broker.example.com:1883
+MQTT_USERNAME=
+MQTT_PASSWORD=
+MQTT_TLS=false
 WEBSOCKET_URL=ws://api.example.com:8000/ws
+BACKEND_API_URL=http://api.example.com:8000
 MCP_SERVER_URL=http://api.example.com:8000
+LORA_GATEWAY_URL=http://lora-gateway.example.com:8080
+YOLO_SERVER_URL=http://yolo-inference.example.com:5000
+CROWD_API_URL=http://api.example.com:8000/api/crowd
+OPEN_DATA_API_URL=https://demo.ckan.org/api/3
+FIND_MY_PROXY_URL=https://find-my-proxy.example.com
 ```
+
+### Backend-Konfiguration (.env)
+
+```bash
+cp .env.example .env
+# .env mit CORS_ORIGINS, API_TOKEN, MQTT_USERNAME/PASSWORD, TLS pflegen
+```
+
+Offene Punkte siehe [`docs/ABARBEITUNGSLISTE.md`](docs/ABARBEITUNGSLISTE.md).
 
 ---
 

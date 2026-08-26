@@ -34,7 +34,7 @@ fun apiKey(name: String): String {
 
 android {
     namespace = "com.secureguard.enterprise"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.secureguard.enterprise"
@@ -56,8 +56,17 @@ android {
         buildConfigField("String", "NETATMO_TOKEN", "\"${apiKey("NETATMO_TOKEN")}\"")
         buildConfigField("String", "GOOGLE_API_KEY", "\"${apiKey("GOOGLE_API_KEY")}\"")
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
+        buildConfigField("String", "MQTT_USERNAME", "\"${apiKey("MQTT_USERNAME")}\"")
+        buildConfigField("String", "MQTT_PASSWORD", "\"${apiKey("MQTT_PASSWORD")}\"")
+        buildConfigField("boolean", "MQTT_TLS", "${apiKey("MQTT_TLS").toBoolean()}")
         buildConfigField("String", "WEBSOCKET_URL", "\"${apiKey("WEBSOCKET_URL")}\"")
+        buildConfigField("String", "BACKEND_API_URL", "\"${apiKey("BACKEND_API_URL")}\"")
+        buildConfigField("String", "CROWD_API_URL", "\"${apiKey("CROWD_API_URL")}\"")
         buildConfigField("String", "MCP_SERVER_URL", "\"${apiKey("MCP_SERVER_URL")}\"")
+        buildConfigField("String", "LORA_GATEWAY_URL", "\"${apiKey("LORA_GATEWAY_URL")}\"")
+        buildConfigField("String", "YOLO_SERVER_URL", "\"${apiKey("YOLO_SERVER_URL")}\"")
+        buildConfigField("String", "OPEN_DATA_API_URL", "\"${apiKey("OPEN_DATA_API_URL")}\"")
+        buildConfigField("String", "FIND_MY_PROXY_URL", "\"${apiKey("FIND_MY_PROXY_URL")}\"")
     }
 
     val releaseSigning = signingConfigs.create("release") {

@@ -20,5 +20,7 @@ data class Detection(
     val longitude: Double? = null,
     val accuracyMeters: Float? = null,
     val message: String? = null,
-    val timestamp: Date = Date()
+    val timestamp: Date = Date(),
+    /** true bei einer historischen/vermuteten Position (kein reales Live-Fix). */
+    val isHistorical: Boolean = false
 )

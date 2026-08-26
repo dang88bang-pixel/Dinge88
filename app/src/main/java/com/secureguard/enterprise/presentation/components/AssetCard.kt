@@ -77,7 +77,7 @@ fun AssetCard(
                     )
                 }
                 Text(
-                    "📶 ${asset.rssi} dBm",
+                    if (asset.rssi == 0) "📶 –" else "📶 ${asset.rssi} dBm",
                     style = MaterialTheme.typography.bodySmall
                 )
             }

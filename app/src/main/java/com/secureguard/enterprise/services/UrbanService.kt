@@ -37,10 +37,10 @@ class UrbanService @Inject constructor(
                 assetMac = asset.mac,
                 sourceType = DetectionSource.URBAN,
                 nodeId = "charger-${nearest.id}",
-                rssi = -75,
+                rssi = 0,
                 latitude = nearest.latitude ?: lat,
                 longitude = nearest.longitude ?: lon,
-                accuracyMeters = 50f,
+                accuracyMeters = null,
                 message = "Ladesäule: ${nearest.operator ?: nearest.title ?: "Unbekannt"}",
                 timestamp = Date()
             ).also { emit(it) }
@@ -54,10 +54,10 @@ class UrbanService @Inject constructor(
                 assetMac = asset.mac,
                 sourceType = DetectionSource.URBAN,
                 nodeId = "dhl-${nearest.id ?: "unknown"}",
-                rssi = -80,
+                rssi = 0,
                 latitude = nearest.latitude ?: lat,
                 longitude = nearest.longitude ?: lon,
-                accuracyMeters = 80f,
+                accuracyMeters = null,
                 message = "Packstation: ${nearest.name ?: nearest.id ?: "?"}",
                 timestamp = Date()
             ).also { emit(it) }
@@ -74,8 +74,9 @@ class UrbanService @Inject constructor(
                 rssi = 0,
                 latitude = lat,
                 longitude = lon,
-                accuracyMeters = 100f,
-                message = "Smart-City: ${ds.title ?: "Datensatz gefunden"}",
+                accuracyMeters = null,
+                isHistorical = true,
+                message = "Smart-City-Datensatz (keine Live-Position): ${ds.title ?: "Datensatz gefunden"}",
                 timestamp = Date()
             ).also { emit(it) }
         }

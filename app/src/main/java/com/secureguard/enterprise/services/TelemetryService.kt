@@ -55,10 +55,10 @@ class TelemetryService @Inject constructor(
             assetMac = asset.mac,
             sourceType = DetectionSource.TELEMETRY,
             nodeId = "telemetry-gatt",
-            rssi = -50,
+            rssi = 0,
             latitude = telemetry.latitude,
             longitude = telemetry.longitude,
-            accuracyMeters = 8f,
+            accuracyMeters = null,
             timestamp = telemetry.timestamp
         ).also { emit(it) }
     }

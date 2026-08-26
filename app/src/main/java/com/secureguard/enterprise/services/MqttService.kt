@@ -20,10 +20,10 @@ import javax.inject.Singleton
  * MQTT-Client (Paho) für Echtzeit-Kommunikation mit Assets/Gateways.
  *
  * Implementiert mit [MqttAsyncClient] aus `org.eclipse.paho.client.mqttv3`
- * (nicht mit dem veralteten `paho.android.service` – siehe
- * IMPLEMENTIERUNGS_INVENTUR.md „Abweichungen"). Der Client verbindet sich
- * selbstständig, abonniert Telemetrie-/Alert-Themen und emittiert
- * [MqttEvent]s, die vom Agenten gesammelt werden.
+ * (nicht mit dem veralteten `paho.android.service`). Der Client verbindet sich
+ * nur, wenn eine Broker-URL in `local.properties` konfiguriert ist. Er
+ * abonniert Telemetrie-, Alert-, Status- und Suchantwort-Themen und emittiert
+ * [MqttEvent]s, die vom Agenten verarbeitet werden.
  */
 @Singleton
 class MqttService @Inject constructor() {
@@ -41,9 +41,14 @@ class MqttService @Inject constructor() {
     @Synchronized
     fun connect() {
         if (client?.isConnected == true) return
+        val brokerUrl = normalizeBrokerUrl(MqttConfig.BROKER_URL)
+        if (brokerUrl.isBlank()) {
+            _events.tryEmit(MqttEvent.Error("Keine MQTT-Broker-URL konfiguriert (MQTT_BROKER_URL)"))
+            return
+        }
         val clientId = "${MqttConfig.CLIENT_ID_PREFIX}_${System.currentTimeMillis()}"
         val newClient = try {
-            MqttAsyncClient(MqttConfig.BROKER_URL, clientId, MemoryPersistence())
+            MqttAsyncClient(brokerUrl, clientId, MemoryPersistence())
         } catch (e: Exception) {
             _events.tryEmit(MqttEvent.Error("MQTT-Client konnte nicht erstellt werden: ${e.message}"))
             return
@@ -57,6 +62,8 @@ class MqttService @Inject constructor() {
                 subscribe(MqttConfig.TOPIC_ALERT)
                 subscribe(MqttConfig.TOPIC_STATUS)
                 subscribe(MqttConfig.TOPIC_BROADCAST)
+                subscribe(MqttConfig.TOPIC_SEARCH_RESPONSE)
+                subscribe(MqttConfig.TOPIC_SEARCH_RESPONSE_ALT)
             }
 
             override fun connectionLost(cause: Throwable?) {
@@ -77,6 +84,10 @@ class MqttService @Inject constructor() {
             isAutomaticReconnect = true
             keepAliveInterval = MqttConfig.KEEP_ALIVE_SECONDS
             connectionTimeout = MqttConfig.CONNECT_TIMEOUT_SECONDS
+            if (MqttConfig.USERNAME.isNotEmpty()) {
+                userName = MqttConfig.USERNAME
+                password = MqttConfig.PASSWORD.toCharArray()
+            }
         }
 
         try {
@@ -96,6 +107,18 @@ class MqttService @Inject constructor() {
         } catch (e: Exception) {
             _events.tryEmit(MqttEvent.Error("MQTT-connect-Fehler: ${e.message}"))
         }
+    }
+
+    /** Normalisiert Broker-Schemata auf Paho-Schemata (`ssl://` für TLS). */
+    private fun normalizeBrokerUrl(url: String): String {
+        var result = url.trim()
+        when {
+            result.startsWith("mqtts://") -> result = "ssl://" + result.removePrefix("mqtts://")
+            result.startsWith("tls://") -> result = "ssl://" + result.removePrefix("tls://")
+            result.startsWith("mqtt://") && MqttConfig.USE_TLS ->
+                result = "ssl://" + result.removePrefix("mqtt://")
+        }
+        return result
     }
 
     /** Abonniert ein Topic (QoS siehe [MqttConfig]). */
@@ -127,6 +150,16 @@ class MqttService @Inject constructor() {
         publish(MqttConfig.commandTopic(assetMac), command, MqttConfig.QOS_COMMAND)
     }
 
+    /** Sendet eine asynchrone Suchanfrage für ein Asset an alle Gateways/Backend. */
+    fun sendSearchRequest(assetMac: String) {
+        if (!isConnected) return
+        publish(
+            MqttConfig.TOPIC_SEARCH_REQUEST,
+            "{\"mac\":\"${assetMac.uppercase()}\",\"requestedAt\":${System.currentTimeMillis()}}",
+            MqttConfig.QOS_SEARCH
+        )
+    }
+
     @Synchronized
     fun disconnect() {
         try {
@@ -144,6 +177,33 @@ class MqttService @Inject constructor() {
         val t = topic ?: return
         try {
             when {
+                t.contains("/search/response") || t.contains("/search_response") -> {
+                    val json = gson.fromJson(payload, JsonObject::class.java)
+                    val mac = json.get("mac")?.asString
+                        ?: json.get("assetMac")?.asString
+                        ?: extractMac(t)
+                    _events.tryEmit(
+                        MqttEvent.SearchResponse(
+                            assetMac = mac ?: t,
+                            rssi = json.get("rssi")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+                            latitude = json.get("lat")
+                                ?.takeIf { !it.isJsonNull }?.asDouble
+                                ?: json.get("latitude")?.takeIf { !it.isJsonNull }?.asDouble,
+                            longitude = json.get("lng")
+                                ?.takeIf { !it.isJsonNull }?.asDouble
+                                ?: json.get("longitude")?.takeIf { !it.isJsonNull }?.asDouble,
+                            accuracyMeters = json.get("accuracyMeters")
+                                ?.takeIf { !it.isJsonNull }?.asFloat
+                                ?: json.get("accuracy_meters")?.takeIf { !it.isJsonNull }?.asFloat,
+                            isHistorical = json.get("isHistorical")
+                                ?.takeIf { !it.isJsonNull }?.asBoolean
+                                ?: json.get("historical")?.takeIf { !it.isJsonNull }?.asBoolean
+                                ?: false,
+                            payload = payload
+                        )
+                    )
+                }
+
                 t.endsWith("/telemetry") -> {
                     val json = gson.fromJson(payload, JsonObject::class.java)
                     val mac = json.get("mac")?.asString ?: extractMac(t)
@@ -198,6 +258,17 @@ sealed class MqttEvent {
         val rssi: Int = 0,
         val latitude: Double? = null,
         val longitude: Double? = null,
+        val payload: String = ""
+    ) : MqttEvent()
+
+    /** Antwort auf eine zuvor gesendete [MqttService.sendSearchRequest]. */
+    data class SearchResponse(
+        val assetMac: String,
+        val rssi: Int = 0,
+        val latitude: Double? = null,
+        val longitude: Double? = null,
+        val accuracyMeters: Float? = null,
+        val isHistorical: Boolean = false,
         val payload: String = ""
     ) : MqttEvent()
 

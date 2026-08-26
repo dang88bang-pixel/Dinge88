@@ -48,6 +48,8 @@ char wifi_ssid[64] = "";
 char wifi_password[64] = "";
 char mqtt_host[128] = "";
 int mqtt_port = 1883;
+char mqtt_user[64] = "";
+char mqtt_pass[64] = "";
 char device_id[32] = "ESP32_SecureGuard";
 
 WiFiClient espClient;
@@ -72,21 +74,28 @@ void loadConfig() {
     String s_pass = prefs.getString("wifi_pass", "secureguard123");
     String s_mqtt = prefs.getString("mqtt_host", "192.168.1.100");
     mqtt_port = prefs.getInt("mqtt_port", 1883);
+    String s_user = prefs.getString("mqtt_user", "");
+    String s_pass = prefs.getString("mqtt_pass", "");
     String s_devid = prefs.getString("device_id", "ESP32_SecureGuard");
     prefs.end();
 
     s_ssid.toCharArray(wifi_ssid, sizeof(wifi_ssid));
     s_pass.toCharArray(wifi_password, sizeof(wifi_password));
     s_mqtt.toCharArray(mqtt_host, sizeof(mqtt_host));
+    s_user.toCharArray(mqtt_user, sizeof(mqtt_user));
+    s_pass.toCharArray(mqtt_pass, sizeof(mqtt_pass));
     s_devid.toCharArray(device_id, sizeof(device_id));
 }
 
-void saveConfig(const char* ssid, const char* pass, const char* mqttH, int port) {
+void saveConfig(const char* ssid, const char* pass, const char* mqttH, int port,
+                const char* user, const char* pw) {
     prefs.begin("secureguard", false);
     prefs.putString("wifi_ssid", ssid);
     prefs.putString("wifi_pass", pass);
     prefs.putString("mqtt_host", mqttH);
     prefs.putInt("mqtt_port", port);
+    prefs.putString("mqtt_user", user);
+    prefs.putString("mqtt_pass", pw);
     prefs.end();
     Serial.println("Konfiguration gespeichert – Neustart...");
     ESP.restart();
@@ -279,6 +288,19 @@ void callback(char* topic, byte* payload, unsigned int length) {
             delay(100);
         }
         Serial.println("MESSAGE empfangen – LED-Bestätigung");
+    } else if (message.indexOf("SEARCH") >= 0) {
+        // Suchanfrage der App (secureguard/search/request) beantworten.
+        // Das Gateway kennt keine Live-GPS-Position → isHistorical=true.
+        String mac = extractJsonValue(message, "mac");
+        char resp[512];
+        snprintf(resp, sizeof(resp),
+            "{\"mac\":\"%s\",\"device\":\"%s\",\"rssi\":%d,\"battery\":%d,"
+            "\"isHistorical\":true,\"gateway\":\"%s\"}",
+            mac.c_str(), device_id, WiFi.RSSI(), batteryPercent, device_id);
+        char topic[64];
+        snprintf(topic, sizeof(topic), "secureguard/%s/search/response", device_id);
+        client.publish(topic, resp);
+        Serial.printf("SEARCH-Antwort für %s gesendet\n", mac.c_str());
     } else if (message.indexOf("POSITION") >= 0) {
         // Positions-Anfrage: GPS-Daten senden (via WiFi-Position oder gespeicherte Koords)
         char resp[128];
@@ -324,10 +346,13 @@ void parseAndSaveConfig(String json) {
     String pass = extractJsonValue(json, "wifi_pass");
     String mqttH = extractJsonValue(json, "mqtt_host");
     String portStr = extractJsonValue(json, "mqtt_port");
+    String user = extractJsonValue(json, "mqtt_user");
+    String pw = extractJsonValue(json, "mqtt_pass");
     int port = portStr.length() > 0 ? portStr.toInt() : 1883;
 
     if (ssid.length() > 0 && mqttH.length() > 0) {
-        saveConfig(ssid.c_str(), pass.c_str(), mqttH.c_str(), port);
+        saveConfig(ssid.c_str(), pass.c_str(), mqttH.c_str(), port,
+                   user.c_str(), pw.c_str());
     } else {
         Serial.println("CONFIG unvollständig – ignoriert");
     }
@@ -337,12 +362,16 @@ void parseAndSaveConfig(String json) {
 void reconnect() {
     while (!client.connected()) {
         Serial.printf("MQTT verbinden mit %s:%d...", mqtt_host, mqtt_port);
-        if (client.connect(device_id)) {
+        bool connected = (strlen(mqtt_user) > 0)
+            ? client.connect(device_id, mqtt_user, mqtt_pass)
+            : client.connect(device_id);
+        if (connected) {
             Serial.println("ok");
             char cmdTopic[64];
             snprintf(cmdTopic, sizeof(cmdTopic), "secureguard/%s/command", device_id);
             client.subscribe(cmdTopic);
             client.subscribe("secureguard/+/command");
+            client.subscribe("secureguard/search/request");
             // Online-Status melden
             char statusTopic[64];
             snprintf(statusTopic, sizeof(statusTopic), "secureguard/%s/status", device_id);

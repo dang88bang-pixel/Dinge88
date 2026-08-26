@@ -1,0 +1,45 @@
+# SecureGuard Enterprise – MQTT-Broker (Mosquitto 2.x) – Produktions-/TLS-Beispiel
+# ---------------------------------------------------------------
+# Diese Datei ist eine VORLAGE. Aktivieren für TLS:
+#   1. Zertifikate nach mosquitto/certs/ legen (nie committen)
+#   2. Diese Datei nach mosquitto/config/mosquitto.conf kopieren
+#   3. docker compose restart mqtt
+#
+# Beispiel-Zertifikate (testweise) erzeugen:
+#   openssl req -new -x509 -days 365 -nodes -out mosquitto/certs/server.crt \
+#     -keyout mosquitto/certs/server.key -subj "/CN=broker.example.com"
+# ---------------------------------------------------------------
+
+# ============ KLARTEXT (nur Entwicklungsnetz) ============
+listener 1883
+protocol mqtt
+allow_anonymous false
+password_file /mosquitto/config/passwd
+acl_file /mosquitto/config/acl
+
+# ============ MQTT OVER TLS ============
+listener 8883
+protocol mqtt
+allow_anonymous false
+password_file /mosquitto/config/passwd
+acl_file /mosquitto/config/acl
+cafile /mosquitto/certs/ca.crt
+certfile /mosquitto/certs/server.crt
+keyfile /mosquitto/certs/server.key
+tls_version tlsv1.2
+
+# ============ MQTT OVER WEBSOCKETS (optional, hinter Reverse-Proxy) ============
+listener 9001
+protocol websockets
+allow_anonymous false
+password_file /mosquitto/config/passwd
+acl_file /mosquitto/config/acl
+
+# ============ PERSISTENZ / LOGGING ============
+persistence true
+persistence_location /mosquitto/data/
+log_dest file /mosquitto/log/mosquitto.log
+log_dest stdout
+log_type error
+log_type warning
+log_type notice

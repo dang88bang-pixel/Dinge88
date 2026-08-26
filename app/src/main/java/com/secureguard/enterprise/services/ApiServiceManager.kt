@@ -149,7 +149,7 @@ class ApiServiceManager @Inject constructor(
                     rssi = 0,
                     latitude = result.trilat,
                     longitude = result.trilong,
-                    accuracyMeters = 100f,
+                    accuracyMeters = null,
                     message = "WiGle-Treffer: ${result.ssid ?: "unbekannt"}",
                     timestamp = Date()
                 )
