@@ -27,6 +27,9 @@
 ## 2. Schnellstart (Host mit JDK/SDK/Docker)
 
 ```bash
+# 0) Integritäts-Check (ohne Secrets)
+./scripts/prepare-all.sh
+
 # 1) Backend-Stack
 ./scripts/start-stack.sh
 ./scripts/smoke-check.sh

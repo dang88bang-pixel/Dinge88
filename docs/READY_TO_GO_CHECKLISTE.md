@@ -3,6 +3,8 @@
 Stand: 2026-08-26 · Branch `arena/01a03c79-dinge88`  
 Ziel: **vollständige App mit allen Diensten angebunden und einsatzbereit**.
 
+> **Update 2026-08-26 (Vollbereitstellung):** `prepare-all.sh`, Docker-Healthchecks, Branch/PR-ready. Alle Funktionen erhalten.
+
 > **Update 2026-08-26 (Batch 4 / Go-Live-Pack):** DSGVO Datenauskunft/Retention/Löschen, Health-Monitor-Screen, Backend `/api/health` Stats, smoke/start-stack Scripts, CI Unit-Tests.
 
 > **Update 2026-08-26 (Batch 3):** UI/Unit-Tests (PIN, Asset-CRUD, Agent-Cycle); Keystore-Passwörter nur vom Anwender.
