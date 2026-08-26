@@ -72,11 +72,24 @@ class MCPClient @Inject constructor() {
 
     // ============ VERBINDUNG ============
 
+    /**
+     * Normalisiert eine Server-URL auf ein WebSocket-Schema:
+     * `http://…` → `ws://…`, `https://…` → `wss://…`. Die Beispiel-
+     * Konfiguration in local.properties.example nutzt `http://` – OkHttp
+     * würde das sonst als ungültiges WebSocket-Schema ablehnen.
+     */
+    private fun normalizeWebSocketUrl(url: String): String = when {
+        url.startsWith("ws://") || url.startsWith("wss://") -> url
+        url.startsWith("https://") -> "wss://${url.removePrefix("https://")}"
+        url.startsWith("http://") -> "ws://${url.removePrefix("http://")}"
+        else -> "ws://$url"
+    }
+
     /** Verbindet mit dem MCP-Server (WebSocket). */
     fun connect() {
         if (!isConfigured || webSocket != null) return
         val request = Request.Builder()
-            .url(serverUrl)
+            .url(normalizeWebSocketUrl(serverUrl))
             .build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {

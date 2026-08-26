@@ -1,17 +1,25 @@
 # SecureGuard Enterprise - Backend-Konfiguration
 # Kopiere diese Datei zu local.properties und fülle die Werte aus GitHub Secrets
 
-# API-Keys (aus GitHub Secrets)
+# API-Keys (aus GitHub Secrets; im CI via ORG_GRADLE_PROJECT_* übergeben)
 WIGLE_API_KEY=your_wigle_key_here
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
 NETATMO_TOKEN=your_netatmo_token_here
 GOOGLE_API_KEY=your_google_key_here
+
 # Backend-Endpunkte (für Pilot)
+# MCP_SERVER_URL: MCP-Server aus docker-compose (Service "mcp", Port 8001);
+# http(s):// wird vom MCPClient automatisch zu ws(s):// normalisiert.
 MQTT_BROKER_URL=mqtt://broker.example.com:1883
 WEBSOCKET_URL=ws://api.example.com:8000/ws
-MCP_SERVER_URL=http://api.example.com:8000
+MCP_SERVER_URL=http://api.example.com:8001
 
-# LoRa/Optik/Urban/Crowd-Endpunkte
+# --- Reserviert, DERZEIT NICHT VERDRAHTET (kein BuildConfig-Feld, keine
+# --- Code-Referenz – siehe IMPLEMENTIERUNGS_INVENTUR.md):
+# LORA_GATEWAY_URL   → eigener LoRa-Gateway-Endpunkt (App nutzt aktuell Helium-API + MQTT)
+# YOLO_SERVER_URL    → optische Objekterkennung per YOLO-Inferenzserver (Feature fehlt)
+# OPEN_DATA_API_URL  → CKAN-Endpunkt (aktuell hardcodierte Demo-URL in CkanOpenDataApi.kt)
+# FIND_MY_PROXY_URL  → nicht implementiert
 LORA_GATEWAY_URL=http://lora-gateway.example.com:8080
 YOLO_SERVER_URL=http://yolo-inference.example.com:5000
 OPEN_DATA_API_URL=https://demo.ckan.org/api/3
