@@ -1,4 +1,5 @@
-fastapi>=0.111
-uvicorn[standard]>=0.30
-paho-mqtt>=1.6
-pydantic>=2.7
+# Backend-Abhängigkeiten – fest gepinnt (paho 2.x bricht mqtt.Client(client_id=...))
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+paho-mqtt==1.6.1
+pydantic==2.10.4
