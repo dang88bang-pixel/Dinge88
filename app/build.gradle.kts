@@ -88,7 +88,11 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8: Code-Shrinking + Obfuskation + Ressourcen-Shrinking.
+            // Die nötigen Keep-Regeln für reflektive Serialisierung (Gson),
+            // Retrofit-Interfaces und Room-Enums stehen in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
             if (hasAnyKeystore) {
                 signingConfig = releaseSigning
             }
