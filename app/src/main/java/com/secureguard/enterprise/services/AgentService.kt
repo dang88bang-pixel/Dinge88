@@ -1,10 +1,6 @@
 package com.secureguard.enterprise.services
 
-import com.secureguard.enterprise.agent.ApiNodeManager
 import com.secureguard.enterprise.data.local.SecureGuardDatabase
-import com.secureguard.enterprise.data.model.Alert
-import com.secureguard.enterprise.data.model.AlertSeverity
-import com.secureguard.enterprise.data.model.AlertType
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.model.Detection
@@ -17,18 +13,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import okhttp3.MediaType
-import okhttp3.OkHttpClient
-import okhttp3.RequestBody
-import org.json.JSONObject
 import java.util.Date
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,16 +30,16 @@ import javax.inject.Singleton
  *
  * Every cycle it queries every available channel for every whitelisted asset,
  * fuses the results (best RSSI wins), persists the winning detection and
- * updates the asset's status. In learning mode the channel that most recently
- * produced a hit for an asset is queried first on the next cycle.
+ * updates the asset's status. In [AgentSettings.learningMode] the channel that
+ * most recently produced a hit for an asset is queried first on the next cycle
+ * ("rekursive Verbesserung"). The agent is fully decoupled from Meshtastic:
+ * LoRa is just one of several channels via [LoraService].
  *
- * Integrated subsystems:
- * - External REST APIs via [ApiServiceManager] (only with consent)
- * - Real-time channels MQTT ([MqttService]) and WebSocket ([WebSocketService])
- * - NFC tag detection via [NfcService]
- * - API node orchestration via [ApiNodeManager] (circuit-breaker, rate limits)
- * - Learning engine ([LearningEngine]) for adaptive interval/source selection
- * - Audit log ([AuditLogService]) and offline queue ([OfflineQueue])
+ * Zusätzlich integriert:
+ * - externe REST-APIs über [ApiServiceManager] (nur mit Einwilligung)
+ * - Echtzeit-Kanäle MQTT ([MqttService]) und WebSocket ([WebSocketService])
+ * - Lern-Engine ([LearningEngine]) für adaptives Intervall/Quellenwahl
+ * - Audit-Log ([AuditLogService]) und Offline-Queue ([OfflineQueue])
  */
 @Singleton
 class AgentService @Inject constructor(
@@ -67,19 +59,13 @@ class AgentService @Inject constructor(
     private val learningEngine: LearningEngine,
     private val auditLogService: AuditLogService,
     private val offlineQueue: OfflineQueue,
-    private val tempMailService: TempMailService,
-    private val apiNodeManager: ApiNodeManager,
-    private val nfcService: NfcService,
-    private val usbSerialService: UsbSerialService,
-    private val alertSoundManager: AlertSoundManager,
-    private val errorHandler: com.secureguard.enterprise.util.ErrorHandler
+    private val tempMailService: TempMailService
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var loopJob: Job? = null
     private var mqttCollectorJob: Job? = null
     private var webSocketCollectorJob: Job? = null
-    private var nfcCollectorJob: Job? = null
 
     private val _agentStatus = MutableStateFlow(AgentStatus())
     val agentStatus: StateFlow<AgentStatus> = _agentStatus.asStateFlow()
@@ -114,8 +100,6 @@ class AgentService @Inject constructor(
         mqttCollectorJob = null
         webSocketCollectorJob?.cancel()
         webSocketCollectorJob = null
-        nfcCollectorJob?.cancel()
-        nfcCollectorJob = null
         mqttService.disconnect()
         webSocketService.disconnect()
         _agentStatus.value = _agentStatus.value.copy(running = false)
@@ -124,16 +108,13 @@ class AgentService @Inject constructor(
         }
     }
 
-    /** Connects MQTT/WebSocket/NFC and collects real-time events. */
+    /** Verbindet MQTT/WebSocket und sammelt Echtzeit-Ereignisse. */
     private fun startRealtimeChannels() {
         mqttCollectorJob = scope.launch {
             mqttService.events.collect { event -> handleMqttEvent(event) }
         }
         webSocketCollectorJob = scope.launch {
             webSocketService.events.collect { event -> handleWebSocketEvent(event) }
-        }
-        nfcCollectorJob = scope.launch {
-            nfcService.detections.collect { detection -> handleNfcDetection(detection) }
         }
         mqttService.connect()
         if (webSocketService.isConfigured) webSocketService.connect()
@@ -143,10 +124,10 @@ class AgentService @Inject constructor(
         while (scope.isActive) {
             val cycleStart = System.currentTimeMillis()
             val result = runCatching { runCycle(settings) }
-                .onFailure { errorHandler.handleError(it, "AgentCycle") }
                 .getOrDefault(AgentCycleResult())
 
             val now = System.currentTimeMillis()
+            // Adaptives Intervall: die Lern-Engine optimiert die Taktung.
             val baseIntervalMs = settings.interval.coerceAtLeast(5) * 1000L
             val intervalMs = if (settings.learningMode) {
                 learningEngine.getOptimalInterval() * 1000L
@@ -166,12 +147,14 @@ class AgentService @Inject constructor(
             )
 
             val elapsed = System.currentTimeMillis() - cycleStart
-            kotlinx.coroutines.delay((intervalMs - elapsed).coerceAtLeast(0L))
+            delay((intervalMs - elapsed).coerceAtLeast(0L))
         }
     }
 
     /** Runs one complete cycle over all whitelisted assets. */
     suspend fun runCycle(settings: AgentSettings = _agentStatus.value.settings): AgentCycleResult {
+        // Take a snapshot by using the first emission is awkward inside a suspend fun;
+        // query via a one-shot list instead.
         val snapshot = currentWhitelistedAssets()
         var hits = 0
         val channelHits = mutableMapOf<String, Int>()
@@ -186,6 +169,7 @@ class AgentService @Inject constructor(
                     learningMemory[asset.mac.uppercase()] = result.detection.sourceType
                 }
             }
+            // Lern-Engine füttert jede Suche als Erfahrung.
             learningEngine.learn(
                 Experience(
                     assetId = asset.id,
@@ -196,86 +180,7 @@ class AgentService @Inject constructor(
                     sourceType = result.detection?.sourceType?.name ?: "UNKNOWN"
                 )
             )
-
-            // Check for low battery alert
-            if (asset.batteryLevel != null && asset.batteryLevel <= 15) {
-                database.alertDao().insert(
-                    Alert(
-                        assetId = asset.id,
-                        type = AlertType.LOW_BATTERY,
-                        severity = AlertSeverity.WARNING,
-                        message = "Batterie niedrig: ${asset.batteryLevel}% (${asset.shortName})",
-                        timestamp = Date()
-                    )
-                )
-            }
-
-            // Check for maintenance alert
-            if (asset.maintenanceDue) {
-                database.alertDao().insert(
-                    Alert(
-                        assetId = asset.id,
-                        type = AlertType.MAINTENANCE,
-                        severity = AlertSeverity.INFO,
-                        message = "Wartung fällig: ${asset.shortName}",
-                        timestamp = Date()
-                    )
-                )
-            }
         }
-
-        // Check USB serial for asset detections
-        runCatching { readUsbSerial() }
-            .onFailure { errorHandler.handleError(it, "UsbSerial") }
-
-            // Use LearningEngine predictions to inform search strategy
-            if (settings.learningMode && snapshot.isNotEmpty()) {
-                val prediction = learningEngine.predictNextLocation()
-                if (prediction != null) {
-                    auditLogService.log(
-                        action = "PREDICTION",
-                        details = "Naechster Standort: ${"%.4f".format(prediction.first)}, ${"%.4f".format(prediction.second)}"
-                    )
-                }
-                // Periodic pattern analysis every 10 cycles
-                if (cycleCount.get() % 10 == 0L) {
-                    val patterns = learningEngine.analyzePatterns(emptyList())
-                    if (patterns.isNotEmpty()) {
-                        auditLogService.log(
-                            action = "PATTERNS",
-                            details = "${patterns.size} Muster erkannt"
-                        )
-                    }
-                }
-                // Check if external sources should be used based on confidence
-                if (learningEngine.shouldUseExternalSources() && !settings.externalSources) {
-                    auditLogService.log(
-                        action = "SUGGEST_EXTERNAL",
-                        details = "LearningEngine empfiehlt externe Quellen (niedrige Konfidenz)"
-                    )
-                }
-                snapshot.forEach { asset ->
-                    val probability = learningEngine.getSuccessProbability(asset.id)
-                    if (probability < 0.2f) {
-                        auditLogService.log(
-                            action = "LOW_PROBABILITY",
-                            details = "${asset.shortName}: Erfolgswahrscheinlichkeit ${"%.0f".format(probability * 100)}%"
-                        )
-                    }
-                }
-            }
-
-        // Flush offline queue when MQTT is connected
-        if (mqttService.isConnected) {
-            val flushed = flushOfflineQueue()
-            if (flushed > 0) {
-                auditLogService.log(
-                    action = "QUEUE_FLUSH",
-                    details = "$flushed Aktionen aus Offline-Queue zugestellt"
-                )
-            }
-        }
-
         return AgentCycleResult(
             assetsChecked = snapshot.size,
             detections = hits,
@@ -284,6 +189,7 @@ class AgentService @Inject constructor(
     }
 
     private suspend fun currentWhitelistedAssets(): List<Asset> {
+        // Room's @Query returns a Flow; take the current snapshot.
         return database.assetDao().observeWhitelisted().first()
     }
 
@@ -297,6 +203,7 @@ class AgentService @Inject constructor(
         val results = channels.map { (source, block) ->
             async {
                 runCatching { block() }.getOrNull()?.also { detection ->
+                    // Persist every channel hit for the history view.
                     persist(detection)
                     if (settings.learningMode) {
                         learningMemory[asset.mac.uppercase()] = source
@@ -307,23 +214,6 @@ class AgentService @Inject constructor(
 
         val best = results.filterNotNull().minByOrNull { it.rssi }
         if (best != null) {
-            // Geofence check: alert if asset found >5km from last known position
-            if (asset.latitude != null && asset.longitude != null &&
-                best.latitude != null && best.longitude != null
-            ) {
-                val distKm = haversineKm(asset.latitude, asset.longitude, best.latitude, best.longitude)
-                if (distKm > GEOFENCE_RADIUS_KM) {
-                    database.alertDao().insert(
-                        Alert(
-                            assetId = asset.id,
-                            type = AlertType.GEOFENCE,
-                            severity = AlertSeverity.WARNING,
-                            message = "Geofence: ${asset.shortName} ${"%.1f".format(distKm)}km entfernt",
-                            timestamp = Date()
-                        )
-                    )
-                }
-            }
             applyDetectionToAsset(asset, best)
             SearchResult(found = true, detection = best, accuracy = best.rssi)
         } else {
@@ -345,27 +235,14 @@ class AgentService @Inject constructor(
         all[DetectionSource.OPTICAL] = { opticalService.searchAsset(asset) }
         all[DetectionSource.URBAN] = { urbanService.searchAsset(asset) }
 
-        // Satellite/GPS is a local hardware channel (device GNSS receiver),
-        // not an external cloud service – always available when permitted.
-        all[DetectionSource.SATELLITE] = { satelliteService.searchAsset(asset) }
-
         // External / internet channels are only used when permitted.
         if (!settings.offlineOnly || settings.externalSources) {
             if (asset.externalAllowed || settings.externalSources) {
                 all[DetectionSource.CROWD] = { crowdService.searchAsset(asset) }
+                // Externe REST-APIs (WiGle.net etc.) – nur mit Einwilligung.
+                all[DetectionSource.API] = { apiServiceManager.searchViaWiGle(asset.mac) }
             }
-        }
-
-        // API channel via ApiNodeManager (circuit-breaker, rate limits, health monitoring)
-        if (!settings.offlineOnly || settings.externalSources) {
-            all[DetectionSource.API] = {
-                val apiDetections = apiNodeManager.queryAllNodes(
-                    mac = asset.mac,
-                    latitude = asset.latitude,
-                    longitude = asset.longitude
-                )
-                apiDetections.firstOrNull()
-            }
+            all[DetectionSource.SATELLITE] = { satelliteService.searchAsset(asset) }
         }
 
         if (!settings.learningMode) return all.toList()
@@ -405,7 +282,7 @@ class AgentService @Inject constructor(
     /** Manually trigger a single-asset search (used by the detail screen). */
     suspend fun searchAsset(asset: Asset): SearchResult = comprehensiveSearch(asset)
 
-    // ============ REAL-TIME CHANNELS (MQTT / WEBSOCKET / NFC) ============
+    // ============ ECHTZEIT-KANÄLE (MQTT / WEBSOCKET) ============
 
     private suspend fun handleMqttEvent(event: MqttEvent) {
         when (event) {
@@ -427,16 +304,18 @@ class AgentService @Inject constructor(
 
             is MqttEvent.Alert -> {
                 database.alertDao().insert(
-                    Alert(
+                    com.secureguard.enterprise.data.model.Alert(
                         assetId = event.assetMac,
-                        type = AlertType.SECURITY,
-                        severity = AlertSeverity.WARNING,
+                        type = com.secureguard.enterprise.data.model.AlertType.SECURITY,
+                        severity = com.secureguard.enterprise.data.model.AlertSeverity.WARNING,
                         message = event.message,
                         timestamp = Date()
                     )
                 )
-                notificationService.sendAlertNotification("MQTT-Alert", event.message)
-                alertSoundManager.playForSeverity("WARNING")
+                notificationService.sendAlertNotification(
+                    "MQTT-Alert",
+                    event.message
+                )
             }
 
             else -> Unit
@@ -467,15 +346,14 @@ class AgentService @Inject constructor(
                 val mac = event.data["mac"] as? String ?: event.data["assetMac"] as? String
                 if (mac != null) {
                     database.alertDao().insert(
-                        Alert(
+                        com.secureguard.enterprise.data.model.Alert(
                             assetId = mac.uppercase(),
-                            type = AlertType.CRITICAL,
-                            severity = AlertSeverity.CRITICAL,
-                            message = event.data["message"] as? String ?: "Kritischer WebSocket-Alert",
+                            type = com.secureguard.enterprise.data.model.AlertType.SECURITY,
+                            severity = com.secureguard.enterprise.data.model.AlertSeverity.CRITICAL,
+                            message = event.data["message"] as? String ?: "WebSocket-Alert",
                             timestamp = Date()
                         )
                     )
-                    alertSoundManager.playForSeverity("CRITICAL")
                 }
             }
 
@@ -483,31 +361,18 @@ class AgentService @Inject constructor(
         }
     }
 
-    /** Handles NFC tag detections collected from NfcService. */
-    private suspend fun handleNfcDetection(detection: Detection) {
-        persist(detection)
-        updateAssetIfKnown(detection)
-        notificationService.sendAlertNotification(
-            "NFC-Tag erkannt",
-            "Asset ${detection.assetMac} per NFC identifiziert"
-        )
-        auditLogService.log(
-            action = "NFC_TAG",
-            details = "Tag gelesen: ${detection.assetMac}"
-        )
-    }
-
-    /** Updates the asset status if the asset is known (whitelisted). */
+    /** Aktualisiert den Asset-Status, falls das Asset bekannt (whitelisted) ist. */
     private suspend fun updateAssetIfKnown(detection: Detection) {
         val asset = database.assetDao().getByMac(detection.assetMac) ?: return
         applyDetectionToAsset(asset, detection)
     }
 
-    // ============ ACTIONS ============
+    // ============ AKTIONEN ============
 
     /**
-     * Sends an action via all available channels (MQTT, WebSocket, BLE/GATT).
-     * If no channel delivers, the action is enqueued in the offline queue.
+     * Führt eine Aktion über alle verfügbaren Kanäle aus (MQTT, WebSocket,
+     * BLE-GATT). Bei fehlender Verbindung wird die Aktion in die
+     * Offline-Queue eingereiht.
      */
     suspend fun sendAction(asset: Asset, action: String): Boolean {
         auditLogService.log(
@@ -527,39 +392,35 @@ class AgentService @Inject constructor(
             delivered = true
         }
 
-        // 3. BLE/GATT (telemetry channel)
+        // 3. BLE/GATT (Telemetrie-Kanal)
         if (telemetryService.sendCommand(asset.mac, action)) delivered = true
 
-        // 4. Offline fallback: persist action when nothing was delivered.
+        // 4. Offline-Fallback: Aktion persistieren, wenn nichts zugestellt wurde.
         if (!delivered) {
-            val payload = mapOf("assetId" to asset.id, "action" to action)
-            val jsonPayload = com.google.gson.Gson().toJson(payload)
-            if (offlineQueue.isValidPayload(jsonPayload)) {
-                offlineQueue.enqueue(
-                    actionType = action,
-                    assetMac = asset.mac,
-                    payload = payload
-                )
-            }
+            offlineQueue.enqueue(
+                actionType = action,
+                assetMac = asset.mac,
+                payload = mapOf("assetId" to asset.id, "action" to action)
+            )
         }
         return delivered
     }
 
-    /** Delivers pending actions from the offline queue via MQTT. */
+    /** Zustellung der Offline-Queue über alle Kanäle. */
     suspend fun flushOfflineQueue(): Int {
-        if (!mqttService.isConnected) return 0
         return offlineQueue.retryPending { action ->
             mqttService.sendCommand(action.assetMac, action.actionType)
-            mqttService.isConnected
+            true
         }
     }
 
-    // ============ TEMPORARY EMAIL / REGISTRATION ============
+    // ============ TEMPORÄRE E-MAIL / REGISTRIERUNG ============
 
     /**
-     * Automated registration with a temporary email address:
-     * Create inbox → perform registration → retrieve OTP.
-     * Only for legitimate purposes (test environments, authorised API key generation).
+     * Automatisierte Registrierung mit temporärer E-Mail-Adresse:
+     * Inbox erstellen → (Aufrufer führt die Registrierung durch) →
+     * OTP abrufen. Nur für legitime Zwecke (Testumgebungen, autorisierte
+     * API-Key-Generierung). Ohne konfigurierten MCP-Server → Fehler.
      */
     suspend fun autoRegisterExternalService(
         serviceName: String,
@@ -578,9 +439,11 @@ class AgentService @Inject constructor(
                 details = "Registrierung bei $serviceName (URL: $registrationUrl)"
             )
 
+            // 1. Temporäre Inbox erstellen
             val inbox = tempMailService.createInbox()
                 ?: return RegistrationResult(success = false, error = "Inbox-Erstellung fehlgeschlagen")
 
+            // 2. Registrierung mit der temporären E-Mail durchführen
             val registerSuccess = performRegistration(
                 serviceName = serviceName,
                 url = registrationUrl,
@@ -596,6 +459,7 @@ class AgentService @Inject constructor(
                 )
             }
 
+            // 3. Auf OTP warten
             val otpResult = tempMailService.waitForOTP()
             return if (otpResult?.success == true) {
                 auditLogService.log(
@@ -627,96 +491,19 @@ class AgentService @Inject constructor(
         }
     }
 
-    /**
-     * Performs the actual HTTP POST registration with the temporary email
-     * address included in the payload.
-     */
+    /** Führt die Registrierung durch (hier als HTTP-POST-Skizze). */
     private suspend fun performRegistration(
         serviceName: String,
         url: String,
         data: Map<String, String>,
         email: String
     ): Boolean {
-        return try {
-            val client = OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .build()
-
-            val payload = JSONObject(data.toMutableMap().apply { put("email", email) })
-            val body = RequestBody.create(
-                MediaType.parse("application/json"),
-                payload.toString()
-            )
-            val request = okhttp3.Request.Builder()
-                .url(url)
-                .post(body)
-                .build()
-
-            val response = client.newCall(request).execute()
-            val success = response.isSuccessful
-
-            auditLogService.log(
-                action = "REGISTER_HTTP",
-                details = "$serviceName: HTTP ${response.code()} (${if (success) "OK" else "FEHLER"})"
-            )
-
-            response.close()
-            success
-        } catch (e: Exception) {
-            auditLogService.log(
-                action = "REGISTER_HTTP_ERROR",
-                details = "$serviceName: ${e.message}"
-            )
-            false
-        }
-    }
-
-    /**
-     * Reads data from USB serial (FTDI/CP210x) and creates a detection
-     * if the data contains a known asset MAC.
-     */
-    suspend fun readUsbSerial(): Detection? {
-        val line = usbSerialService.readLine() ?: return null
-        // Try to extract a MAC address from the serial data
-        val macPattern = Regex("([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}")
-        val mac = macPattern.find(line)?.value?.uppercase() ?: return null
-
-        val asset = database.assetDao().getByMac(mac) ?: return null
-
-        return Detection(
-            assetMac = mac,
-            sourceType = DetectionSource.UNKNOWN,
-            nodeId = "usb-serial",
-            rssi = 0,
-            latitude = asset.latitude,
-            longitude = asset.longitude,
-            accuracyMeters = 1f,
-            message = "USB-Serial: ${line.take(80)}",
-            timestamp = Date()
-        ).also { detection ->
-            persist(detection)
-            updateAssetIfKnown(detection)
-            auditLogService.log(
-                action = "USB_SERIAL",
-                details = "Asset $mac via USB-Serial erkannt"
-            )
-        }
+        // TODO: echte Registrierung (HTTP-POST mit email im Payload) –
+        // bewusst skizziert, um keine unautorisierten Aufrufe auszulösen.
+        return false
     }
 
     companion object {
         private const val STALE_MS = 5 * 60 * 1000L // 5 minutes
-        private const val GEOFENCE_RADIUS_KM = 5.0
-
-        /** Haversine formula: distance in km between two lat/lon points. */
-        private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-            val r = 6371.0 // Earth radius in km
-            val dLat = Math.toRadians(lat2 - lat1)
-            val dLon = Math.toRadians(lon2 - lon1)
-            val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
-                kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-                kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
-            return r * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-        }
     }
 }

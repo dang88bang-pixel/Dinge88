@@ -32,16 +32,26 @@ fun apiKey(name: String): String {
     return ""
 }
 
+// Version: lokal 1.0.0/1. In CI setzt der Workflow RELEASE_TAG (z. B. "v1.0.8")
+// aus Tag/Release – dann werden versionCode/versionName automatisch abgeleitet:
+//   versionName = "1.0.8", versionCode = 1*10000 + 0*100 + 8 = 10008
+val releaseTag = (System.getenv("RELEASE_TAG") ?: "").trim().removePrefix("v")
+val tagParts = releaseTag.split(".")
+val tagIsSemver = tagParts.size == 3 && tagParts.all { it.toIntOrNull() != null }
+val tagVersionCode = (tagParts.getOrNull(0)?.toIntOrNull() ?: 1) * 10000 +
+        (tagParts.getOrNull(1)?.toIntOrNull() ?: 0) * 100 +
+        (tagParts.getOrNull(2)?.toIntOrNull() ?: 0)
+
 android {
     namespace = "com.secureguard.enterprise"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.secureguard.enterprise"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = if (tagIsSemver) tagVersionCode else 1
+        versionName = if (tagIsSemver) releaseTag else "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -122,6 +132,18 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "/META-INF/INDEX.LIST"
             excludes += "/META-INF/io.netty.versions.properties"
+        }
+    }
+}
+
+// Release-APK konsequent als "release.apk" benennen (das Release erwartet
+// genau diese Datei; vorher: app-release.apk / app-release-unsigned.apk).
+androidComponents {
+    onVariants { variant ->
+        if (variant.buildType == "release") {
+            variant.outputs.forEach { output ->
+                output.outputFileName.set("release.apk")
+            }
         }
     }
 }
@@ -235,4 +257,120 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+// Nur auf GitHub Actions aktiv: Nach jedem assemble*-Lauf (auch bei Fehlern,
+// dank finalizedBy) werden APK + Prüfsummen + Build-Info als Orphan-Branch
+// `apk-delivery-<release|debug>` ins Repo gepusht (force). Der Branch ist der
+// zuverlässige Download-Kanal (git fetch origin apk-delivery-release).
+val isCi = System.getenv("GITHUB_ACTIONS") == "true"
+val ghToken = System.getenv("GITHUB_TOKEN")
+val ghRepo = System.getenv("GITHUB_REPOSITORY")
+val ghRunId = System.getenv("GITHUB_RUN_ID") ?: ""
+val ghSha = System.getenv("GITHUB_SHA") ?: ""
+
+tasks.register("publishApkDelivery") {
+    group = "build"
+    description = "Publiziert die gebaute APK + Prüfsummen als apk-delivery-* Git-Branch (nur CI)."
+    doLast {
+        if (!isCi || ghToken.isNullOrBlank() || ghRepo.isNullOrBlank()) {
+            logger.lifecycle("publishApkDelivery: nicht auf GitHub Actions – übersprungen.")
+            return@doLast
+        }
+        fun sh(cmd: List<String>, dir: File? = null): Pair<Int, String> {
+            val p = ProcessBuilder(cmd).apply {
+                directory(dir ?: rootProject.projectDir)
+                redirectErrorStream(true)
+                environment()["GIT_AUTHOR_NAME"] = "github-actions[bot]"
+                environment()["GIT_AUTHOR_EMAIL"] = "41898282+github-actions[bot]@users.noreply.github.com"
+                environment()["GIT_COMMITTER_NAME"] = "github-actions[bot]"
+                environment()["GIT_COMMITTER_EMAIL"] = "41898282+github-actions[bot]@users.noreply.github.com"
+            }.start()
+            val out = p.inputStream.bufferedReader().readText()
+            val code = p.waitFor()
+            return code to out.trim()
+        }
+        try {
+            val wantsRelease = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+            val buildType = if (wantsRelease) "release" else "debug"
+            val apkDir = file("build/outputs/apk/$buildType")
+            val apks = apkDir.listFiles { f: File -> f.isFile && f.extension == "apk" }?.sortedBy { it.name } ?: emptyList()
+            logger.lifecycle("publishApkDelivery: buildType=$buildType, gefundene APKs=${apks.map { it.name }}")
+
+            val workDir = java.nio.file.Files.createTempDirectory("apkdelivery").toFile()
+            val dist = File(workDir, "apk-dist").apply { mkdirs() }
+
+            // 1) APKs kopieren, große splitten (GitHub blockt Blobs > 100 MB)
+            apks.forEach { apk ->
+                val target = File(dist, apk.name)
+                apk.copyTo(target, overwrite = true)
+                if (target.length() > 90_000_000) {
+                    val (c, o) = sh(listOf("split", "-b", "90M", "-d", target.absolutePath, target.absolutePath + ".part-"))
+                    if (c != 0) logger.warn("split fehlgeschlagen: $o") else target.delete()
+                }
+            }
+
+            // 2) Prüfsummen
+            val sums = StringBuilder()
+            dist.listFiles { f: File -> f.isFile }?.sortedBy { it.name }?.forEach { f ->
+                val (c, o) = sh(listOf("sha256sum", f.name), dir = dist)
+                if (c == 0) sums.appendLine(o)
+            }
+            File(dist, "SHA256SUMS.txt").writeText(sums.toString())
+
+            // 3) Build-Info + Diagnose
+            val diag = StringBuilder()
+            gradle.taskGraph.allTasks.forEach { t ->
+                val failed = try { t.state.failure } catch (_: Throwable) { null }
+                if (failed != null) {
+                    diag.appendLine("FAILED TASK: ${t.path}")
+                    var cause: Throwable? = failed
+                    var depth = 0
+                    while (cause != null && depth < 6) {
+                        diag.appendLine("  ${cause.javaClass.simpleName}: ${cause.message?.take(2000)}")
+                        cause = cause.cause
+                        depth++
+                    }
+                }
+            }
+            val info = buildString {
+                appendLine("buildType      : $buildType")
+                appendLine("versionName    : ${android.defaultConfig.versionName}")
+                appendLine("versionCode    : ${android.defaultConfig.versionCode}")
+                appendLine("minSdk         : ${android.defaultConfig.minSdk}")
+                appendLine("targetSdk      : ${android.defaultConfig.targetSdk}")
+                appendLine("compileSdk     : ${android.compileSdk}")
+                appendLine("ciRunId        : $ghRunId")
+                appendLine("commit         : $ghSha")
+                appendLine("timestamp (UTC): ${java.time.Instant.now()}")
+                appendLine()
+                if (diag.isNotEmpty()) {
+                    appendLine("=== DIAGNOSE (fehlgeschlagene Tasks) ===")
+                    appendLine(diag)
+                } else {
+                    appendLine("BUILD ERFOLGREICH")
+                }
+            }
+            File(dist, "BUILD-INFO.txt").writeText(info)
+
+            // 4) Orphan-Branch committen + pushen
+            val branch = "apk-delivery-$buildType"
+            val remote = "https://x-access-token:$ghToken@github.com/$ghRepo.git"
+            var (c, o) = sh(listOf("git", "init", "-q", "-b", branch, workDir.absolutePath))
+            if (c != 0) throw GradleException("git init: $o")
+            listOf("git", "-C", workDir.absolutePath, "add", "-f", "apk-dist").let { (cc, oo) -> if (cc != 0) throw GradleException("git add: $oo") }
+            val commitMsg = "APK-Delivery: buildType=$buildType run=$ghRunId sha=${ghSha.take(7)}"
+            listOf("git", "-C", workDir.absolutePath, "commit", "-q", "-m", commitMsg).let { (cc, oo) -> if (cc != 0) throw GradleException("git commit: $oo") }
+            val (pc, po) = sh(listOf("git", "-C", workDir.absolutePath, "push", "-q", "--force", remote, "HEAD:refs/heads/$branch"))
+            if (pc != 0) throw GradleException("git push (${po.take(500)})")
+            logger.lifecycle("publishApkDelivery: OK -> Branch '$branch' (run=$ghRunId). Dateien: ${dist.listFiles()?.joinToString { it.name }}")
+        } catch (e: Exception) {
+            logger.warn("publishApkDelivery FEHLGESCHLAGEN (Build selbst bleibt unberührt): ${e.message}")
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name == "assembleDebug" || name == "assembleRelease") {
+        finalizedBy("publishApkDelivery")
+    }
 }

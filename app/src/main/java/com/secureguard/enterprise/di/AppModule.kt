@@ -28,6 +28,7 @@ object AppModule {
             SecureGuardDatabase.DATABASE_NAME
         )
             .addMigrations(SecureGuardDatabase.MIGRATION_1_2)
+            .fallbackToDestructiveMigration()
             .build()
 
     @Provides

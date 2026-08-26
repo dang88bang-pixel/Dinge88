@@ -18,7 +18,7 @@ sealed class NavItem(val route: String, val label: String, val icon: ImageVector
     data object Settings : NavItem("settings", "Einstellungen", Icons.Default.Settings)
 
     companion object {
-        val bottomNavItems = listOf(Dashboard, Assets, Map, Actions, Settings)
+        val bottomNavItems = listOf(Dashboard, Assets, Map, Actions)
     }
 }
 
@@ -36,9 +36,5 @@ object Routes {
     const val ASSET_DETAIL = "asset_detail/{assetId}"
     const val NODE_STATUS = "node_status"
     const val TEMP_MAIL = "temp_mail"
-    const val TERMINAL = "terminal"
-    const val SENSOR_FUSION = "sensor_fusion"
-    const val SECURITY = "security"
-    const val ESP32_CONFIG = "esp32_config"
     fun assetDetail(id: String) = "asset_detail/$id"
 }

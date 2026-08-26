@@ -1,99 +1,49 @@
 package com.secureguard.enterprise.presentation.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
+import androidx.compose.ui.platform.LocalContext
 
-// Stitch Design System: Dark Enterprise Theme (#0a2540 Deep Navy)
-private val DarkEnterpriseScheme = darkColorScheme(
-    primary = AccentCyan,
-    onPrimary = DeepNavy,
-    primaryContainer = NavyLight,
-    onPrimaryContainer = OnSurfacePrimary,
-    secondary = AccentGreen,
-    onSecondary = DeepNavy,
-    secondaryContainer = Color(0xFF004D25),
-    onSecondaryContainer = AccentGreen,
-    tertiary = AccentAmber,
-    onTertiary = DeepNavy,
-    tertiaryContainer = Color(0xFF4D3800),
-    onTertiaryContainer = AccentAmber,
-    error = AccentRed,
-    onError = Color.White,
-    errorContainer = Color(0xFF4D0011),
-    onErrorContainer = AccentRed,
-    background = SurfaceDark,
-    onBackground = OnSurfacePrimary,
-    surface = SurfaceDark,
-    onSurface = OnSurfacePrimary,
-    surfaceVariant = SurfaceCard,
-    onSurfaceVariant = OnSurfaceSecondary,
-    outline = OnSurfaceMuted,
-    outlineVariant = Color(0xFF2A3A4A),
-    inverseSurface = OnSurfacePrimary,
-    inverseOnSurface = SurfaceDark,
+private val DarkColors = darkColorScheme(
+    primary = DarkPrimary,
+    secondary = DarkSecondary,
+    tertiary = SecureCyan,
+    background = DarkBackground,
+    surface = DarkSurface,
+    error = SecureRed
 )
 
-private val LightEnterpriseScheme = lightColorScheme(
-    primary = DeepNavy,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFD1E4FF),
-    onPrimaryContainer = DeepNavy,
-    secondary = Color(0xFF006B35),
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFF9AF6B4),
-    onSecondaryContainer = Color(0xFF00210C),
-    tertiary = Color(0xFF6B5900),
-    onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFF8DE51),
-    onTertiaryContainer = Color(0xFF211A00),
-    error = Color(0xFFBA1A1A),
-    onError = Color.White,
-    background = Color(0xFFF8FAFC),
-    onBackground = DeepNavy,
-    surface = Color(0xFFF8FAFC),
-    onSurface = DeepNavy,
-    surfaceVariant = Color(0xFFDFE3EB),
-    onSurfaceVariant = Color(0xFF43556B),
-    outline = Color(0xFF73859A),
+private val LightColors = lightColorScheme(
+    primary = SecureBlue,
+    secondary = SecureCyan,
+    tertiary = SecureGreen,
+    error = SecureRed
 )
 
 @Composable
 fun SecureGuardTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val view = LocalView.current
-            if (darkTheme) DarkEnterpriseScheme else LightEnterpriseScheme
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkEnterpriseScheme
-        else -> LightEnterpriseScheme
-    }
-
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = (if (darkTheme) SurfaceDark else DeepNavy).toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
-        }
+        darkTheme -> DarkColors
+        else -> LightColors
     }
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = EnterpriseTypography,
+        typography = Typography,
         content = content
     )
 }

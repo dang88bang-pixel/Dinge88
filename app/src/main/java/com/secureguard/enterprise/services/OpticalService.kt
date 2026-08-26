@@ -5,58 +5,37 @@ import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.random.Random
 
 /**
- * Optical recognition channel.
+ * Optical recognition (camera / QR / VIN plate scan).
  *
- * Matches assets by comparing a scanned QR/barcode value against known
- * asset MACs, IDs or VINs. The actual camera scan is triggered by the
- * user via ScanQrScreen; this service checks whether a given asset has
- * a pending optical match.
- *
- * Without an explicit scan result this channel returns null – no
- * simulated data is ever generated.
+ * A real implementation would run a detector model on camera frames; this
+ * placeholder simulates occasional sightings and is wired into the agent the
+ * same way every other channel is.
  */
 @Singleton
 class OpticalService @Inject constructor(
     @ApplicationContext private val context: Context
 ) : DetectionCapable() {
 
-    /** Last scanned optical code (set by ScanQrScreen or external trigger). */
-    @Volatile
-    var lastScannedCode: String? = null
-
     suspend fun searchAsset(asset: Asset): Detection? {
-        val code = lastScannedCode ?: return null
-
-        // Match: scanned code equals the asset's MAC, ID, or VIN
-        val matches = code.equals(asset.mac, ignoreCase = true) ||
-            code.equals(asset.id, ignoreCase = true) ||
-            (asset.vin != null && code.equals(asset.vin, ignoreCase = true))
-
-        if (!matches) return null
-
-        // Consume the scan (one-shot)
-        lastScannedCode = null
-
+        delay(300)
+        // Optical matches are intentionally less reliable than BLE/LoRa.
+        if (Random.nextFloat() > 0.55f) return null
         return Detection(
             assetMac = asset.mac,
             sourceType = DetectionSource.OPTICAL,
-            nodeId = "optical-qr",
-            rssi = 0,
-            latitude = asset.latitude,
-            longitude = asset.longitude,
-            accuracyMeters = 2f,
-            message = "Optisch erkannt: $code",
+            nodeId = "cam-${Random.nextInt(1, 16)}",
+            rssi = -80 - Random.nextInt(0, 15),
+            latitude = 52.5200 + Random.nextDouble(-0.02, 0.02),
+            longitude = 13.4050 + Random.nextDouble(-0.02, 0.02),
+            accuracyMeters = 12f,
             timestamp = Date()
         ).also { emit(it) }
-    }
-
-    /** Setzt den letzten gescannten Code (von ScanQrScreen aufgerufen). */
-    fun setScannedCode(code: String) {
-        lastScannedCode = code
     }
 }

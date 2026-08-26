@@ -19,8 +19,7 @@ class SecureAgentWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val agentService: AgentService,
-    private val notificationService: NotificationService,
-    private val databaseCleanup: com.secureguard.enterprise.services.DatabaseCleanup
+    private val notificationService: NotificationService
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -29,14 +28,6 @@ class SecureAgentWorker @AssistedInject constructor(
             notificationService.sendAgentCycleNotification(
                 "Zyklus abgeschlossen · ${result.assetsChecked} Assets · ${result.detections} Treffer"
             )
-            // Periodic cleanup: remove old detections, alerts, audit entries
-            val cleanup = databaseCleanup.cleanup()
-            if (cleanup.deletedDetections > 0 || cleanup.deletedAlerts > 0) {
-                notificationService.sendAgentCycleNotification(
-                    "Bereinigung: ${cleanup.deletedDetections} Detektionen, " +
-                        "${cleanup.deletedAlerts} Alarme, ${cleanup.deletedAuditEntries} Log-Einträge entfernt"
-                )
-            }
             Result.success()
         } catch (e: Exception) {
             Result.retry()
