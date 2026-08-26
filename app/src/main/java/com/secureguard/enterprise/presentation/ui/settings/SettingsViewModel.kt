@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import com.secureguard.enterprise.services.AgentForegroundService
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
+import com.secureguard.enterprise.services.MqttCredentialManager
 import com.secureguard.enterprise.services.MqttService
 import com.secureguard.enterprise.services.ServiceEndpoints
 import com.secureguard.enterprise.services.WebSocketService
@@ -41,7 +42,8 @@ class SettingsViewModel @Inject constructor(
     private val backupManager: com.secureguard.enterprise.services.BackupManager,
     private val exportService: com.secureguard.enterprise.services.ExportService,
     private val mqttService: MqttService,
-    private val webSocketService: WebSocketService
+    private val webSocketService: WebSocketService,
+    private val credentialManager: MqttCredentialManager
 ) : ViewModel() {
 
     private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
@@ -49,21 +51,25 @@ class SettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(load())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
-    private fun load() = SettingsUiState(
-        notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),
-        externalCrowdAllowed = prefs.getBoolean(KEY_CROWD, false),
-        offlineOnly = prefs.getBoolean(KEY_OFFLINE, true),
-        learningMode = prefs.getBoolean(KEY_LEARNING, true),
-        darkMode = prefs.getBoolean(KEY_DARK, false),
-        consentGiven = prefs.getBoolean(KEY_CONSENT, true),
-        userName = prefs.getString(KEY_USERNAME, "Admin") ?: "Admin",
-        organization = prefs.getString(KEY_ORG, "SecureGuard") ?: "SecureGuard",
-        mqttUrl = ServiceEndpoints.mqttUrl(context),
-        websocketUrl = ServiceEndpoints.webSocketUrl(context),
-        mcpUrl = ServiceEndpoints.mcpUrl(context),
-        mqttUsername = ServiceEndpoints.mqttUsername(context),
-        mqttPassword = ServiceEndpoints.mqttPassword(context)
-    )
+    private fun load(): SettingsUiState {
+        // Zugangsdaten werden direkt in der App erzeugt (kein externes Setup nötig)
+        credentialManager.ensureCredentials()
+        return SettingsUiState(
+            notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),
+            externalCrowdAllowed = prefs.getBoolean(KEY_CROWD, false),
+            offlineOnly = prefs.getBoolean(KEY_OFFLINE, true),
+            learningMode = prefs.getBoolean(KEY_LEARNING, true),
+            darkMode = prefs.getBoolean(KEY_DARK, false),
+            consentGiven = prefs.getBoolean(KEY_CONSENT, true),
+            userName = prefs.getString(KEY_USERNAME, "Admin") ?: "Admin",
+            organization = prefs.getString(KEY_ORG, "SecureGuard") ?: "SecureGuard",
+            mqttUrl = ServiceEndpoints.mqttUrl(context),
+            websocketUrl = ServiceEndpoints.webSocketUrl(context),
+            mcpUrl = ServiceEndpoints.mcpUrl(context),
+            mqttUsername = ServiceEndpoints.mqttUsername(context),
+            mqttPassword = ServiceEndpoints.mqttPassword(context)
+        )
+    }
 
     private fun save(transform: (SettingsUiState) -> SettingsUiState) {
         _uiState.update { current ->
@@ -147,6 +153,45 @@ class SettingsViewModel @Inject constructor(
         webSocketService.disconnect()
         webSocketService.connect()
         _uiState.update { it.copy(statusMessage = "✅ Endpunkte gespeichert & neu verbunden") }
+    }
+
+    /**
+     * Erzeugt das MQTT-Passwort direkt in der App (SecureRandom, 24 Zeichen)
+     * – ohne externe Dateien oder Nutzungseinschränkungen – und verbindet neu.
+     */
+    fun generateMqttCredentials() {
+        val created = credentialManager.ensureCredentials()
+        _uiState.update {
+            it.copy(
+                mqttUsername = ServiceEndpoints.mqttUsername(context),
+                mqttPassword = ServiceEndpoints.mqttPassword(context)
+            )
+        }
+        mqttService.disconnect()
+        mqttService.connect()
+        _uiState.update {
+            it.copy(
+                statusMessage = if (created) {
+                    "✅ MQTT-Zugangsdaten in der App erzeugt & verbunden"
+                } else {
+                    "✅ MQTT-Zugangsdaten vorhanden – Verbindung neu aufgebaut"
+                }
+            )
+        }
+    }
+
+    /** Erzeugt ein NEUES MQTT-Passwort und verbindet neu. */
+    fun regenerateMqttPassword() {
+        credentialManager.regenerate()
+        _uiState.update {
+            it.copy(
+                mqttUsername = ServiceEndpoints.mqttUsername(context),
+                mqttPassword = ServiceEndpoints.mqttPassword(context),
+                statusMessage = "🔑 Neues MQTT-Passwort in der App erzeugt & verbunden"
+            )
+        }
+        mqttService.disconnect()
+        mqttService.connect()
     }
 
     fun clearStatus() { _uiState.update { it.copy(statusMessage = null) } }

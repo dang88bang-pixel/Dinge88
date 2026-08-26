@@ -165,7 +165,7 @@ fun SettingsScreen(
                             onValueChange = { user ->
                                 viewModel.updateEndpointFields(mqttUsername = user)
                             },
-                            label = { Text("MQTT-Benutzername (Broker-Auth)") },
+                            label = { Text("MQTT-Benutzername (in der App erzeugt)") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -175,12 +175,23 @@ fun SettingsScreen(
                             onValueChange = { pass ->
                                 viewModel.updateEndpointFields(mqttPassword = pass)
                             },
-                            label = { Text("MQTT-Passwort") },
+                            label = { Text("MQTT-Passwort (in der App erzeugt)") },
                             singleLine = true,
                             visualTransformation =
                                 androidx.compose.ui.text.input.PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth()
                         )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.Button(
+                                onClick = { viewModel.generateMqttCredentials() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("🔑 Zugangsdaten in App erzeugen") }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.regenerateMqttPassword() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Neu erzeugen") }
+                        }
                         Spacer(Modifier.height(8.dp))
                         androidx.compose.material3.Button(
                             onClick = {

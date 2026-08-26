@@ -17,12 +17,12 @@ import com.secureguard.enterprise.BuildConfig
  */
 object ServiceEndpoints {
 
-    private const val PREFS_NAME = "secureguard_settings"
-    private const val KEY_MQTT = "endpoint_mqtt_url"
-    private const val KEY_WS = "endpoint_ws_url"
-    private const val KEY_MCP = "endpoint_mcp_url"
-    private const val KEY_MQTT_USER = "endpoint_mqtt_username"
-    private const val KEY_MQTT_PASS = "endpoint_mqtt_password"
+    const val PREFS_NAME = "secureguard_settings"
+    const val KEY_MQTT = "endpoint_mqtt_url"
+    const val KEY_WS = "endpoint_ws_url"
+    const val KEY_MCP = "endpoint_mcp_url"
+    const val KEY_MQTT_USER = "endpoint_mqtt_username"
+    const val KEY_MQTT_PASS = "endpoint_mqtt_password"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

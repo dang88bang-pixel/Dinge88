@@ -441,7 +441,7 @@ getWhitelistedAssets, getAllAssets, getAssetByMac, getAssetById, resolveAsset, u
 
 ## 🔒 Sicherheit & Berechtigungen
 
-### Android-Permissions (22)
+### Android-Permissions (25)
 
 | Permission | Genutzt von | Zweck |
 |-----------|-------------|-------|
@@ -463,6 +463,9 @@ getWhitelistedAssets, getAllAssets, getAssetByMac, getAssetById, resolveAsset, u
 | `MODIFY_AUDIO_SETTINGS` | AlertSoundManager | Alarm-Töne |
 | `FOREGROUND_SERVICE` | AgentForegroundService | Hintergrund-Agent |
 | `FOREGROUND_SERVICE_DATA_SYNC` | AgentForegroundService | Foreground-Typ |
+| `FOREGROUND_SERVICE_CONNECTED_DEVICE` (≥API 34) | AgentForegroundService | BLE im Foreground-Service |
+| `FOREGROUND_SERVICE_LOCATION` (≥API 34) | AgentForegroundService | GPS im Foreground-Service |
+| `ACCESS_BACKGROUND_LOCATION` (≥API 29) | SatelliteService | GPS bei Hintergrund-Agent |
 | `WAKE_LOCK` | WorkManager | Worker-Ausführung |
 | `RECEIVE_BOOT_COMPLETED` | BootReceiver | Agent nach Neustart |
 | `READ_EXTERNAL_STORAGE` (≤API 28) | BackupManager | Backup-Dateien lesen |
@@ -480,6 +483,8 @@ funktional nötigen Runtime-Permissions an:
 - Standort: `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`
 - BLE (≥API 31): `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`
 - API 33+: `POST_NOTIFICATIONS`, `NEARBY_WIFI_DEVICES`
+- Hintergrund-Agent (≥API 29): `ACCESS_BACKGROUND_LOCATION` (getrennte Anfrage
+  erst nach erteiltem `ACCESS_FINE_LOCATION`, gemäß Android-Vorgaben)
 
 Ohne diese Erlaubnisse bleiben die betroffenen Detection-Kanäle
 (BLE/WiFi/GPS) inaktiv – die Abfrage stellt die vollständige Funktion
@@ -530,11 +535,21 @@ Das Backend abonniert `secureguard/+/telemetry`, `+/alert`, `+/status` und forwa
 
 ## 📟 Firmware (ESP32)
 
+### Toolchain (PlatformIO)
+
+```bash
+pip install platformio
+cd firmware/secureguard_esp32
+pio run                 # kompilieren (platformio.ini: esp32dev, LoRa, PubSubClient)
+pio run -t upload       # flashen
+pio device monitor      # Serielle Konsole (115200)
+```
+
 ### Hardware
 
 | Komponente | Pin/Anschluss | Bibliothek |
 |-----------|---------------|-----------|
-| LoRa SX1278 | SS=5, RST=14, DIO0=2 (868 MHz) | MCCI LoRa |
+| LoRa SX1278 | SS=5, RST=14, DIO0=2 (868 MHz) | sandeepmistry/LoRa (platformio.ini) |
 | BLE | Integrated | ESP32 BLE Arduino |
 | WiFi | Integrated | WiFi.h |
 | MQTT | WiFi → Broker | PubSubClient |
@@ -626,7 +641,7 @@ Node-RED mit Dashboard. Authentifizierung für den Produktivbetrieb:
 
 | Dienst | URL | Zweck |
 |--------|-----|-------|
-| MQTT (TCP) | `tcp://127.0.0.1:1883` | App, ESP32-Gateways, Backend (**Auth aktiv**) |
+| MQTT (TCP) | `tcp://127.0.0.1:1883` | App, ESP32-Gateways, Backend (**ohne Nutzungseinschränkungen** – Zugangsdaten erzeugt die App) |
 | MQTT (WebSocket) | `ws://127.0.0.1:9001` | Browser-Dashboards |
 | FastAPI | `http://127.0.0.1:8000` | REST + `/docs` + `/api/health` |
 | Node-RED | `http://127.0.0.1:1880/ui` | Live-Dashboard (Telemetrie, Alarme, **Login geschützt**) |
@@ -834,21 +849,40 @@ MCP_SERVER_URL=http://10.0.2.2:8000
 **Zur Laufzeit änderbar:** Einstellungen → „Anbindungen“ (MQTT/WS/MCP) –
 die Verbindung wird nach dem Speichern automatisch neu aufgebaut.
 
+**MQTT-Zugangsdaten:** werden **in der App erzeugt** (Einstellungen →
+„🔑 Zugangsdaten in App erzeugen“) – Benutzer `sg-<Geräte-ID>` + zufälliges
+24-Zeichen-Passwort via `SecureRandom`, ohne Nutzungseinschränkungen am
+Broker (kein externes File, keine Topic-ACLs).
+
 ---
 
-## 📟 Honeywell CT45P XON
+## 📟 Honeywell CT45P XON (Android 11)
 
 | Bereich | Umsetzung |
 |---------|-----------|
 | **Android 11 (API 30)** | `CT45PConfig.kt` erkennt Gerät + loggt beim Start |
-| **MQTT (tcp://)** | `usesCleartextTraffic="true"` im Manifest |
-| **BLE-Scan** | API ≤ 30: `ACCESS_FINE_LOCATION` statt `BLUETOOTH_SCAN` |
-| **WiFi-Scan** | Standortberechtigung erforderlich |
+| **MQTT-Zugangsdaten** | **in der App erzeugt** (`MqttCredentialManager`, SecureRandom, 24 Zeichen) – kein externes File, keine Nutzungseinschränkung |
+| **MQTT (tcp://)** | `usesCleartextTraffic="true"` im Manifest (Android 11 erlaubt lokale Broker) |
+| **BLE-Scan** | API 30: `ACCESS_FINE_LOCATION` statt `BLUETOOTH_SCAN`; Permission-Guard in `BleService` |
+| **WiFi-Scan** | `ACCESS_WIFI_STATE`/`CHANGE_WIFI_STATE` + Standort; Permission-Guard in `WifiService` |
+| **GPS** | `ACCESS_FINE_LOCATION` + `ACCESS_BACKGROUND_LOCATION` (Hintergrund-Agent); Guard in `SatelliteService` |
 | **Barcode-Scanner** | HID-Keyboard (2D-Imager) + ZXing-Kamera |
 | **USB-Host** | FTDI/CP210x/CH34x via `UsbSerialService` + `device_filter.xml` |
 | **NFC** | NDEF + Tech-Filter (`nfc_tech_filter.xml`) |
-| **Benachrichtigungen** | `POST_NOTIFICATIONS` nur ab API 33 |
+| **Benachrichtigungen** | `POST_NOTIFICATIONS` wird auf Android 11 **nicht** angefragt (nur API 33+) |
 | **Boot-Restart** | `BootReceiver` → WorkManager reschedule |
+
+**Einrichtung auf dem CT45P XON (Android 11):**
+1. APK installieren → App startet → `MainActivity` fragt automatisch die nötigen
+   Runtime-Berechtigungen an (Standort fein/grob + Hintergrund-Standort getrennt
+   nach Standort-Erteilung, gemäß Android-Regeln).
+2. Einstellungen → „Anbindungen“ → **„🔑 Zugangsdaten in App erzeugen“**:
+   Benutzer `sg-<Geräte-ID>` + 24-Zeichen-Passwort werden direkt auf dem
+   Gerät erzeugt und lokal gespeichert; der Broker akzeptiert sie ohne
+   Nutzungseinschränkungen und ohne Topic-ACLs.
+3. MQTT/WebSocket/MCP-Endpunkte eintragen (Standard: `10.0.2.2` im Emulator,
+   sonst Host-IP) → „Endpunkte speichern & verbinden“.
+4. Optional: Foreground-Dienst starten für dauerhaften Betrieb.
 
 ---
 
@@ -856,7 +890,7 @@ die Verbindung wird nach dem Speichern automatisch neu aufgebaut.
 
 1. **Debug-APK** aus GitHub Actions laden → `adb install secureguard-pro-debug.apk`
 2. Berechtigungen erteilen: Standort, Bluetooth, Kamera, Benachrichtigungen
-3. Einstellungen → Backend-Endpunkte konfigurieren
+3. Einstellungen → Backend-Endpunkte konfigurieren + MQTT-Zugangsdaten in der App erzeugen
 4. Optional: Foreground-Dienst starten für dauerhaften Betrieb
 
 ---

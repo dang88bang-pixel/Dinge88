@@ -36,16 +36,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-echo "🔌 MQTT-Broker auf 0.0.0.0:1883 (+ WebSocket 9001) – Auth aktiv"
-NODE_PATH="$NODE_PATH" node scripts/mqtt-broker.js &
+echo "🔌 MQTT-Broker auf 0.0.0.0:1883 (+ WebSocket 9001) – KEINE Nutzungseinschränkungen"
+# Broker ohne Einschränkungen: App erzeugt ihre MQTT-Zugangsdaten selbst.
+# Strikt nur mit SG_MQTT_RESTRICTED=true (siehe mqtt-broker.js).
+NODE_PATH="$NODE_PATH" SG_MQTT_RESTRICTED="${SG_MQTT_RESTRICTED:-}" node scripts/mqtt-broker.js &
 
 sleep 1
 
 echo "🖥  FastAPI-Backend auf 0.0.0.0:8000"
 DATABASE_PATH="data/secureguard.db" \
 MQTT_BROKER="127.0.0.1:1883" \
-MQTT_USERNAME="$SG_MQTT_USERNAME" \
-MQTT_PASSWORD="$SG_MQTT_PASSWORD" \
+MQTT_USERNAME="${SG_MQTT_USERNAME:-}" \
+MQTT_PASSWORD="${SG_MQTT_PASSWORD:-}" \
 "$VENV/bin/uvicorn" main:app --app-dir backend --host 0.0.0.0 --port 8000 &
 
 sleep 2

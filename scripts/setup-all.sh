@@ -117,10 +117,14 @@ cat <<'EOF'
    scripts/start-services.sh
 
  Dienste:
-   MQTT (TCP)     : 127.0.0.1:1883   (Authentifizierung aktiv)
+   MQTT (TCP)     : 127.0.0.1:1883   (KEINE Nutzungseinschränkungen –
+                                      Zugangsdaten erzeugt die App selbst)
    MQTT (WebSock) : 127.0.0.1:9001
    Backend API    : http://127.0.0.1:8000
    Node-RED       : http://127.0.0.1:1880  (Login erforderlich)
+
+ App → Einstellungen → „Anbindungen“ → „🔑 Zugangsdaten in App erzeugen“
+ (Benutzer + 24-Zeichen-Passwort werden direkt auf dem Gerät erzeugt)
 
  Produktiv mit Docker:  docker compose up --build
 ==============================================================

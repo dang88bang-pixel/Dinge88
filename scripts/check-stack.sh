@@ -66,28 +66,41 @@ else
 fi
 
 echo
-echo "── 4. MQTT-Authentifizierung ─────────────────────"
-if [ -f "$CREDS" ]; then
+echo "── 4. MQTT: App-erzeugte Zugangsdaten, keine Einschränkungen ──"
+# Die App erzeugt ihre Zugangsdaten selbst (MqttCredentialManager) – der
+# Broker akzeptiert beliebige app-erzeugte Benutzer/Passwörter ohne
+# Topic-ACLs oder Nutzungseinschränkungen.
+OUT_RANDOM=$(cd "$RUNTIME" && timeout 6 node -e "
+  const m=require('mqtt');
+  const u='sg-'+Math.random().toString(36).slice(2,10);
+  const p=Math.random().toString(36).slice(2,18)+Math.random().toString(36).slice(2,18);
+  const c=m.connect('mqtt://127.0.0.1:1883',{username:u,password:p,connectTimeout:3000,reconnectPeriod:0});
+  c.on('connect',()=>{console.log('CONN');process.exit(0)});
+  c.on('error',e=>{console.log('ERR '+e.message);process.exit(1)});" 2>&1)
+case "$OUT_RANDOM" in *CONN*) ok "App-erzeugte Zugangsdaten (zufällig) akzeptiert – keine Nutzungseinschränkung";; *) bad "Zufällige Zugangsdaten abgewiesen: $OUT_RANDOM";; esac
+# Optionale strikte Prüfung: falls SG_MQTT_RESTRICTED=true gesetzt
+if [ "${SG_MQTT_RESTRICTED:-false}" = "true" ] && [ -f "$CREDS" ]; then
   set -a; source "$CREDS"; set +a
-  OUT_NOAUTH=$(cd "$RUNTIME" && timeout 6 node -e "
+  OUT_BAD=$(cd "$RUNTIME" && timeout 6 node -e "
     const m=require('mqtt');const c=m.connect('mqtt://127.0.0.1:1883',{username:'secureguard',password:'FALSCH',connectTimeout:3000,reconnectPeriod:0});
     c.on('connect',()=>{console.log('CONN');process.exit(0)});
     c.on('error',e=>{console.log('REJECTED');process.exit(0)});" 2>&1)
-  OUT_AUTH=$(cd "$RUNTIME" && timeout 6 node -e "
+  OUT_GOOD=$(cd "$RUNTIME" && timeout 6 node -e "
     const m=require('mqtt');const c=m.connect('mqtt://127.0.0.1:1883',{username:'$SG_MQTT_USERNAME',password:'$SG_MQTT_PASSWORD',connectTimeout:3000,reconnectPeriod:0});
     c.on('connect',()=>{console.log('CONN');process.exit(0)});
     c.on('error',e=>{console.log('ERR '+e.message);process.exit(1)});" 2>&1)
-  case "$OUT_NOAUTH" in *CONN*) bad "Falsche Credentials werden AKZEPTIERT";; *) ok "Falsche Credentials abgewiesen";; esac
-  case "$OUT_AUTH" in *CONN*) ok "Korrekte Credentials akzeptiert";; *) bad "Korrekte Credentials abgewiesen: $OUT_AUTH";; esac
-else
-  echo "  ⚠ credentials.env fehlt – Auth-Test übersprungen"
+  case "$OUT_BAD" in *CONN*) bad "STRIKT: Falsche Credentials werden AKZEPTIERT";; *) ok "STRIKT: Falsche Credentials abgewiesen";; esac
+  case "$OUT_GOOD" in *CONN*) ok "STRIKT: Korrekte Credentials akzeptiert";; *) bad "STRIKT: Korrekte Credentials abgewiesen: $OUT_GOOD";; esac
 fi
 
 echo
 echo "── 5. MQTT → WebSocket-Bridge ────────────────────"
 WS_RESULT=$(cd "$RUNTIME" && timeout 12 node -e "
   const mqtt=require('mqtt');const WebSocket=require('ws');
-  const c=mqtt.connect('mqtt://127.0.0.1:1883',{username:'$SG_MQTT_USERNAME',password:'$SG_MQTT_PASSWORD'});
+  // App-Typ: Zugangsdaten werden in der App erzeugt – Broker ohne Einschränkung
+  const u='sg-check-'+Math.random().toString(36).slice(2,10);
+  const pw=Math.random().toString(36).slice(2,18)+Math.random().toString(36).slice(2,18);
+  const c=mqtt.connect('mqtt://127.0.0.1:1883',{username:u,password:pw});
   let got=false;const ws=new WebSocket('ws://127.0.0.1:8000/ws');
   ws.on('open',()=>{c.publish('secureguard/AA:BB:CC:DD:EE:01/telemetry',JSON.stringify({type:'telemetry',battery:42,device:'check'}),{qos:1});});
   ws.on('message',(d)=>{if(String(d).includes('check')){got=true;}});
@@ -119,20 +132,37 @@ PYEOF
 
 echo
 echo "── 7. Android-App: Berechtigungen & Vollständigkeit ──"
-REQUIRED=(INTERNET ACCESS_NETWORK_STATE BLUETOOTH BLUETOOTH_ADMIN BLUETOOTH_SCAN BLUETOOTH_CONNECT NEARBY_WIFI_DEVICES ACCESS_WIFI_STATE CHANGE_WIFI_STATE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION CAMERA NFC POST_NOTIFICATIONS VIBRATE MODIFY_AUDIO_SETTINGS FOREGROUND_SERVICE FOREGROUND_SERVICE_DATA_SYNC WAKE_LOCK RECEIVE_BOOT_COMPLETED READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE)
+REQUIRED=(INTERNET ACCESS_NETWORK_STATE BLUETOOTH BLUETOOTH_ADMIN BLUETOOTH_SCAN BLUETOOTH_CONNECT NEARBY_WIFI_DEVICES ACCESS_WIFI_STATE CHANGE_WIFI_STATE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION CAMERA NFC POST_NOTIFICATIONS VIBRATE MODIFY_AUDIO_SETTINGS FOREGROUND_SERVICE FOREGROUND_SERVICE_DATA_SYNC FOREGROUND_SERVICE_CONNECTED_DEVICE FOREGROUND_SERVICE_LOCATION ACCESS_BACKGROUND_LOCATION WAKE_LOCK RECEIVE_BOOT_COMPLETED READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE)
 MANIFEST_PERMS=$(grep -oP 'android.permission.[A-Z_]+' app/src/main/AndroidManifest.xml | sed 's/android.permission.//' | sort -u)
 MISSING=""
 for p in "${REQUIRED[@]}"; do
   echo "$MANIFEST_PERMS" | grep -qx "$p" || MISSING="$MISSING $p"
 done
-if [ -z "$MISSING" ]; then ok "Alle 22 Permissions im Manifest"; else bad "Permissions fehlen:$MISSING"; fi
+if [ -z "$MISSING" ]; then ok "Alle 25 Permissions im Manifest"; else bad "Permissions fehlen:$MISSING"; fi
 check "Runtime-Permission-Anfragen (MainActivity)" "grep -q 'RequestMultiplePermissions' app/src/main/java/com/secureguard/enterprise/MainActivity.kt"
+check "ACCESS_BACKGROUND_LOCATION wird angefragt" "grep -q 'ACCESS_BACKGROUND_LOCATION' app/src/main/java/com/secureguard/enterprise/MainActivity.kt"
+check "Foreground-Typen: dataSync|connectedDevice|location" "grep -q 'foregroundServiceType=\"dataSync|connectedDevice|location\"' app/src/main/AndroidManifest.xml"
 check "compileSdk >= targetSdk" "python3 -c \"
+
 import re;s=open('app/build.gradle.kts').read()
 c=int(re.search(r'compileSdk = (\\d+)',s).group(1));t=int(re.search(r'targetSdk = (\\d+)',s).group(1));assert c>=t\""
+check "MQTT-Passwort wird in der App erzeugt (MqttCredentialManager)" "[ -f app/src/main/java/com/secureguard/enterprise/services/MqttCredentialManager.kt ] && grep -q 'SecureRandom' app/src/main/java/com/secureguard/enterprise/services/MqttCredentialManager.kt"
+check "In-App-Erzeugung: 24 Zeichen Passwort" "grep -q 'buildString(24)' app/src/main/java/com/secureguard/enterprise/services/MqttCredentialManager.kt"
+check "Settings: Zugangsdaten erzeugen/neu erzeugen" "grep -q 'generateMqttCredentials' app/src/main/java/com/secureguard/enterprise/presentation/ui/settings/SettingsViewModel.kt && grep -q 'regenerateMqttPassword' app/src/main/java/com/secureguard/enterprise/presentation/ui/settings/SettingsViewModel.kt"
+check "Broker: keine Nutzungseinschränkungen (Standard)" "grep -q 'KEINE Nutzungseinschränkungen' scripts/mqtt-broker.js"
+check "Broker: keine Topic-ACLs" "! grep -qiE 'authorizePublish|authorizeSubscribe|\\bacl\\b' scripts/mqtt-broker.js"
+check "Honeywell CT45P-Konfig (Android 11) vorhanden" "grep -q 'needsLocationForBle' app/src/main/java/com/secureguard/enterprise/config/CT45PConfig.kt && grep -q 'Build.VERSION_CODES.R' app/src/main/java/com/secureguard/enterprise/config/CT45PConfig.kt"
+check "BLE-Scan: Permission-Guard (Android 11)" "grep -q 'ACCESS_FINE_LOCATION' app/src/main/java/com/secureguard/enterprise/services/BleService.kt"
+check "WiFi-Scan: Permission-Guard (Android 11)" "grep -q 'checkSelfPermission' app/src/main/java/com/secureguard/enterprise/services/WifiService.kt"
+check "GPS: Permission-Guard" "grep -q 'checkSelfPermission' app/src/main/java/com/secureguard/enterprise/services/SatelliteService.kt"
 check "Keine Demo-Seeds im App-Code" "! grep -q 'seedDemoDataIfEmpty\\|Demo-Asset\\|demo' app/src/main/java/com/secureguard/enterprise/SecureGuardApplication.kt"
 check "Kein Demo-Simulator im Stack" "[ ! -f scripts/demo-publisher.js ] && [ ! -f scripts/seed_backend.py ]"
 check "Keine Demo-Knoten im Node-RED-Flow" "! grep -q 'sg-btn-demo\\|sg-mqtt-out-demo' nodered/flows.json nodered/flows.docker.json"
+check "Keine Sim/Mock in Firmware" "! grep -qiE 'simulat|mock|dummy' firmware/secureguard_esp32/secureguard_esp32.ino"
+check "Keine Sim/Mock im Backend" "! grep -qiE 'simulat|mock|dummy|demo' backend/main.py"
+check "16+ Navigationsrouten" "[ \$(grep -c 'const val' app/src/main/java/com/secureguard/enterprise/presentation/navigation/NavItems.kt) -ge 16 ]"
+check "17+ UI-Screens" "[ \$(ls app/src/main/java/com/secureguard/enterprise/presentation/ui/*/*Screen.kt 2>/dev/null | wc -l) -ge 17 ]"
+check "13+ Backend-Endpunkte" "[ \$(grep -cE '@app\\.(get|post|websocket)' backend/main.py) -ge 13 ]"
 
 echo
 echo "── 8. Syntax- & Strukturprüfung ──────────────────"
@@ -145,6 +175,11 @@ check "docker-compose.yml YAML gültig" "'$RUNTIME/venv/bin/python' -c 'import y
 check "30 Services-Implementierungen vorhanden" "[ \$(ls app/src/main/java/com/secureguard/enterprise/services/*.kt | wc -l) -ge 30 ]"
 check "5 DAOs vorhanden" "[ \$(ls app/src/main/java/com/secureguard/enterprise/data/local/dao/*.kt 2>/dev/null | wc -l) -ge 5 ]"
 check "8 Retrofit-APIs vorhanden" "[ \$(ls app/src/main/java/com/secureguard/enterprise/services/apis/*.kt 2>/dev/null | wc -l) -ge 8 ]"
+check "PlatformIO (Firmware-Toolchain) installiert" "'$RUNTIME/venv/bin/pio' --version >/dev/null 2>&1"
+check "platformio.ini vorhanden" "[ -f firmware/secureguard_esp32/platformio.ini ]"
+check "Firmware-Datei vorhanden" "[ -f firmware/secureguard_esp32/secureguard_esp32.ino ]"
+check "nodered/Dockerfile vorhanden" "[ -f nodered/Dockerfile ]"
+check "check-stack.sh Syntax" "bash -n scripts/check-stack.sh"
 
 echo
 echo "══════════════════════════════════════════════════════"
