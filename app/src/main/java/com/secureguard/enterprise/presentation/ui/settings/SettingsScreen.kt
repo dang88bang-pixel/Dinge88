@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.clickable
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.presentation.navigation.Routes
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,10 +49,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("⚙️ Einstellungen") },
+                title = { Text(stringResource(R.string.title_settings)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 }
             )
@@ -66,14 +68,14 @@ fun SettingsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("👤 Profil & Sicherheit",
+                        Text(stringResource(R.string.section_profile),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(8.dp))
                         androidx.compose.material3.OutlinedTextField(
                             value = state.userName,
                             onValueChange = viewModel::setUserName,
-                            label = { Text("Benutzer") },
+                            label = { Text(stringResource(R.string.label_user)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -81,7 +83,7 @@ fun SettingsScreen(
                         androidx.compose.material3.OutlinedTextField(
                             value = state.organization,
                             onValueChange = viewModel::setOrganization,
-                            label = { Text("Organisation") },
+                            label = { Text(stringResource(R.string.label_organization)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -92,12 +94,12 @@ fun SettingsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("🔔 Benachrichtigungen",
+                        Text(stringResource(R.string.section_notifications),
                             style = MaterialTheme.typography.titleMedium)
-                        SwitchRow("Push-Benachrichtigungen", state.notificationsEnabled,
+                        SwitchRow(stringResource(R.string.switch_push_notifications), state.notificationsEnabled,
                             viewModel::setNotifications)
                         HorizontalDivider()
-                        SwitchRow("Nur im Offline-Modus arbeiten", state.offlineOnly,
+                        SwitchRow(stringResource(R.string.switch_offline_only), state.offlineOnly,
                             viewModel::setOfflineOnly)
                     }
                 }
@@ -106,14 +108,14 @@ fun SettingsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("🌐 Verbindungen", style = MaterialTheme.typography.titleMedium)
-                        SwitchRow("Externe Crowdsource-Suche (Apple/Google)",
+                        Text(stringResource(R.string.section_connections), style = MaterialTheme.typography.titleMedium)
+                        SwitchRow(stringResource(R.string.switch_external_crowd),
                             state.externalCrowdAllowed, viewModel::setExternalCrowd)
                         HorizontalDivider()
-                        SwitchRow("Selbstlernender Agent", state.learningMode,
+                        SwitchRow(stringResource(R.string.switch_learning_agent), state.learningMode,
                             viewModel::setLearning)
                         HorizontalDivider()
-                        SwitchRow("Dunkelmodus", state.darkMode, viewModel::setDarkMode)
+                        SwitchRow(stringResource(R.string.switch_dark_mode), state.darkMode, viewModel::setDarkMode)
                     }
                 }
             }
@@ -121,7 +123,7 @@ fun SettingsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("🛡️ Datenschutz (DSGVO)",
+                        Text(stringResource(R.string.section_privacy),
                             style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -129,16 +131,11 @@ fun SettingsScreen(
                                 checked = state.consentGiven,
                                 onCheckedChange = viewModel::setConsent
                             )
-                            Text(
-                                "Ich willige in die Verarbeitung meiner Daten gemäß " +
-                                    "Betriebsvereinbarung ein."
-                            )
+                            Text(stringResource(R.string.gdpr_consent))
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Alle Ortungsdaten werden ausschließlich lokal auf dem Gerät " +
-                                "gespeichert. Externe Kanäle (Crowd/Satellit) sind standardmäßig " +
-                                "deaktiviert und bedürfen ausdrücklicher Zustimmung.",
+                            stringResource(R.string.gdpr_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -149,11 +146,11 @@ fun SettingsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("📡 Erweiterte Werkzeuge",
+                        Text(stringResource(R.string.section_tools),
                             style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Abfrageknoten (Status, Ratenlimits, Ein/Aus)",
+                            stringResource(R.string.tool_node_status),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -162,7 +159,7 @@ fun SettingsScreen(
                         )
                         HorizontalDivider()
                         Text(
-                            "Temporäre E-Mail (OTP für Registrierungen)",
+                            stringResource(R.string.tool_temp_mail),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -171,7 +168,7 @@ fun SettingsScreen(
                         )
                         HorizontalDivider()
                         Text(
-                            "Security & Integrity Center",
+                            stringResource(R.string.tool_security_center),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -180,7 +177,7 @@ fun SettingsScreen(
                         )
                         HorizontalDivider()
                         Text(
-                            "ESP32 Gateway Konfiguration",
+                            stringResource(R.string.tool_esp32_config),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -189,20 +186,20 @@ fun SettingsScreen(
                         )
                         HorizontalDivider()
                         Spacer(Modifier.height(8.dp))
-                        Text("🤖 Vordergrund-Dienst", style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.section_foreground_service), style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             androidx.compose.material3.Button(
                                 onClick = { viewModel.startForegroundService() },
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Starten") }
+                            ) { Text(stringResource(R.string.btn_start)) }
                             androidx.compose.material3.OutlinedButton(
                                 onClick = { viewModel.stopForegroundService() },
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Stoppen") }
+                            ) { Text(stringResource(R.string.btn_stop)) }
                         }
                         Text(
-                            "Hält den Agent aktiv, auch wenn die App im Hintergrund ist.",
+                            stringResource(R.string.foreground_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -213,7 +210,7 @@ fun SettingsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("💾 Daten & Export",
+                        Text(stringResource(R.string.section_data_export),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(8.dp))
@@ -221,40 +218,40 @@ fun SettingsScreen(
                             androidx.compose.material3.Button(
                                 onClick = { viewModel.createBackup() },
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Backup") }
+                            ) { Text(stringResource(R.string.btn_backup)) }
                             androidx.compose.material3.Button(
                                 onClick = { viewModel.exportCsv() },
                                 modifier = Modifier.weight(1f)
-                            ) { Text("CSV") }
+                            ) { Text(stringResource(R.string.btn_csv)) }
                             androidx.compose.material3.Button(
                                 onClick = { viewModel.exportPdf() },
                                 modifier = Modifier.weight(1f)
-                            ) { Text("PDF") }
+                            ) { Text(stringResource(R.string.btn_pdf)) }
                         }
                         Spacer(Modifier.height(4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             androidx.compose.material3.OutlinedButton(
                                 onClick = { viewModel.exportDetectionsCsv() },
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Detekt. CSV") }
+                            ) { Text(stringResource(R.string.btn_detections_csv)) }
                             androidx.compose.material3.OutlinedButton(
                                 onClick = { viewModel.exportEncryptedCsv() },
                                 modifier = Modifier.weight(1f)
-                            ) { Text("CSV 🔒") }
+                            ) { Text(stringResource(R.string.btn_csv_encrypted)) }
                             androidx.compose.material3.OutlinedButton(
                                 onClick = { viewModel.restoreBackup() },
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Restore") }
+                            ) { Text(stringResource(R.string.btn_restore)) }
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "${viewModel.listBackups()} Backups verfügbar",
+                            stringResource(R.string.backups_available, viewModel.listBackups()),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Offline-Karten: ${viewModel.getOfflineMapUrl()}",
+                            stringResource(R.string.offline_maps_url, viewModel.getOfflineMapUrl()),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontFamily = FontFamily.Monospace
@@ -288,7 +285,7 @@ fun SettingsScreen(
 
             item {
                 Text(
-                    "SecureGuard Enterprise v1.0.0 · generisches LoRa/LoRaWAN",
+                    stringResource(R.string.footer_version),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp)

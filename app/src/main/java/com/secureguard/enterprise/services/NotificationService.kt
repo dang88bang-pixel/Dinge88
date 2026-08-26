@@ -34,27 +34,27 @@ class NotificationService @Inject constructor(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val alerts = NotificationChannel(
                 CHANNEL_ALERTS,
-                "Sicherheitsalarme",
+                context.getString(R.string.alerts_channel_name),
                 NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = "Alarme und sicherheitsrelevante Ereignisse" }
+            ).apply { description = context.getString(R.string.alerts_channel_desc) }
 
             val agent = NotificationChannel(
                 CHANNEL_AGENT,
-                "Agent-Status",
+                context.getString(R.string.agent_channel_name),
                 NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "Statusmeldungen des selbstlernenden Agenten" }
+            ).apply { description = context.getString(R.string.agent_channel_desc) }
 
             val telemetry = NotificationChannel(
                 CHANNEL_TELEMETRY,
-                "Telemetriedaten",
+                context.getString(R.string.telemetry_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT
-            ).apply { description = "Fahrzeug-/Asset-Telemetrie" }
+            ).apply { description = context.getString(R.string.telemetry_channel_desc) }
 
             val system = NotificationChannel(
                 CHANNEL_SYSTEM,
-                "Systemmeldungen",
+                context.getString(R.string.system_channel_name),
                 NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "Systembenachrichtigungen (Backup, Sync, Fehler)" }
+            ).apply { description = context.getString(R.string.system_channel_desc) }
 
             notificationManager.createNotificationChannels(
                 listOf(alerts, agent, telemetry, system)
@@ -87,8 +87,14 @@ class NotificationService @Inject constructor(
     }
 
     fun sendActionNotification(asset: Asset, actionType: Any, success: Boolean) {
-        val title = if (success) "Aktion ausgeführt" else "Aktion fehlgeschlagen"
-        val body = "${actionType::class.simpleName ?: "Aktion"} · ${asset.shortName}"
+        val title = context.getString(
+            if (success) R.string.notification_action_success else R.string.notification_action_failed
+        )
+        val body = context.getString(
+            R.string.notification_action_body,
+            actionType::class.simpleName ?: context.getString(R.string.fallback_action),
+            asset.shortName
+        )
         notify(System.currentTimeMillis().toInt(), title, body, CHANNEL_ALERTS)
     }
 

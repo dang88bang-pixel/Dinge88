@@ -3,6 +3,7 @@ package com.secureguard.enterprise.presentation.ui.agent
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -89,12 +90,12 @@ class AgentViewModel @Inject constructor(
 
     fun autoRegisterService(serviceName: String, url: String) {
         viewModelScope.launch {
-            _registerStatus.value = "Registriere bei $serviceName..."
+            _registerStatus.value = context.getString(R.string.register_status_in_progress, serviceName)
             val result = agentService.autoRegisterExternalService(serviceName, url, emptyMap())
             _registerStatus.value = if (result.success) {
-                "✅ Registriert: ${result.email} (OTP: ${result.otp})"
+                context.getString(R.string.register_status_success, result.email, result.otp)
             } else {
-                "❌ ${result.error}"
+                context.getString(R.string.register_status_error, result.error ?: "")
             }
         }
     }

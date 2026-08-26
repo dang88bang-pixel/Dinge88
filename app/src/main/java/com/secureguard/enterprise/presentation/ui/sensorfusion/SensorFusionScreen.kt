@@ -38,10 +38,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.secureguard.enterprise.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 
@@ -57,10 +59,10 @@ fun SensorFusionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sensordaten-Fusion & Präzisions-Ortung") },
+                title = { Text(stringResource(R.string.title_sensor_fusion)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 }
             )
@@ -102,14 +104,14 @@ fun SensorFusionScreen(
                         )
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text("Fusions-Status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.fusion_status), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        MetricValue("${fusionState.confidence}%", "Konfidenz")
-                        MetricValue("± ${fusionState.deviation}m", "Abweichung")
-                        MetricValue("${fusionState.channels}/9", "Kanäle")
+                        MetricValue("${fusionState.confidence}%", stringResource(R.string.sf_confidence))
+                        MetricValue("± ${fusionState.deviation}m", stringResource(R.string.sf_deviation))
+                        MetricValue("${fusionState.channels}/9", stringResource(R.string.sf_channels))
                     }
                 }
             }
@@ -117,26 +119,26 @@ fun SensorFusionScreen(
             // GPS
             SensorCard(Icons.Default.GpsFixed, "GPS", fusionState.gpsStatus, listOf(
                 "Lat / Long" to "${fusionState.latitude}° N, ${fusionState.longitude}° E",
-                "Satelliten" to "${fusionState.satellites} / 14",
-                "Signalstärke" to fusionState.gpsSignal
+                stringResource(R.string.sf_satellites) to "${fusionState.satellites} / 14",
+                stringResource(R.string.sf_signal_strength) to fusionState.gpsSignal
             ))
 
             // Magnetometer
-            SensorCard(Icons.Default.Explore, "Magnetometer", if (fusionState.isActive) "Kalibriert" else "Standby", listOf(
-                "X-Achse" to "${fusionState.magX} μT",
-                "Y-Achse" to "${fusionState.magY} μT",
-                "Z-Achse" to "${fusionState.magZ} μT"
+            SensorCard(Icons.Default.Explore, "Magnetometer", if (fusionState.isActive) stringResource(R.string.sf_calibrated) else stringResource(R.string.fusion_status_standby), listOf(
+                stringResource(R.string.sf_axis_x) to "${fusionState.magX} μT",
+                stringResource(R.string.sf_axis_y) to "${fusionState.magY} μT",
+                stringResource(R.string.sf_axis_z) to "${fusionState.magZ} μT"
             ))
 
             // Kompass
-            SensorCard(Icons.Default.Navigation, "Kompass", "${fusionState.heading}° ${fusionState.headingDir}", emptyList())
+            SensorCard(Icons.Default.Navigation, stringResource(R.string.sf_compass), "${fusionState.heading}° ${fusionState.headingDir}", emptyList())
 
             // Netzwerk RSSI
-            SensorCard(Icons.Default.WifiTethering, "Netzwerk (RSSI)", "${fusionState.networkNodes} Knoten", fusionState.rssiNodes)
+            SensorCard(Icons.Default.WifiTethering, stringResource(R.string.sf_network_rssi), stringResource(R.string.sf_nodes_count, fusionState.networkNodes), fusionState.rssiNodes)
 
             // Assets mit Position
             if (assets.isNotEmpty()) {
-                Text("Getrackte Assets", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.tracked_assets), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 assets.take(5).forEach { asset ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Row(

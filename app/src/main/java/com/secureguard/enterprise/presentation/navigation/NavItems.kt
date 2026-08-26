@@ -1,5 +1,6 @@
 package com.secureguard.enterprise.presentation.navigation
 
+import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Map
@@ -8,14 +9,15 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.secureguard.enterprise.R
 
 /** Top-level destinations shown in the bottom navigation bar. */
-sealed class NavItem(val route: String, val label: String, val icon: ImageVector) {
-    data object Dashboard : NavItem("dashboard", "Dashboard", Icons.Default.Dashboard)
-    data object Assets : NavItem("assets", "Assets", Icons.Default.LocalShipping)
-    data object Map : NavItem("map", "Karte", Icons.Default.Map)
-    data object Actions : NavItem("actions", "Aktionen", Icons.Default.Bolt)
-    data object Settings : NavItem("settings", "Einstellungen", Icons.Default.Settings)
+sealed class NavItem(val route: String, @StringRes val labelRes: Int, val icon: ImageVector) {
+    data object Dashboard : NavItem("dashboard", R.string.nav_dashboard, Icons.Default.Dashboard)
+    data object Assets : NavItem("assets", R.string.nav_assets, Icons.Default.LocalShipping)
+    data object Map : NavItem("map", R.string.nav_map, Icons.Default.Map)
+    data object Actions : NavItem("actions", R.string.nav_actions, Icons.Default.Bolt)
+    data object Settings : NavItem("settings", R.string.title_settings, Icons.Default.Settings)
 
     companion object {
         val bottomNavItems = listOf(Dashboard, Assets, Map, Actions, Settings)

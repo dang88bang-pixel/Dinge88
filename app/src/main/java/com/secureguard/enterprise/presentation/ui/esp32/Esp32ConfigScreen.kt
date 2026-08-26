@@ -33,12 +33,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,10 +60,10 @@ fun Esp32ConfigScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ESP32 Gateway Konfiguration") },
+                title = { Text(stringResource(R.string.title_esp32_config)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 }
             )
@@ -81,11 +83,11 @@ fun Esp32ConfigScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Memory, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.padding(end = 8.dp))
-                            Text("Ziel-Gerät", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.label_target_device), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.height(8.dp))
                         if (assets.isEmpty()) {
-                            Text("Keine Assets vorhanden", style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(R.string.no_assets), style = MaterialTheme.typography.bodySmall)
                         } else {
                             assets.forEach { asset ->
                                 Row(
@@ -102,7 +104,7 @@ fun Esp32ConfigScreen(
                                     }
                                     Button(
                                         onClick = { selectedMac = asset.mac }
-                                    ) { Text(if (selectedMac == asset.mac) "✓" else "Wählen") }
+                                    ) { Text(if (selectedMac == asset.mac) "✓" else stringResource(R.string.btn_select)) }
                                 }
                             }
                         }
@@ -117,17 +119,17 @@ fun Esp32ConfigScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.padding(end = 8.dp))
-                            Text("WiFi Konfiguration", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.label_wifi_config), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = wifiSsid, onValueChange = { wifiSsid = it },
-                            label = { Text("SSID") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                            label = { Text(stringResource(R.string.label_ssid)) }, singleLine = true, modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = wifiPass, onValueChange = { wifiPass = it },
-                            label = { Text("Passwort") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                            label = { Text(stringResource(R.string.label_password)) }, singleLine = true, modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -137,16 +139,16 @@ fun Esp32ConfigScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("MQTT Broker", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.label_mqtt_broker), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = mqttHost, onValueChange = { mqttHost = it },
-                            label = { Text("Host") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                            label = { Text(stringResource(R.string.label_host)) }, singleLine = true, modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = mqttPort, onValueChange = { mqttPort = it },
-                            label = { Text("Port") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                            label = { Text(stringResource(R.string.label_port)) }, singleLine = true, modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -156,11 +158,10 @@ fun Esp32ConfigScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("CONFIG-Befehl senden", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.send_config_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Sendet die Konfiguration via MQTT an das ESP32-Gateway. " +
-                                "Das Gateway speichert die Werte im NVS und startet neu.",
+                            stringResource(R.string.send_config_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -180,7 +181,7 @@ fun Esp32ConfigScreen(
                         ) {
                             Icon(Icons.Default.Send, contentDescription = null)
                             Spacer(Modifier.padding(end = 8.dp))
-                            Text("An ${selectedMac.ifBlank { "–" }} senden")
+                            Text(stringResource(R.string.btn_send_to, selectedMac.ifBlank { "–" }))
                         }
                         lastCommand?.let {
                             Spacer(Modifier.height(8.dp))
@@ -194,12 +195,12 @@ fun Esp32ConfigScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("USB-Serial Adapter", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.label_usb_serial), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
                         Button(
                             onClick = { viewModel.scanUsbDevices() },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Adapter scannen") }
+                        ) { Text(stringResource(R.string.btn_scan_adapters)) }
                         usbDevices?.let {
                             Spacer(Modifier.height(8.dp))
                             Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
@@ -216,14 +217,14 @@ fun Esp32ConfigScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Firmware-Info", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.label_firmware_info), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
-                        InfoRow("Plattform", "ESP32 (Arduino)")
-                        InfoRow("LoRa", "SX1278 · 868 MHz")
-                        InfoRow("BLE Service", "6BA1B218-…-FD13")
-                        InfoRow("Befehle", "ALARM, LIGHT, MOTOR_OFF, BATTERY, MESSAGE, POSITION, RESTART, TELEMETRY, CONFIG")
-                        InfoRow("NVS-Keys", "wifi_ssid, wifi_pass, mqtt_host, mqtt_port, device_id")
-                        InfoRow("ADC", "GPIO34 (Batterie, 100k/100k Teiler)")
+                        InfoRow(stringResource(R.string.info_platform), "ESP32 (Arduino)")
+                        InfoRow(stringResource(R.string.info_lora), "SX1278 · 868 MHz")
+                        InfoRow(stringResource(R.string.info_ble_service), "6BA1B218-…-FD13")
+                        InfoRow(stringResource(R.string.info_commands), "ALARM, LIGHT, MOTOR_OFF, BATTERY, MESSAGE, POSITION, RESTART, TELEMETRY, CONFIG")
+                        InfoRow(stringResource(R.string.info_nvs_keys), "wifi_ssid, wifi_pass, mqtt_host, mqtt_port, device_id")
+                        InfoRow(stringResource(R.string.info_adc), "GPIO34 (100k/100k)")
                     }
                 }
             }

@@ -35,11 +35,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.compose.material3.ExperimentalMaterial3Api
+import com.secureguard.enterprise.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,15 +54,15 @@ fun AgentConfigScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("🤖 Agent-Konfiguration") },
+                title = { Text(stringResource(R.string.title_agent_config)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.saveSettings() }) {
-                        Icon(Icons.Default.Save, contentDescription = "Speichern")
+                        Icon(Icons.Default.Save, contentDescription = stringResource(R.string.cd_save))
                     }
                 }
             )
@@ -83,7 +85,7 @@ fun AgentConfigScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
-                ) { Text("💾 Konfiguration speichern") }
+                ) { Text(stringResource(R.string.btn_save_config)) }
             }
         }
     }
@@ -107,15 +109,15 @@ private fun StatusCard(uiState: AgentUiState) {
                     Box(Modifier.size(12.dp).background(color, CircleShape))
                     Spacer(Modifier.size(8.dp))
                     Text(
-                        if (running) "AKTIV" else "INAKTIV",
+                        stringResource(if (running) R.string.agent_active else R.string.agent_inactive),
                         color = color,
                         fontWeight = FontWeight.Bold
                     )
                 }
-                Text("⏱ Laufzeit: ${uiState.runtime}", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.agent_runtime, uiState.runtime), style = MaterialTheme.typography.bodySmall)
             }
             Spacer(Modifier.height(8.dp))
-            Text("📊 Gesamtdauer: ${uiState.progress.toInt()}%",
+            Text(stringResource(R.string.agent_progress, uiState.progress.toInt()),
                 style = MaterialTheme.typography.bodySmall)
             LinearProgressIndicator(
                 progress = { uiState.progress / 100f },
@@ -130,11 +132,16 @@ private fun StatusCard(uiState: AgentUiState) {
 private fun DurationCard(uiState: AgentUiState, viewModel: AgentViewModel) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("📅 Gesamtdauer", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.section_duration), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("1h" to "1 Std.", "6h" to "6 Std.", "24h" to "24 Std.",
-                    "1w" to "1 Woche", "unlimited" to "∞").forEach { (value, label) ->
+                listOf(
+                    "1h" to stringResource(R.string.duration_1h),
+                    "6h" to stringResource(R.string.duration_6h),
+                    "24h" to stringResource(R.string.duration_24h),
+                    "1w" to stringResource(R.string.duration_1w),
+                    "unlimited" to stringResource(R.string.duration_unlimited)
+                ).forEach { (value, label) ->
                     FilterChip(
                         selected = uiState.duration == value,
                         onClick = { viewModel.setDuration(value) },
@@ -151,14 +158,14 @@ private fun DurationCard(uiState: AgentUiState, viewModel: AgentViewModel) {
                 OutlinedTextField(
                     value = uiState.customDays.toString(),
                     onValueChange = { viewModel.setCustomDays(it.toIntOrNull() ?: 0) },
-                    label = { Text("Tage") },
+                    label = { Text(stringResource(R.string.label_days)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
                 Button(
                     onClick = { viewModel.applyCustomDuration() },
                     modifier = Modifier.align(Alignment.CenterVertically)
-                ) { Text("✔️ Speichern") }
+                ) { Text(stringResource(R.string.btn_save_check)) }
             }
         }
     }
@@ -169,11 +176,16 @@ private fun DurationCard(uiState: AgentUiState, viewModel: AgentViewModel) {
 private fun IntervalCard(uiState: AgentUiState, viewModel: AgentViewModel) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("⏱ Abfrageintervall", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.section_interval), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(30 to "30 Sek.", 60 to "1 Min.", 300 to "5 Min.",
-                    900 to "15 Min.", 3600 to "1 Std.").forEach { (value, label) ->
+                listOf(
+                    30 to stringResource(R.string.interval_30s),
+                    60 to stringResource(R.string.interval_1m),
+                    300 to stringResource(R.string.interval_5m),
+                    900 to stringResource(R.string.interval_15m),
+                    3600 to stringResource(R.string.interval_1h)
+                ).forEach { (value, label) ->
                     FilterChip(
                         selected = uiState.interval == value,
                         onClick = { viewModel.setInterval(value) },
@@ -190,14 +202,14 @@ private fun IntervalCard(uiState: AgentUiState, viewModel: AgentViewModel) {
                 OutlinedTextField(
                     value = uiState.customInterval.toString(),
                     onValueChange = { viewModel.setCustomInterval(it.toIntOrNull() ?: 30) },
-                    label = { Text("Sekunden") },
+                    label = { Text(stringResource(R.string.label_seconds)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
                 Button(
                     onClick = { viewModel.applyCustomInterval() },
                     modifier = Modifier.align(Alignment.CenterVertically)
-                ) { Text("✔️ Speichern") }
+                ) { Text(stringResource(R.string.btn_save_check)) }
             }
         }
     }
@@ -208,13 +220,13 @@ private fun IntervalCard(uiState: AgentUiState, viewModel: AgentViewModel) {
 private fun PriorityCard(uiState: AgentUiState, viewModel: AgentViewModel) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("🎯 Priorisierung", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.section_priority), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = uiState.priority == "high",
                     onClick = { viewModel.setPriority("high") },
-                    label = { Text("Hoch") },
+                    label = { Text(stringResource(R.string.priority_high)) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = Color(0xFFC62828).copy(alpha = 0.2f)
                     )
@@ -222,7 +234,7 @@ private fun PriorityCard(uiState: AgentUiState, viewModel: AgentViewModel) {
                 FilterChip(
                     selected = uiState.priority == "medium",
                     onClick = { viewModel.setPriority("medium") },
-                    label = { Text("Mittel") },
+                    label = { Text(stringResource(R.string.priority_medium)) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = Color(0xFFF9A825).copy(alpha = 0.2f)
                     )
@@ -230,15 +242,15 @@ private fun PriorityCard(uiState: AgentUiState, viewModel: AgentViewModel) {
                 FilterChip(
                     selected = uiState.priority == "low",
                     onClick = { viewModel.setPriority("low") },
-                    label = { Text("Niedrig") },
+                    label = { Text(stringResource(R.string.priority_low)) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = Color(0xFF2E7D32).copy(alpha = 0.2f)
                     )
                 )
             }
-            CheckRow(uiState.dynamicPriority, "⚡ Dynamische Anpassung",
+            CheckRow(uiState.dynamicPriority, stringResource(R.string.check_dynamic_priority),
                 viewModel::setDynamicPriority)
-            CheckRow(uiState.learningMode, "🔄 Lernmodus (rekursive Verbesserung)",
+            CheckRow(uiState.learningMode, stringResource(R.string.check_learning_mode),
                 viewModel::setLearningMode)
         }
     }

@@ -17,8 +17,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.secureguard.enterprise.R
 
 /**
  * Sperrbildschirm (PIN-Eingabe). Wird von der MainActivity angezeigt,
@@ -40,19 +42,19 @@ fun LockScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "🛡️ SecureGuard",
+            text = stringResource(R.string.lock_app_title),
             style = MaterialTheme.typography.headlineMedium
         )
         Spacer(Modifier.height(24.dp))
         Text(
-            text = "App gesperrt – PIN eingeben",
+            text = stringResource(R.string.lock_app_subtitle),
             style = MaterialTheme.typography.bodyMedium
         )
         Spacer(Modifier.height(16.dp))
         OutlinedTextField(
             value = pin,
             onValueChange = { pin = it },
-            label = { Text("PIN") },
+            label = { Text(stringResource(R.string.label_pin)) },
             visualTransformation = PasswordVisualTransformation(),
             singleLine = true
         )
@@ -73,14 +75,14 @@ fun LockScreen(
                 } else {
                     pin = ""
                     error = if (attemptsRemaining > 1) {
-                        "Falsche PIN – noch $attemptsRemaining Versuche"
+                        stringResource(R.string.wrong_pin_attempts, attemptsRemaining)
                     } else {
-                        "Falsche PIN – App gesperrt"
+                        stringResource(R.string.wrong_pin_locked)
                     }
                 }
             }
         ) {
-            Text("Entsperren")
+            Text(stringResource(R.string.btn_unlock))
         }
     }
 }

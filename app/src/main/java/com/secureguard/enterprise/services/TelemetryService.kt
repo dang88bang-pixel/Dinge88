@@ -146,8 +146,12 @@ class TelemetryService @Inject constructor(
 
     /**
      * Parses a JSON telemetry payload from the GATT characteristic.
-     * Expected format:
-     * {"battery":85,"fuel":45,"motor":true,"tires":true,"hours":123.4,"km":567.8,"lat":52.52,"lon":13.40}
+     * Schema (abgestimmt mit secureguard_esp32.ino):
+     * {"battery":85,"motor":true,"fuel":45,"tires":true,"hours":123.4,"km":567.8,
+     *  "lat":52.52,"lon":13.40,"wifi_rssi":-42,"lora_rssi":-67,"uptime":3600,
+     *  "ip":"192.168.1.50","device":"ESP32_SecureGuard"}
+     * Fehlende Keys (keine Sensor-Hardware) werden über die opt*()-Defaults
+     * zu null – die Firmware sendet sie nicht.
      */
     private fun parseTelemetryJson(mac: String, json: String): Telemetry? {
         return try {
@@ -162,6 +166,11 @@ class TelemetryService @Inject constructor(
                 kilometers = obj.optDouble("km").takeIf { !it.isNaN() },
                 latitude = obj.optDouble("lat").takeIf { !it.isNaN() },
                 longitude = obj.optDouble("lon").takeIf { !it.isNaN() },
+                wifiRssi = obj.optInt("wifi_rssi", 0).takeIf { it != 0 },
+                loraRssi = obj.optInt("lora_rssi", 0).takeIf { it != 0 },
+                uptimeSeconds = obj.optLong("uptime", -1L).takeIf { it >= 0 },
+                ipAddress = obj.optString("ip", "").takeIf { it.isNotBlank() },
+                device = obj.optString("device", "").takeIf { it.isNotBlank() },
                 timestamp = Date()
             )
         } catch (e: Exception) {

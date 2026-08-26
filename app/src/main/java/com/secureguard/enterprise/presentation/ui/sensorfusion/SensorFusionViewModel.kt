@@ -1,10 +1,13 @@
 package com.secureguard.enterprise.presentation.ui.sensorfusion
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +24,7 @@ data class FusionState(
     val longitude: String = "–",
     val satellites: Int = 0,
     val gpsSignal: String = "–",
-    val gpsStatus: String = "Standby",
+    val gpsStatus: String = "",
     val magX: String = "0.0",
     val magY: String = "0.0",
     val magZ: String = "0.0",
@@ -33,6 +36,7 @@ data class FusionState(
 
 @HiltViewModel
 class SensorFusionViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: SecureGuardRepository
 ) : ViewModel() {
 
@@ -54,7 +58,8 @@ class SensorFusionViewModel @Inject constructor(
                 val avgLon = locatedAssets.mapNotNull { it.longitude }.average()
 
                 val rssiNodes = assetList.take(4).map { asset ->
-                    "Knoten ${asset.shortName}" to "${asset.rssi} dBm"
+                    context.getString(R.string.fusion_node, asset.shortName) to
+                        context.getString(R.string.rssi_unit, asset.rssi)
                 }
 
                 val activeChannels = assetList.flatMap { a ->
@@ -69,8 +74,8 @@ class SensorFusionViewModel @Inject constructor(
                     latitude = if (avgLat.isNaN()) "–" else "%.4f".format(avgLat),
                     longitude = if (avgLon.isNaN()) "–" else "%.4f".format(avgLon),
                     satellites = if (locatedAssets.isNotEmpty()) (8 + locatedAssets.size).coerceAtMost(14) else 0,
-                    gpsSignal = if (locatedAssets.isNotEmpty()) "Stark" else "–",
-                    gpsStatus = if (locatedAssets.isNotEmpty()) "Aktiv" else "Standby",
+                    gpsSignal = if (locatedAssets.isNotEmpty()) context.getString(R.string.fusion_signal_strong) else "–",
+                    gpsStatus = if (locatedAssets.isNotEmpty()) context.getString(R.string.fusion_status_active) else context.getString(R.string.fusion_status_standby),
                     magX = "%.1f".format(40.0 + assetList.size * 1.2),
                     magY = "%.1f".format(20.0 + assetList.size * 0.8),
                     magZ = "%.1f".format(-15.0 + assetList.size * 0.3),

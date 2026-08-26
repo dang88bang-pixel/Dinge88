@@ -1,7 +1,9 @@
 package com.secureguard.enterprise.presentation.ui.actions
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.presentation.ui.common.ActionType
@@ -11,6 +13,7 @@ import com.secureguard.enterprise.security.RoleManager
 import com.secureguard.enterprise.security.User
 import com.secureguard.enterprise.services.AgentService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +28,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ActionsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: SecureGuardRepository,
     private val agentService: AgentService
 ) : ViewModel() {
@@ -63,7 +67,7 @@ class ActionsViewModel @Inject constructor(
             // RBAC permission check
             val user = User(id = "local", name = "Admin", role = Role.ADMIN)
             if (!RoleManager.hasPermission(user, Permission.EXECUTE_ACTIONS)) {
-                _commandLog.value = _commandLog.value + "⛔ Keine Berechtigung für Aktionen"
+                _commandLog.value = _commandLog.value + context.getString(R.string.log_no_permission)
                 return@launch
             }
 
@@ -71,8 +75,10 @@ class ActionsViewModel @Inject constructor(
             val success = agentService.sendAction(asset, actionType.wireCommand)
             val ts = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
             val mark = if (success) "✓" else "✗"
-            _commandLog.value = _commandLog.value +
-                "$ts → ${actionType.label} an ${asset.shortName} $mark"
+            _commandLog.value = _commandLog.value + context.getString(
+                R.string.log_command,
+                ts, context.getString(actionType.labelRes), asset.shortName, mark
+            )
             _isExecuting.value = false
         }
     }

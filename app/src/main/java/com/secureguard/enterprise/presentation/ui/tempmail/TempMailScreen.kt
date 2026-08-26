@@ -32,9 +32,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 
 /**
  * Dashboard für temporäre E-Mail-Inboxes (OTP-Abruf für den Agenten).
@@ -54,15 +56,15 @@ fun TempMailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("📧 Temporäre E-Mail") },
+                title = { Text(stringResource(R.string.title_temp_mail)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.clearInbox() }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Leeren")
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_clear))
                     }
                 }
             )
@@ -78,9 +80,7 @@ fun TempMailScreen(
             if (!viewModel.isConfigured) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "⚠️ Kein MCP-Server konfiguriert.\n" +
-                            "Setze MCP_SERVER_URL in local.properties, um temporäre " +
-                            "E-Mail-Inboxes zu nutzen.",
+                        text = stringResource(R.string.tempmail_not_configured),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(16.dp)
@@ -100,20 +100,20 @@ fun TempMailScreen(
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("📨 Aktuelle Inbox", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.current_inbox), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
                     if (currentInbox != null) {
-                        Text("📧 ${currentInbox?.email}", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.inbox_email, currentInbox?.email ?: ""), style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "🔑 Token: ${currentInbox?.token?.take(20)}…",
+                            stringResource(R.string.inbox_token, currentInbox?.token?.take(20) ?: ""),
                             style = MaterialTheme.typography.bodySmall
                         )
                         Text(
-                            "📋 ID: ${currentInbox?.inboxId}",
+                            stringResource(R.string.inbox_id, currentInbox?.inboxId ?: ""),
                             style = MaterialTheme.typography.bodySmall
                         )
                     } else {
-                        Text("Keine Inbox erstellt", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.no_inbox), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
             }
@@ -131,19 +131,19 @@ fun TempMailScreen(
                     if (isProcessing) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp))
                     } else {
-                        Text("📬 Neue Inbox")
+                        Text(stringResource(R.string.btn_new_inbox))
                     }
                 }
                 Button(
                     onClick = { viewModel.quickRegister() },
-                    enabled = !isProcessing && isConfigured,
+                    enabled = !isProcessing && viewModel.isConfigured,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (isProcessing) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text("⚡ Quick-Register + OTP")
+                    Text(stringResource(R.string.btn_quick_register))
                 }
 
                 Button(
@@ -151,14 +151,14 @@ fun TempMailScreen(
                     enabled = !isProcessing && currentInbox != null,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("🔗 Magic Link abrufen")
+                    Text(stringResource(R.string.btn_magic_link))
                 }
 
                 Button(
                     onClick = { viewModel.checkExistingOtp() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("📋 Gespeichertes OTP prüfen")
+                    Text(stringResource(R.string.btn_check_saved_otp))
                 }
 
                 Button(
@@ -166,7 +166,7 @@ fun TempMailScreen(
                     modifier = Modifier.weight(1f),
                     enabled = currentInbox != null && !isProcessing
                 ) {
-                    Text("⏳ OTP abrufen")
+                    Text(stringResource(R.string.btn_wait_otp))
                 }
             }
 
@@ -184,25 +184,25 @@ fun TempMailScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            if (lastOTP?.success == true) "✅ OTP empfangen!" else "❌ Kein OTP",
+                            stringResource(if (lastOTP?.success == true) R.string.otp_received else R.string.otp_none),
                             style = MaterialTheme.typography.titleMedium
                         )
                         if (lastOTP?.success == true) {
                             Text(
-                                "🔑 OTP: ${lastOTP?.otp}",
+                                stringResource(R.string.otp_value, lastOTP?.otp ?: ""),
                                 style = MaterialTheme.typography.titleLarge
                             )
                             Text(
-                                "📧 Von: ${lastOTP?.from}",
+                                stringResource(R.string.otp_from, lastOTP?.from ?: ""),
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
-                                "📋 Betreff: ${lastOTP?.subject}",
+                                stringResource(R.string.otp_subject, lastOTP?.subject ?: ""),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         } else {
                             Text(
-                                lastOTP?.error ?: "Fehler",
+                                lastOTP?.error ?: stringResource(R.string.error_fallback),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -217,7 +217,7 @@ fun TempMailScreen(
                     .weight(1f)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("📋 Log", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.section_log), style = MaterialTheme.typography.titleMedium)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     LazyColumn {
                         items(uiState.logEntries.takeLast(10)) { entry ->

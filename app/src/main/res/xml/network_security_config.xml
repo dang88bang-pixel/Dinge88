@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SecureGuard Enterprise – Network Security Configuration
+    =======================================================
+    Global ist Klartextverkehr (HTTP/ws ohne TLS) VERBOTEN. Ausnahmen gelten
+    nur für lokale Entwicklungs-/Pilot-Endpunkte:
+
+      - 10.0.2.2        Loopback des Android-Emulators (Host-Rechner:
+                        FastAPI-Backend :8000, MCP-Server :8001, Mosquitto-WS :9001)
+      - localhost/127.0.0.1  On-Device-Tooling (z. B. adb reverse)
+
+    HINWEIS ZU PRIVATEN SUBNETZEN (192.168.x.x):
+    Die Network-Security-Config unterstützt KEINE CIDR-Notation und keine
+    IP-Wildcards – pauschale Freigaben wie "192.168.*.*" sind technisch nicht
+    ausdrückbar. Für einen Pilotzugriff auf einen konkreten Rechner im LAN
+    (z. B. Docker-Host 192.168.1.50) die IP hier explizit ergänzen:
+
+        <domain includeSubdomains="false">192.168.1.50</domain>
+
+    Produktionssysteme melden sich ausschließlich über HTTPS/WSS (Backend,
+    MCP) bzw. MQTT/TLS (Port 8883, siehe mosquitto.conf-Härtung).
+-->
+<network-security-config>
+    <!-- Basisregel: KEIN Klartext für alle Domains -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Ausnahmen: lokale Entwicklungs-/Pilot-Endpunkte -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android-Emulator: Host-Rechner -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- On-Device-Loopback (adb reverse etc.) -->
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

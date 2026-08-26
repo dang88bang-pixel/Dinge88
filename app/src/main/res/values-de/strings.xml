@@ -5,4 +5,8 @@
     <string name="alerts_channel_name">Sicherheitsalarme</string>
     <string name="telemetry_channel_name">Telemetriedaten</string>
     <string name="system_channel_name">Systemmeldungen</string>
+    <string name="agent_channel_desc">Statusmeldungen des selbstlernenden Agenten</string>
+    <string name="alerts_channel_desc">Alarme und sicherheitsrelevante Ereignisse</string>
+    <string name="telemetry_channel_desc">Fahrzeug-/Asset-Telemetrie</string>
+    <string name="system_channel_desc">Systembenachrichtigungen (Backup, Sync, Fehler)</string>
 </resources>

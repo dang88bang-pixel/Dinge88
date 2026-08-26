@@ -21,10 +21,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
 import java.text.SimpleDateFormat
@@ -77,7 +79,7 @@ fun AssetCard(
                     )
                 }
                 Text(
-                    "📶 ${asset.rssi} dBm",
+                    stringResource(R.string.rssi_unit, asset.rssi),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -88,12 +90,16 @@ fun AssetCard(
             ) {
                 val loc = when {
                     asset.latitude != null && asset.longitude != null ->
-                        "📍 ${"%.4f".format(asset.latitude)}, ${"%.4f".format(asset.longitude)}"
-                    else -> "📍 Unbekannt"
+                        stringResource(
+                            R.string.coordinates_format,
+                            "%.4f".format(asset.latitude),
+                            "%.4f".format(asset.longitude)
+                        )
+                    else -> stringResource(R.string.position_unknown)
                 }
                 Text(loc, style = MaterialTheme.typography.bodySmall)
                 asset.batteryLevel?.let {
-                    Text("🔋 $it%", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.battery_badge, it), style = MaterialTheme.typography.bodySmall)
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -108,7 +114,7 @@ fun AssetCard(
                 )
                 if (asset.maintenanceDue) {
                     Text(
-                        "🔧 Wartung fällig",
+                        stringResource(R.string.maintenance_due),
                         style = MaterialTheme.typography.bodySmall,
                         color = statusColor
                     )

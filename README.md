@@ -20,7 +20,7 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 - [Echtzeit-Kanäle](#-echtzeit-kanäle-3)
 - [Externe APIs (8)](#-externe-apis-8)
 - [Services (30)](#-services-30)
-- [UI-Screens (13)](#-ui-screens-13)
+- [UI-Screens (16)](#-ui-screens-16)
 - [Datenmodelle (8)](#-datenmodelle-8)
 - [Datenbank (Room v2)](#-datenbank-room-v2)
 - [Sicherheit & Berechtigungen](#-sicherheit--berechtigungen)
@@ -167,10 +167,10 @@ app/src/main/java/com/secureguard/enterprise/
     │   ├── StatCard.kt               # Dashboard-Statistik-Karte
     │   └── ActionButton.kt           # Aktions-Button
     ├── navigation/
-    │   ├── NavItems.kt               # 12 Routes + BottomNav-Items
+    │   ├── NavItems.kt               # 16 Routes + BottomNav-Items
     │   └── SecureGuardApp.kt         # NavHost + Scaffold + BottomBar
     ├── theme/                         # Material 3 (Light/Dark/Dynamic)
-    └── ui/                            # 13 Screens + 12 ViewModels
+    └── ui/                            # 16 Screens + 15 ViewModels
         ├── dashboard/                 # DashboardScreen + DashboardViewModel
         ├── assets/                    # AssetList, AssetDetail, AddAsset, ScanQr
         ├── map/                       # MapScreen + MapViewModel (osmdroid)
@@ -527,6 +527,11 @@ Das Backend abonniert `secureguard/+/telemetry`, `+/alert`, `+/status` und forwa
 
 ### Befehle (9)
 
+Werdegang: Befehle werden **sowohl per MQTT als auch per BLE-GATT-Write**
+(Command-Characteristic, `onWrite`-Handler) angenommen und in derselben
+Befehlskette verarbeitet. Antworten (BATTERY/POSITION/TELEMETRY) gehen parallel
+per MQTT und BLE-Notify zurück an die App.
+
 | Befehl | Aktion |
 |--------|--------|
 | `ALARM` | LED 5x blinken (200ms) |
@@ -553,6 +558,7 @@ Command Char:   6BA1B218-15A8-461F-9FA8-5DC85327FD15 (Write)
 {
   "type": "telemetry",
   "battery": 85,
+  "motor": true,
   "wifi_rssi": -42,
   "lora_rssi": -67,
   "uptime": 3600,
@@ -560,6 +566,11 @@ Command Char:   6BA1B218-15A8-461F-9FA8-5DC85327FD15 (Write)
   "device": "ESP32_SecureGuard"
 }
 ```
+
+Schema-Abstimmung mit `TelemetryService.kt`: Keys ohne Sensor-Hardware
+(`fuel`, `tires`, `hours`, `km`, `lat`, `lon`) werden von der Firmware **nicht
+gesendet** (keine simulierten Werte) und von der App zu `null` aufgelöst –
+Details siehe `IMPLEMENTIERUNGS_INVENTUR.md`.
 
 ### Konfiguration (NVS)
 
@@ -581,14 +592,25 @@ Konfiguration änderbar via MQTT-Befehl `CONFIG` mit JSON-Payload.
 services:
   mqtt:        # Eclipse Mosquitto 2.0
     ports: 1883 (MQTT), 9001 (WebSocket)
+    healthcheck: mosquitto_sub ($SYS/broker/uptime)
   backend:     # FastAPI + Uvicorn
     ports: 8000
-    depends_on: mqtt
-  nodered:     # Node-RED Dashboard
+    depends_on: mqtt (service_healthy)
+    healthcheck: GET /api/health
+  mcp:         # MCP-Server (Temp-Mail/OTP, backend-mcp/)
+    ports: 8001  # Ziel von MCP_SERVER_URL (Tools: create_inbox, wait_for_otp, …)
+    healthcheck: GET /api/health
+  nodered:     # Node-RED Dashboard (Flows: nodered/flows.json)
     ports: 1880
+    depends_on: mqtt (service_healthy)
 ```
 
 **Start:** `docker compose up --build`
+
+**Node-RED-Dashboard:** Der Flow `SecureGuard` (nodered/flows.json) wird beim
+Start automatisch geladen – abonniert `secureguard/#`, sortiert Nachrichten je
+Kanal in die Debug-Sidebar, zählt Meldungen pro Kanal und bietet Inject-Buttons
+für Testbefehle an den ESP32.
 
 ---
 
@@ -735,7 +757,9 @@ services:
 
 Workflow `.github/workflows/build-release.yml`:
 - **Trigger:** Push auf `main`/`develop`, Tags `v*`, Pull Requests, manuell
-- **JDK:** 17 · **SDK:** android-34 · **Build-Tools:** 34.0.0 · **Gradle:** 8.9
+- **JDK:** 17 · **SDK:** android-35 · **Build-Tools:** 35.0.0 · **Gradle:** 8.9
+- **Test-Job:** `testDebugUnitTest` + `lintDebug` laufen **vor** dem APK-Build (`build: needs: test`), Reports als Artefakt *(aktiv in `.github/workflows/build-release.yml`)*
+- **API-Keys:** optionale Repo-Secrets (`WIGLE_API_KEY`, …) werden via `ORG_GRADLE_PROJECT_*` an den Build durchgereicht
 - **Artefakte:** `secureguard-pro-debug` (Debug-APK), `secureguard-pro` (Release-APK)
 - **Release-Signing:** Optional via `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
 

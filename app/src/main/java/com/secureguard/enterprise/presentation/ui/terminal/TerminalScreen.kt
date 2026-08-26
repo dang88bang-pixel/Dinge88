@@ -34,12 +34,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.presentation.theme.TerminalBg
 import com.secureguard.enterprise.presentation.theme.TerminalCyan
 import com.secureguard.enterprise.presentation.theme.TerminalGreen
@@ -72,7 +74,7 @@ fun TerminalScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -166,7 +168,7 @@ fun TerminalScreen(
                         }
                     }
                 ) {
-                    Icon(Icons.Default.Send, contentDescription = "Senden", tint = TerminalGreen)
+                    Icon(Icons.Default.Send, contentDescription = stringResource(R.string.cd_send), tint = TerminalGreen)
                 }
             }
         }

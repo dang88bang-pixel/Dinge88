@@ -48,10 +48,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.components.ActionButton
 import com.secureguard.enterprise.presentation.ui.common.ActionType
@@ -75,15 +77,15 @@ fun ActionsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("⚡ Aktionen") },
+                title = { Text(stringResource(R.string.section_actions)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.clearLog() }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Log löschen")
+                        Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cd_clear_log))
                     }
                 }
             )
@@ -99,14 +101,14 @@ fun ActionsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("🎯 Asset auswählen", style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.select_asset), style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(8.dp))
                         ExposedDropdownMenuBox(
                             expanded = menuExpanded,
                             onExpandedChange = { viewModel.setMenuExpanded(it) }
                         ) {
                             OutlinedTextField(
-                                value = selectedAsset?.shortName ?: "Asset auswählen",
+                                value = selectedAsset?.shortName ?: stringResource(R.string.select_asset_placeholder),
                                 onValueChange = {},
                                 readOnly = true,
                                 trailingIcon = {
@@ -148,12 +150,12 @@ fun ActionsScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                "🚀 Aktionen für ${asset.shortName}",
+                                stringResource(R.string.actions_for_asset, asset.shortName),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                "STATUS: ${asset.status}  |  📶 ${asset.rssi} dBm",
+                                stringResource(R.string.asset_status_line, asset.status.toString(), asset.rssi),
                                 style = MaterialTheme.typography.bodySmall
                             )
 
@@ -163,36 +165,36 @@ fun ActionsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ActionButton(Modifier.weight(1f), Icons.Default.Warning, "🔔 Alarm",
+                                ActionButton(Modifier.weight(1f), Icons.Default.Warning, stringResource(R.string.ab_alarm),
                                     { viewModel.executeAction(ActionType.ALARM) }, online)
-                                ActionButton(Modifier.weight(1f), Icons.Default.Lightbulb, "💡 Blinken",
+                                ActionButton(Modifier.weight(1f), Icons.Default.Lightbulb, stringResource(R.string.ab_blink),
                                     { viewModel.executeAction(ActionType.LIGHT) }, online)
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ActionButton(Modifier.weight(1f), Icons.Default.PowerSettingsNew, "🔇 Motor",
+                                ActionButton(Modifier.weight(1f), Icons.Default.PowerSettingsNew, stringResource(R.string.ab_motor),
                                     { viewModel.executeAction(ActionType.MOTOR_OFF) }, online)
-                                ActionButton(Modifier.weight(1f), Icons.Default.BatteryAlert, "🔋 Batterie",
+                                ActionButton(Modifier.weight(1f), Icons.Default.BatteryAlert, stringResource(R.string.ab_battery),
                                     { viewModel.executeAction(ActionType.BATTERY) }, online)
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ActionButton(Modifier.weight(1f), Icons.Default.Message, "📝 Nachricht",
+                                ActionButton(Modifier.weight(1f), Icons.Default.Message, stringResource(R.string.ab_message),
                                     { viewModel.executeAction(ActionType.MESSAGE) }, online)
-                                ActionButton(Modifier.weight(1f), Icons.Default.LocationOn, "📍 Position",
+                                ActionButton(Modifier.weight(1f), Icons.Default.LocationOn, stringResource(R.string.ab_position),
                                     { viewModel.executeAction(ActionType.POSITION) }, online)
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ActionButton(Modifier.weight(1f), Icons.Default.Refresh, "🔄 Neustart",
+                                ActionButton(Modifier.weight(1f), Icons.Default.Refresh, stringResource(R.string.ab_restart),
                                     { viewModel.executeAction(ActionType.RESTART) }, online)
-                                ActionButton(Modifier.weight(1f), Icons.Default.Storage, "📊 Telemetrie",
+                                ActionButton(Modifier.weight(1f), Icons.Default.Storage, stringResource(R.string.ab_telemetry),
                                     { viewModel.executeAction(ActionType.TELEMETRY) }, online)
                             }
 
@@ -204,7 +206,7 @@ fun ActionsScreen(
                                 ) {
                                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                                     Spacer(Modifier.size(8.dp))
-                                    Text("Aktion wird ausgeführt...",
+                                    Text(stringResource(R.string.executing_action),
                                         style = MaterialTheme.typography.bodySmall)
                                 }
                             }
@@ -215,10 +217,10 @@ fun ActionsScreen(
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("⚙️ Einstellungen", style = MaterialTheme.typography.titleSmall)
-                            CheckRow(recoverResend, "Recover/Resend aktivieren") { recoverResend = it }
-                            CheckRow(logCommands, "Steuerlog aufzeichnen") { logCommands = it }
-                            CheckRow(autoNotify, "Automatische Benachrichtigung") { autoNotify = it }
+                            Text(stringResource(R.string.section_settings), style = MaterialTheme.typography.titleSmall)
+                            CheckRow(recoverResend, stringResource(R.string.check_recover_resend)) { recoverResend = it }
+                            CheckRow(logCommands, stringResource(R.string.check_log_commands)) { logCommands = it }
+                            CheckRow(autoNotify, stringResource(R.string.check_auto_notify)) { autoNotify = it }
                         }
                     }
                 }
@@ -231,12 +233,12 @@ fun ActionsScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("📋 Command Log", style = MaterialTheme.typography.titleSmall)
-                                TextButton(onClick = { viewModel.clearLog() }) { Text("Leeren") }
+                                Text(stringResource(R.string.command_log), style = MaterialTheme.typography.titleSmall)
+                                TextButton(onClick = { viewModel.clearLog() }) { Text(stringResource(R.string.btn_clear)) }
                             }
                             if (commandLog.isEmpty()) {
                                 Text(
-                                    "Keine Einträge",
+                                    stringResource(R.string.no_entries),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -258,7 +260,7 @@ fun ActionsScreen(
                                 .padding(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("Bitte wähle ein Asset aus",
+                            Text(stringResource(R.string.please_select_asset),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }

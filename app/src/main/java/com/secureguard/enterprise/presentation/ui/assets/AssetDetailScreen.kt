@@ -40,10 +40,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.ui.common.ActionType
 import java.text.SimpleDateFormat
@@ -70,15 +72,15 @@ fun AssetDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(asset?.shortName ?: "Asset") },
+                title = { Text(asset?.shortName ?: stringResource(R.string.fallback_asset)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refreshTelemetry() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Telemetrie aktualisieren")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_refresh_telemetry))
                     }
                 }
             )
@@ -96,13 +98,18 @@ fun AssetDetailScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            asset?.name ?: "Laden...",
+                            asset?.name ?: stringResource(R.string.loading),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(Modifier.height(4.dp))
-                        Text("MAC: ${asset?.mac ?: "–"}", style = MaterialTheme.typography.bodyMedium)
-                        asset?.vin?.let { Text("VIN: $it", style = MaterialTheme.typography.bodySmall) }
+                        Text(
+                            stringResource(R.string.mac_label, asset?.mac ?: "–"),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        asset?.vin?.let {
+                            Text(stringResource(R.string.vin_label, it), style = MaterialTheme.typography.bodySmall)
+                        }
                         Spacer(Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -115,23 +122,30 @@ fun AssetDetailScreen(
                                 else -> Color.Gray
                             }
                             Text(
-                                "Status: ${asset?.status?.name ?: "–"}",
+                                stringResource(R.string.status_label, asset?.status?.name ?: "–"),
                                 color = statusColor,
                                 fontWeight = FontWeight.SemiBold
                             )
-                            Text("📶 ${asset?.rssi ?: 0} dBm")
+                            Text(stringResource(R.string.rssi_label, asset?.rssi ?: 0))
                         }
                         asset?.let { a ->
                             if (a.latitude != null && a.longitude != null) {
                                 Text(
-                                    "📍 ${"%.5f".format(a.latitude)}, ${"%.5f".format(a.longitude)}",
+                                    stringResource(
+                                        R.string.coordinates_format,
+                                        "%.5f".format(a.latitude),
+                                        "%.5f".format(a.longitude)
+                                    ),
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }
                         }
                         asset?.lastSeen?.let {
                             Text(
-                                "Zuletzt gesehen: ${SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(it)}",
+                                stringResource(
+                                    R.string.last_seen_label,
+                                    SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(it)
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -145,19 +159,39 @@ fun AssetDetailScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "📊 Telemetrie",
+                            stringResource(R.string.section_telemetry),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(8.dp))
                         telemetry?.let { data ->
-                            Text("🔋 Batterie: ${data.batteryPercent ?: "–"}%")
-                            Text("⛽ Kraftstoff: ${data.fuelPercent ?: "–"}%")
-                            Text("🏃 Motor: ${if (data.motorOk) "✅ OK" else "❌ Fehler"}")
-                            Text("🛞 Reifen: ${if (data.tiresOk) "✅ OK" else "⚠️ Prüfung nötig"}")
-                            Text("⏱ Betriebsstunden: ${"%.1f".format(data.operatingHours ?: 0.0)}h")
-                            Text("📍 Kilometerstand: ${"%.1f".format(data.kilometers ?: 0.0)} km")
-                        } ?: Text("⏳ Telemetrie wird geladen...")
+                            Text(stringResource(R.string.battery_percent, data.batteryPercent?.toString() ?: "–"))
+                            Text(stringResource(R.string.fuel_percent, data.fuelPercent?.toString() ?: "–"))
+                            Text(
+                                stringResource(
+                                    R.string.motor_label,
+                                    stringResource(if (data.motorOk) R.string.state_ok else R.string.state_error)
+                                )
+                            )
+                            Text(
+                                stringResource(
+                                    R.string.tires_label,
+                                    stringResource(if (data.tiresOk) R.string.state_ok else R.string.state_check_needed)
+                                )
+                            )
+                            Text(
+                                stringResource(
+                                    R.string.operating_hours,
+                                    "%.1f".format(data.operatingHours ?: 0.0)
+                                )
+                            )
+                            Text(
+                                stringResource(
+                                    R.string.kilometers_label,
+                                    "%.1f".format(data.kilometers ?: 0.0)
+                                )
+                            )
+                        } ?: Text(stringResource(R.string.telemetry_loading))
                     }
                 }
             }
@@ -167,7 +201,7 @@ fun AssetDetailScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "🔍 Suche",
+                            stringResource(R.string.section_search),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -175,29 +209,29 @@ fun AssetDetailScreen(
                         if (isSearching) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 CircularProgressIndicator(modifier = Modifier.height(24.dp).padding(end = 8.dp))
-                                Text("Suche läuft...")
+                                Text(stringResource(R.string.searching))
                             }
                         } else {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = { viewModel.startSearch() }) {
                                     Icon(Icons.Default.Search, contentDescription = null)
-                                    Text(" Alle", modifier = Modifier.padding(start = 4.dp))
+                                    Text(stringResource(R.string.search_all), modifier = Modifier.padding(start = 4.dp))
                                 }
                                 Button(onClick = { viewModel.startExternalSearch() }) {
                                     Icon(Icons.Default.LocationOn, contentDescription = null)
-                                    Text(" Crowd", modifier = Modifier.padding(start = 4.dp))
+                                    Text(stringResource(R.string.search_crowd), modifier = Modifier.padding(start = 4.dp))
                                 }
                                 Button(onClick = { viewModel.startSatelliteSearch() }) {
                                     Icon(Icons.Default.Satellite, contentDescription = null)
-                                    Text(" Sat", modifier = Modifier.padding(start = 4.dp))
+                                    Text(stringResource(R.string.search_satellite), modifier = Modifier.padding(start = 4.dp))
                                 }
                             }
                         }
                         searchResult?.let { result ->
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                if (result.found) "✅ Asset gefunden (${result.detection?.sourceType?.name})"
-                                else "❌ Asset nicht gefunden",
+                                if (result.found) stringResource(R.string.asset_found, result.detection?.sourceType?.name ?: "")
+                                else stringResource(R.string.asset_not_found),
                                 color = if (result.found) Color(0xFF2E7D32) else Color(0xFFC62828),
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -211,7 +245,7 @@ fun AssetDetailScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "⚡ Aktionen",
+                            stringResource(R.string.section_actions),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -219,22 +253,22 @@ fun AssetDetailScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { viewModel.executeAction(ActionType.ALARM) }) {
                                 Icon(Icons.Default.Warning, contentDescription = null)
-                                Text(" Alarm", modifier = Modifier.padding(start = 4.dp))
+                                Text(stringResource(R.string.action_alarm_short), modifier = Modifier.padding(start = 4.dp))
                             }
                             Button(onClick = { viewModel.executeAction(ActionType.LIGHT) }) {
                                 Icon(Icons.Default.Lightbulb, contentDescription = null)
-                                Text(" Licht", modifier = Modifier.padding(start = 4.dp))
+                                Text(stringResource(R.string.action_light_short), modifier = Modifier.padding(start = 4.dp))
                             }
                         }
                         Spacer(Modifier.height(4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { viewModel.executeAction(ActionType.MOTOR_OFF) }) {
                                 Icon(Icons.Default.PowerSettingsNew, contentDescription = null)
-                                Text(" Motor", modifier = Modifier.padding(start = 4.dp))
+                                Text(stringResource(R.string.action_motor_short), modifier = Modifier.padding(start = 4.dp))
                             }
                             Button(onClick = { viewModel.executeAction(ActionType.MESSAGE) }) {
                                 Icon(Icons.Default.Message, contentDescription = null)
-                                Text(" Nachricht", modifier = Modifier.padding(start = 4.dp))
+                                Text(stringResource(R.string.action_message_short), modifier = Modifier.padding(start = 4.dp))
                             }
                         }
                         actionResult?.let { result ->
@@ -247,7 +281,7 @@ fun AssetDetailScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 IconButton(onClick = { viewModel.clearActionResult() }, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Default.ArrowBack, contentDescription = "Schließen", modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_close), modifier = Modifier.size(16.dp))
                                 }
                             }
                             LaunchedEffect(result) {
@@ -263,7 +297,7 @@ fun AssetDetailScreen(
             if (detections.isNotEmpty()) {
                 item {
                     Text(
-                        "📋 Detektions-Historie (${detections.size})",
+                        stringResource(R.string.detection_history, detections.size),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -286,11 +320,23 @@ fun AssetDetailScreen(
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }
-                            Text("📶 ${detection.rssi} dBm · ${detection.nodeId ?: "–"}")
+                            Text(
+                                stringResource(
+                                    R.string.rssi_node_label,
+                                    detection.rssi,
+                                    detection.nodeId ?: "–"
+                                )
+                            )
                             detection.latitude?.let { lat ->
                                 detection.longitude?.let { lon ->
-                                    Text("📍 ${"%.5f".format(lat)}, ${"%.5f".format(lon)}",
-                                        style = MaterialTheme.typography.bodySmall)
+                                    Text(
+                                        stringResource(
+                                            R.string.coordinates_format,
+                                            "%.5f".format(lat),
+                                            "%.5f".format(lon)
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
                             }
                             detection.message?.let {

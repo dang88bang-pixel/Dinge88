@@ -31,12 +31,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
+import com.secureguard.enterprise.R
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -85,10 +87,10 @@ fun ScanQrScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("📷 QR-Scan") },
+                title = { Text(stringResource(R.string.title_scan_qr)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 }
             )
@@ -127,17 +129,17 @@ fun ScanQrScreen(
                 )
             } else {
                 Text(
-                    "Kamera-Berechtigung erforderlich",
+                    stringResource(R.string.camera_permission_required),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.titleMedium
                 )
                 Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                    Text("Berechtigung erteilen")
+                    Text(stringResource(R.string.btn_grant_permission))
                 }
             }
 
             scanned?.let { value ->
-                Text("Erkannt: $value", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.detected_code, value), style = MaterialTheme.typography.titleMedium)
                 Button(
                     onClick = {
                         viewModel.onCodeScanned(value)
@@ -145,13 +147,13 @@ fun ScanQrScreen(
                             ?.savedStateHandle?.set("scanned_mac", value)
                         navController.popBackStack()
                     }
-                ) { Text("Übernehmen") }
+                ) { Text(stringResource(R.string.btn_apply)) }
             }
-            Text("oder manuell eingeben:", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.or_enter_manually), style = MaterialTheme.typography.bodyMedium)
             OutlinedTextField(
                 value = manual,
                 onValueChange = { manual = it.uppercase() },
-                label = { Text("MAC-Adresse") },
+                label = { Text(stringResource(R.string.label_mac_address)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -164,7 +166,7 @@ fun ScanQrScreen(
                 },
                 enabled = manual.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Weiter") }
+            ) { Text(stringResource(R.string.btn_continue)) }
         }
     }
 }

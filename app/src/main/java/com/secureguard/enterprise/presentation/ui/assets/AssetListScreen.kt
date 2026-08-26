@@ -33,9 +33,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.presentation.components.AssetCard
 import com.secureguard.enterprise.presentation.navigation.Routes
@@ -63,18 +65,18 @@ fun AssetListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("📦 Assets (${uiState.total})") },
+                title = { Text(stringResource(R.string.title_assets, uiState.total)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { navController.navigate(Routes.SCAN_QR) }) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.cd_scan))
                     }
                     IconButton(onClick = { navController.navigate(Routes.ADD_ASSET) }) {
-                        Icon(Icons.Default.Add, contentDescription = "Hinzufügen")
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_add))
                     }
                 }
             )
@@ -90,13 +92,13 @@ fun AssetListScreen(
                 value = searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("🔍 Asset suchen...") },
+                placeholder = { Text(stringResource(R.string.search_assets_hint)) },
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clearFilters() }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Löschen")
+                            Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cd_delete))
                         }
                     }
                 }
@@ -143,12 +145,12 @@ fun AssetListScreen(
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
-                                    "Keine Assets gefunden",
+                                    stringResource(R.string.no_assets_found),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    "Füge ein Asset hinzu oder ändere die Filter",
+                                    stringResource(R.string.add_asset_or_change_filter),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

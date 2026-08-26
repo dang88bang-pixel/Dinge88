@@ -29,10 +29,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.R
 
 private val MAC_REGEX = Regex("([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}")
 
@@ -70,10 +72,10 @@ fun AddAssetScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("➕ Asset hinzufügen") },
+                title = { Text(stringResource(R.string.title_add_asset)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 }
             )
@@ -88,40 +90,40 @@ fun AddAssetScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                "Neues geschütztes Asset registrieren",
+                stringResource(R.string.add_asset_hint),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
             OutlinedTextField(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
-                label = { Text("Name") },
+                label = { Text(stringResource(R.string.label_name)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
             OutlinedTextField(
                 value = state.shortName,
                 onValueChange = viewModel::onShortNameChange,
-                label = { Text("Kurzname (z.B. Roller #6)") },
+                label = { Text(stringResource(R.string.label_short_name)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
             OutlinedTextField(
                 value = state.mac,
                 onValueChange = viewModel::onMacChange,
-                label = { Text("MAC-Adresse (AA:BB:CC:DD:EE:FF)") },
+                label = { Text(stringResource(R.string.label_mac_format)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 trailingIcon = {
                     IconButton(onClick = { navController.navigate("scan_qr") }) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = "QR scannen")
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.cd_scan_qr))
                     }
                 }
             )
             OutlinedTextField(
                 value = state.vin,
                 onValueChange = viewModel::onVinChange,
-                label = { Text("VIN / Seriennummer (optional)") },
+                label = { Text(stringResource(R.string.label_vin_optional)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -130,7 +132,7 @@ fun AddAssetScreen(
                     checked = state.externalAllowed,
                     onCheckedChange = viewModel::onExternalChange
                 )
-                Text("🌍 Externe Crowdsource-Suche erlaubt (DSGVO-Einwilligung)")
+                Text(stringResource(R.string.check_external_allowed))
             }
 
             state.error?.let {
@@ -143,7 +145,7 @@ fun AddAssetScreen(
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("💾 Asset speichern")
+                Text(stringResource(R.string.btn_save_asset))
             }
         }
     }

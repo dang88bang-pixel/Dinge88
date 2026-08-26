@@ -13,12 +13,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.secureguard.enterprise.R
 import com.secureguard.enterprise.presentation.ui.actions.ActionsScreen
 import com.secureguard.enterprise.presentation.ui.agent.AgentConfigScreen
 import com.secureguard.enterprise.presentation.ui.alerts.AlertsScreen
@@ -62,8 +64,8 @@ fun SecureGuardApp() {
                                     }
                                 }
                             },
-                            icon = { Icon(item.icon, contentDescription = item.label) },
-                            label = { Text(item.label) }
+                            icon = { Icon(item.icon, contentDescription = stringResource(item.labelRes)) },
+                            label = { Text(stringResource(item.labelRes)) }
                         )
                     }
                 }
