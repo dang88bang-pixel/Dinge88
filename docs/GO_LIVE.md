@@ -104,11 +104,14 @@ Release-Build: `network_security_config` verbietet Cleartext → `ssl://broker:8
 
 ## 5. CI
 
-Workflow: `.github/workflows/build-release.yml`
+Workflow: `.github/workflows/build-release.yml` (Basis wie auf `main`).
 
-- `assembleDebug` + **Unit-Tests**
-- `assembleRelease` (+ Keystore-Secrets vom Anwender)
-- Branches: `main`, `develop`, `arena/**`
+Optionale Erweiterungen (Unit-Tests, `arena/**`-Trigger):
+siehe [CI_ENHANCEMENTS.md](CI_ENHANCEMENTS.md) – manuell mergen, falls der
+Push von Workflow-Dateien durch GitHub-App-Rechte blockiert wird.
+
+- `assembleDebug` / `assembleRelease` (+ Keystore-Secrets vom Anwender)
+- Lokal: `./gradlew testDebugUnitTest assembleDebug`
 
 Secrets (Anwender setzt Werte):
 
