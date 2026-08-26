@@ -20,7 +20,7 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
-    <!-- Location (required for BLE/WiFi scan on Android ≤ 11) -->
+    <!-- Location -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
@@ -34,20 +34,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Audio for alert sounds -->
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-
     <!-- Foreground service for the self-learning agent -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
-    <!-- External storage for backup/restore/export (Android ≤ 9) -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
 
     <!-- Hardware features (optional, so non-BLE devices can still install) -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
@@ -77,18 +68,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- NFC: App als NDEF-Handler registrieren -->
-            <intent-filter>
-                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.nfc.action.TECH_DISCOVERED" />
-            </intent-filter>
-            <meta-data
-                android:name="android.nfc.action.TECH_DISCOVERED"
-                android:resource="@xml/nfc_tech_filter" />
         </activity>
 
         <!-- Self-learning agent foreground service -->
@@ -98,18 +77,6 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- Boot receiver: restarts WorkManager agent after device reboot -->
-        <receiver
-            android:name=".receiver.BootReceiver"
-            android:enabled="true"
-            android:exported="true"
-            android:directBootAware="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-
         <!-- WorkManager wird on-demand über HiltWorkerFactory initialisiert
              (SecureGuardApplication implements Configuration.Provider) –
              daher den automatischen androidx.startup-Initializer entfernen. -->
@@ -117,11 +84,6 @@
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
             tools:node="remove" />
-
-        <!-- USB device filter for serial adapters (FTDI, CP210x, CH34x) -->
-        <meta-data
-            android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
-            android:resource="@xml/device_filter" />
 
         <!-- ZXing barcode scanner (QR scan) -->
         <activity

@@ -38,20 +38,6 @@ import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
-import com.secureguard.enterprise.services.OpticalService
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
-
-@HiltViewModel
-class ScanQrViewModel @Inject constructor(
-    private val opticalService: OpticalService
-) : ViewModel() {
-    fun onCodeScanned(code: String) {
-        opticalService.setScannedCode(code)
-    }
-}
 
 /**
  * QR / barcode scanner screen. Uses ZXing embedded so no external scanner app
@@ -60,10 +46,7 @@ class ScanQrViewModel @Inject constructor(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScanQrScreen(
-    navController: NavController,
-    viewModel: ScanQrViewModel = hiltViewModel()
-) {
+fun ScanQrScreen(navController: NavController) {
     val context = LocalContext.current
     var hasPermission by remember {
         mutableStateOf(
@@ -140,13 +123,14 @@ fun ScanQrScreen(
                 Text("Erkannt: $value", style = MaterialTheme.typography.titleMedium)
                 Button(
                     onClick = {
-                        viewModel.onCodeScanned(value)
                         navController.previousBackStackEntry
                             ?.savedStateHandle?.set("scanned_mac", value)
                         navController.popBackStack()
                     }
                 ) { Text("Übernehmen") }
             }
+
+            Spacer(Modifier.height(8.dp))
             Text("oder manuell eingeben:", style = MaterialTheme.typography.bodyMedium)
             OutlinedTextField(
                 value = manual,
@@ -157,7 +141,6 @@ fun ScanQrScreen(
             )
             Button(
                 onClick = {
-                    viewModel.onCodeScanned(manual)
                     navController.previousBackStackEntry
                         ?.savedStateHandle?.set("scanned_mac", manual)
                     navController.popBackStack()

@@ -1,20 +1,20 @@
 package com.secureguard.enterprise.presentation.ui.agent
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.abs
 
 data class AgentUiState(
     val agentRunning: Boolean = false,
@@ -31,11 +31,8 @@ data class AgentUiState(
 
 @HiltViewModel
 class AgentViewModel @Inject constructor(
-    private val agentService: AgentService,
-    @ApplicationContext private val context: Context
+    private val agentService: AgentService
 ) : ViewModel() {
-
-    private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
 
     private val config = MutableStateFlow(
         AgentUiState(
@@ -49,16 +46,10 @@ class AgentViewModel @Inject constructor(
         agentService.agentStatus,
         config
     ) { status, cfg ->
-        val progress = if (status.running && status.startedAt != null) {
-            val intervalMs = status.settings.interval.coerceAtLeast(5) * 1000L
-            val elapsed = System.currentTimeMillis() - (status.lastRunAt ?: status.startedAt!!)
-            (elapsed.toFloat() / intervalMs * 100f).coerceIn(0f, 100f)
-        } else 0f
-
         cfg.copy(
             agentRunning = status.running,
             runtime = formatUptime(status.uptimeMillis),
-            progress = progress
+            progress = if (status.running) 85f else 0f
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AgentUiState())
 
@@ -84,29 +75,14 @@ class AgentViewModel @Inject constructor(
         if (agentService.agentStatus.value.running) agentService.stop() else saveSettings()
     }
 
-    private val _registerStatus = MutableStateFlow<String?>(null)
-    val registerStatus: StateFlow<String?> = _registerStatus.asStateFlow()
-
-    fun autoRegisterService(serviceName: String, url: String) {
-        viewModelScope.launch {
-            _registerStatus.value = "Registriere bei $serviceName..."
-            val result = agentService.autoRegisterExternalService(serviceName, url, emptyMap())
-            _registerStatus.value = if (result.success) {
-                "✅ Registriert: ${result.email} (OTP: ${result.otp})"
-            } else {
-                "❌ ${result.error}"
-            }
-        }
-    }
-
     fun saveSettings() {
         val state = config.value
         val settings = AgentSettings(
             interval = state.interval.coerceAtLeast(5),
             dynamicPriority = state.dynamicPriority,
             learningMode = state.learningMode,
-            offlineOnly = prefs.getBoolean("offline_only", true),
-            externalSources = prefs.getBoolean("external_crowd", false)
+            offlineOnly = true,
+            externalSources = false
         )
         agentService.start(settings)
     }

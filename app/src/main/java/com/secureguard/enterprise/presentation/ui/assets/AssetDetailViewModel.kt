@@ -12,10 +12,6 @@ import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.presentation.ui.common.ActionResult
 import com.secureguard.enterprise.presentation.ui.common.ActionType
 import com.secureguard.enterprise.data.model.Telemetry
-import com.secureguard.enterprise.security.Permission
-import com.secureguard.enterprise.security.Role
-import com.secureguard.enterprise.security.RoleManager
-import com.secureguard.enterprise.security.User
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.NotificationService
 import com.secureguard.enterprise.services.CrowdService
@@ -76,6 +72,7 @@ class AssetDetailViewModel @Inject constructor(
             _assetState.value = found
             if (found != null && found.mac != loadedMac) {
                 loadedMac = found.mac
+                // Prime the telemetry cache with a fresh read.
                 refreshTelemetry()
                 repository.getDetections(found.mac).collect { list ->
                     _detections.value = list
@@ -89,24 +86,17 @@ class AssetDetailViewModel @Inject constructor(
             _actionResult.value = ActionResult.Processing
             val asset = _assetState.value ?: return@launch
 
-            // RBAC permission check
-            val user = User(id = "local", name = "Admin", role = Role.ADMIN)
-            if (!RoleManager.hasPermission(user, Permission.EXECUTE_ACTIONS)) {
-                _actionResult.value = ActionResult(false, "Keine Berechtigung")
-                return@launch
-            }
-
-            val success = agentService.sendAction(asset, actionType.wireCommand)
+            val success = telemetryService.sendCommand(asset.mac, actionType.wireCommand)
             val result = if (success) {
                 ActionResult(true, "${actionType.label} ausgeführt")
             } else {
-                ActionResult(false, "Zustellung fehlgeschlagen (Offline-Queue)")
+                ActionResult(false, "Keine Verbindung zum Asset")
             }
             _actionResult.value = result
 
             repository.raiseAlert(
                 assetId = asset.id,
-                type = if (success) AlertType.INFO else AlertType.WARNING,
+                type = if (success) AlertType.SECURITY else AlertType.CRITICAL,
                 severity = if (success) AlertSeverity.INFO else AlertSeverity.WARNING,
                 message = "${actionType.label}: ${result.message}"
             )
@@ -166,8 +156,10 @@ class AssetDetailViewModel @Inject constructor(
     fun refreshTelemetry() {
         viewModelScope.launch {
             val asset = _assetState.value ?: return@launch
+            // Force a fresh read if nothing cached yet.
             val telemetry = telemetryService.getLatestTelemetry(asset.mac)
                 ?: telemetryService.run {
+                    // Trigger a search which populates the telemetry cache.
                     searchAsset(asset)
                     getLatestTelemetry(asset.mac)
                 }
