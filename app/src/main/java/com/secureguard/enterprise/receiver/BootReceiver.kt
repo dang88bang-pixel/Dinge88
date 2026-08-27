@@ -17,19 +17,25 @@ import java.util.concurrent.TimeUnit
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
-            intent.action != Intent.ACTION_LOCKED_BOOT_COMPLETED
-        ) return
+        // Bewusst KEIN LOCKED_BOOT_COMPLETED: Vor dem User-Unlock ist die
+        // Credential-Encrypted-Storage nicht verfügbar; WorkManager/Hilt/Room
+        // (alle CE-Storage) würden dort crashen. Der periodische Worker wird
+        // ohnehin bei Application.onCreate neu geplant.
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
         Log.i(TAG, "Boot abgeschlossen – Agent-Worker wird neu geplant")
 
-        val request = PeriodicWorkRequestBuilder<SecureAgentWorker>(15, TimeUnit.MINUTES)
-            .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            "secureguard_agent_worker",
-            ExistingPeriodicWorkPolicy.KEEP,
-            request
-        )
+        runCatching {
+            val request = PeriodicWorkRequestBuilder<SecureAgentWorker>(15, TimeUnit.MINUTES)
+                .build()
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                "secureguard_agent_worker",
+                ExistingPeriodicWorkPolicy.KEEP,
+                request
+            )
+        }.onFailure {
+            Log.w(TAG, "WorkManager nach Boot nicht verfügbar", it)
+        }
     }
 
     companion object {

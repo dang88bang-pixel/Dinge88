@@ -33,3 +33,21 @@ fun missingPermissions(context: Context): List<String> =
     requiredPermissions().filter {
         ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
     }
+
+/**
+ * Hintergrund-Standort (ab Android 10): wird für WiFi-/BLE-Scans des
+ * Hintergrund-Agenten benötigt und **nur** separat angefragt, nachdem die
+ * feine Standortfreigabe erteilt wurde (Voraussetzung des Systems).
+ */
+fun missingBackgroundPermissions(context: Context): List<String> {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptyList()
+    val fineGranted = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    if (!fineGranted) return emptyList()
+    val bgGranted = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    return if (bgGranted) emptyList()
+    else listOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+}

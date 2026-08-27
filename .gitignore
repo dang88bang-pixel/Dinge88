@@ -47,6 +47,8 @@ firmware/**/platformio.ini.bak
 .secureguard/
 
 __pycache__/
+secureguard.db
+backend/secureguard.db
 *.py[cod]
 .pytest_cache/
 

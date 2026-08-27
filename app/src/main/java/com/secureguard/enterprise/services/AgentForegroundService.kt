@@ -2,6 +2,8 @@ package com.secureguard.enterprise.services
 
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -28,10 +30,21 @@ class AgentForegroundService : Service() {
                 return START_NOT_STICKY
             }
         }
-        startForeground(
-            NotificationService.AGENT_NOTIFICATION_ID,
-            notificationService.buildAgentNotification("Agent wird initialisiert …")
-        )
+        // Expliziter FGS-Typ: ab Android 14 (targetSdk 34+) Pflicht und verhindert
+        // MissingForegroundServiceTypeException; Hinweis: dataSync-FGS ist ab
+        // Android 15 auf 6 h begrenzt – danach übernimmt der WorkManager-Zyklus.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NotificationService.AGENT_NOTIFICATION_ID,
+                notificationService.buildAgentNotification("Agent wird initialisiert …"),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(
+                NotificationService.AGENT_NOTIFICATION_ID,
+                notificationService.buildAgentNotification("Agent wird initialisiert …")
+            )
+        }
         agentService.start()
         return START_STICKY
     }

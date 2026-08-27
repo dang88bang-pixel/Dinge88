@@ -9,6 +9,8 @@ import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -48,9 +50,9 @@ class OpticalService @Inject constructor(
     @Volatile
     var lastImageJpeg: ByteArray? = null
 
-    suspend fun searchAsset(asset: Asset): Detection? {
-        matchQr(asset)?.let { return it }
-        return queryYolo(asset)
+    suspend fun searchAsset(asset: Asset): Detection? = withContext(Dispatchers.IO) {
+        matchQr(asset)?.let { return@withContext it }
+        queryYolo(asset)
     }
 
     private fun matchQr(asset: Asset): Detection? {

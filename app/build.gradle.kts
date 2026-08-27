@@ -85,6 +85,13 @@ android {
         buildConfigField("String", "FIND_MY_PROXY_URL", "\"${apiKey("FIND_MY_PROXY_URL")}\"")
     }
 
+    if (keystoreFile.exists() && keystorePassword.isBlank()) {
+        logger.warn(
+            "SECUREGUARD: Keystore '${keystoreFile}' existiert, aber KEYSTORE_PASSWORD ist leer – " +
+                "packageRelease würde mit kryptischem Fehler scheitern. Setze KEYSTORE_PASSWORD/KEY_PASSWORD."
+        )
+    }
+
     val releaseSigning = signingConfigs.create("release") {
         if (keystoreFile.exists()) {
             storeFile = keystoreFile
@@ -135,6 +142,13 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    // Room: Schemas nach app/schemas exportieren (Voraussetzung für Migration-Tests)
+    kapt {
+        arguments {
+            arg("room.schemaLocation", "$projectDir/schemas")
+        }
     }
 
     buildFeatures {
@@ -213,7 +227,6 @@ dependencies {
     implementation(libs.retrofit.adapter.rxjava3)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging.interceptor)
-    implementation(libs.okhttp.sse)
 
     // JSON (Moshi + Gson)
     implementation(libs.moshi)
@@ -229,19 +242,11 @@ dependencies {
     // Location (echte GPS-Position)
     implementation(libs.play.services.location)
 
-    // BLE – Nordic ble-ktx (optional; der aktive Scan läuft über die
-    // Plattform-API in BleService.kt, siehe IMPLEMENTIERUNGS_INVENTUR.md)
-    implementation(libs.nordic.ble.ktx)
-
-    // Permissions (Accompanist – optional, Plattform-Permissions util vorhanden)
-    implementation(libs.accompanist.permissions)
-
     // Coil (Bildladen)
     implementation(libs.coil.compose)
 
-    // RxJava (asynchrone Operationen / Rx-Adapter für Retrofit)
+    // RxJava (Rx-Adapter für Retrofit; rxandroid wird nicht genutzt und entfernt)
     implementation(libs.rxjava)
-    implementation(libs.rxandroid)
 
     // USB/Serial (kabelgebundene Anbindung)
     implementation(libs.usb.serial)

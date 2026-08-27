@@ -1,6 +1,8 @@
 package com.secureguard.enterprise.security
 
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -89,6 +91,21 @@ class DatabaseKeyManager @Inject constructor(
 
     private fun getOrCreateWrappingKey(): SecretKey {
         (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+        return try {
+            generateWrappingKey(strongBox = supportsStrongBox())
+        } catch (e: Exception) {
+            // Gerät ohne StrongBox (oder API < 28): Fallback auf TEE/Software-Key.
+            Log.w(TAG, "StrongBox-Key nicht verfügbar – Fallback ohne StrongBox", e)
+            generateWrappingKey(strongBox = false)
+        }
+    }
+
+    /** StrongBox existiert erst ab API 28 und ist nicht auf jedem Gerät vorhanden. */
+    private fun supportsStrongBox(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+            context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEEP)
+
+    private fun generateWrappingKey(strongBox: Boolean): SecretKey {
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         val builder = KeyGenParameterSpec.Builder(
             KEY_ALIAS,
@@ -98,11 +115,8 @@ class DatabaseKeyManager @Inject constructor(
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setKeySize(256)
             .setUserAuthenticationRequired(false)
-        // StrongBox wenn verfügbar (Pixel/CT45P-Nachfolger)
-        try {
+        if (strongBox) {
             builder.setIsStrongBoxBacked(true)
-        } catch (_: Exception) {
-            // ignore – Gerät ohne StrongBox
         }
         generator.init(builder.build())
         return generator.generateKey()

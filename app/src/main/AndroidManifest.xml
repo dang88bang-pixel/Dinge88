@@ -23,6 +23,9 @@
     <!-- Location (required for BLE/WiFi scan on Android ≤ 11) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Background location: WiFi-/BLE-Kanäle des 15-Min-Hintergrund-Agenten
+         liefern ohne Hintergrund-Standortfreigabe (ab Android 10) keine Daten. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <!-- Camera for optical detection / QR scan -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -33,9 +36,6 @@
     <!-- Notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
-
-    <!-- Audio for alert sounds -->
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Foreground service for the self-learning agent -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -66,7 +66,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.SecureGuardEnterprise"
-        android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31">
 
@@ -110,11 +109,9 @@
         <receiver
             android:name=".receiver.BootReceiver"
             android:enabled="true"
-            android:exported="true"
-            android:directBootAware="true">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 
@@ -125,11 +122,6 @@
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
             tools:node="remove" />
-
-        <!-- USB device filter for serial adapters (FTDI, CP210x, CH34x) -->
-        <meta-data
-            android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
-            android:resource="@xml/device_filter" />
 
         <!-- ZXing barcode scanner (QR scan) -->
         <activity

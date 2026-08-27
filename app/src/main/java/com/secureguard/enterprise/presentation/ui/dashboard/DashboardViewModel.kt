@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
+import com.secureguard.enterprise.services.AgentForegroundService
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
+import com.secureguard.enterprise.services.AgentSettingsStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +41,7 @@ class DashboardViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
     private val agentService: AgentService,
     private val databaseCleanup: com.secureguard.enterprise.services.DatabaseCleanup,
+    private val agentSettingsStore: com.secureguard.enterprise.services.AgentSettingsStore,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -96,21 +99,19 @@ class DashboardViewModel @Inject constructor(
     fun toggleAgent() {
         if (agentService.agentStatus.value.running) {
             agentService.stop()
+            // Auch den Foreground-Service beenden – sonst bleibt die
+            // persistente Status-Benachrichtigung stehen.
+            context.stopService(
+                android.content.Intent(context, AgentForegroundService::class.java)
+            )
         } else {
             startAgent()
         }
     }
 
     private fun startAgent() {
-        agentService.start(
-            AgentSettings(
-                interval = 30,
-                dynamicPriority = true,
-                learningMode = true,
-                offlineOnly = true,
-                externalSources = false
-            )
-        )
+        // Persistierte Einstellungen (Agent-Config-Screen) statt harter Defaults.
+        agentService.start(agentSettingsStore.load())
         refresh()
     }
 }

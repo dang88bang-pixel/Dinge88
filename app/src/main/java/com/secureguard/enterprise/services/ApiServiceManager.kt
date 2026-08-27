@@ -138,11 +138,13 @@ class ApiServiceManager @Inject constructor(
 
     /** WiGle.net: BSSID → GPS. Liefert eine [Detection] (Source API) oder null. */
     suspend fun searchViaWiGle(bssid: String): Detection? {
-        if (com.secureguard.enterprise.BuildConfig.WIGLE_API_KEY.isBlank()) return null
+        val authHeader = com.secureguard.enterprise.services.apis.WiGleAuth.header(
+            com.secureguard.enterprise.BuildConfig.WIGLE_API_KEY
+        ) ?: return null
         // Check cache first
         cacheManager.get<Detection>("wigle_$bssid")?.let { return it }
         return com.secureguard.enterprise.util.RetryManager.withRetryOrNull(maxAttempts = 2) {
-            val response = wigleApi.searchBssid(bssid)
+            val response = wigleApi.searchBssid(bssid, auth = authHeader)
             val result = response.results.firstOrNull()
             if (result != null && result.trilat != null && result.trilong != null) {
                 val detection = Detection(

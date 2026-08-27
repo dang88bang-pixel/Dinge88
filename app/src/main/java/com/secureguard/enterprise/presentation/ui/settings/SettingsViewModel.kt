@@ -49,6 +49,7 @@ class SettingsViewModel @Inject constructor(
     private val backupManager: com.secureguard.enterprise.services.BackupManager,
     private val exportService: com.secureguard.enterprise.services.ExportService,
     private val offlineMapService: com.secureguard.enterprise.services.OfflineMapService,
+    private val settingsStore: com.secureguard.enterprise.services.AgentSettingsStore,
     private val endpointConfig: EndpointConfig,
     private val mqttService: MqttService,
     private val webSocketService: WebSocketService,
@@ -101,15 +102,16 @@ class SettingsViewModel @Inject constructor(
 
             if (agentService.agentStatus.value.running) {
                 agentService.stop()
-                agentService.start(
-                    AgentSettings(
-                        interval = agentService.agentStatus.value.settings.interval,
-                        dynamicPriority = agentService.agentStatus.value.settings.dynamicPriority,
-                        learningMode = next.learningMode,
-                        offlineOnly = next.offlineOnly,
-                        externalSources = next.externalCrowdAllowed
-                    )
+                val settings = AgentSettings(
+                    interval = agentService.agentStatus.value.settings.interval,
+                    dynamicPriority = agentService.agentStatus.value.settings.dynamicPriority,
+                    learningMode = next.learningMode,
+                    offlineOnly = next.offlineOnly,
+                    externalSources = next.externalCrowdAllowed
                 )
+                // Persistieren, damit Dashboard/Worker denselben Stand laden.
+                settingsStore.save(settings)
+                agentService.start(settings)
             }
             next
         }

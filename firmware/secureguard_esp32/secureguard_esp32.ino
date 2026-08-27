@@ -14,10 +14,13 @@
  *   - PubSubClient
  *
  * Hardware (Beispiel):
- *   - LoRa-Modul: SS=5, RST=14, DIO0=2 (Ra-02/SX1278, 868 MHz)
+ *   - LoRa-Modul: SS=5, SCK=18, MISO=19, MOSI=23, RST=14, DIO0=2 (Ra-02/SX1278, 868 MHz)
  *   - GPIO2: Alarm-Ausgang (LED/Buzzer)
  *   - GPIO4: Motor-Relay
  *   - GPIO34: Batterie-ADC (Spannungsteiler 100k/100k)
+ *
+ * Wichtig: SS (=LORA_SS) darf NICHT mit SCK/MISO/MOSI kollidieren – früher
+ * kollidierte SCK=5 mit SS=5, womit der LoRa-Transceiver nicht funktionierte.
  */
 
 #include <LoRa.h>
@@ -43,6 +46,7 @@ BLEUUID commandCharUUID("6BA1B218-15A8-461F-9FA8-5DC85327FD15");
 
 // ============ GLOBALE VARIABLEN ============
 Preferences prefs;
+unsigned long alarmStartMs = 0;
 
 char wifi_ssid[64] = "";
 char wifi_password[64] = "";
@@ -68,10 +72,14 @@ unsigned long uptimeSeconds = 0;
 
 void loadConfig() {
     prefs.begin("secureguard", true);
-    String s_ssid = prefs.getString("wifi_ssid", "SECUREGUARD");
-    String s_pass = prefs.getString("wifi_pass", "secureguard123");
-    String s_mqtt = prefs.getString("mqtt_host", "192.168.1.100");
+    // Defaults LEER: keine fest verdrahteten Zugangsdaten im Source. Der
+    // Anwender setzt WLAN/MQTT per CONFIG-Befehl (App: ESP32-Config-Screen).
+    String s_ssid = prefs.getString("wifi_ssid", "");
+    String s_pass = prefs.getString("wifi_pass", "");
+    String s_mqtt = prefs.getString("mqtt_host", "");
     mqtt_port = prefs.getInt("mqtt_port", 1883);
+    // device_id = Asset-MAC (z. B. "AA:BB:CC:DD:EE:01"), damit App/Backend
+    // gezielt auf secureguard/<MAC>/command zustellen können.
     String s_devid = prefs.getString("device_id", "ESP32_SecureGuard");
     prefs.end();
 
@@ -81,12 +89,15 @@ void loadConfig() {
     s_devid.toCharArray(device_id, sizeof(device_id));
 }
 
-void saveConfig(const char* ssid, const char* pass, const char* mqttH, int port) {
+void saveConfig(const char* ssid, const char* pass, const char* mqttH, int port, const char* devid) {
     prefs.begin("secureguard", false);
     prefs.putString("wifi_ssid", ssid);
     prefs.putString("wifi_pass", pass);
     prefs.putString("mqtt_host", mqttH);
     prefs.putInt("mqtt_port", port);
+    if (devid != nullptr && strlen(devid) > 0) {
+        prefs.putString("device_id", devid);
+    }
     prefs.end();
     Serial.println("Konfiguration gespeichert – Neustart...");
     ESP.restart();
@@ -113,7 +124,9 @@ void setup() {
     pinMode(2, OUTPUT);
     pinMode(MOTOR_RELAY_PIN, OUTPUT);
     digitalWrite(2, LOW);
-    digitalWrite(MOTOR_RELAY_PIN, HIGH);  // Motor default: AN
+    // Sicherheitshalber AUS nach Boot; der Befehl "MOTOR_OFF"/"RESTART" bzw.
+    // Config setzt den Zustand. (Vorher default AN – unerwünschtes Anlaufen.)
+    digitalWrite(MOTOR_RELAY_PIN, LOW);  // Motor default: AUS
 
     loadConfig();
     Serial.printf("Device: %s\n", device_id);
@@ -121,7 +134,8 @@ void setup() {
     Serial.printf("MQTT: %s:%d\n", mqtt_host, mqtt_port);
 
     // --- LoRa initialisieren ---
-    SPI.begin(5, 19, 27, 18);
+    // SPI-Pins: SCK=18, MISO=19, MOSI=23, SS=5 (= LORA_SS, kein Konflikt!)
+    SPI.begin(18, 19, 23, LORA_SS);
     LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
     if (!LoRa.begin(LORA_FREQ)) {
         Serial.println("LoRa init FAILED!");
@@ -148,7 +162,10 @@ void setup() {
     pAdvertising->start();
     Serial.println("BLE gestartet");
 
-    // --- WiFi ---
+    // --- WiFi (nur wenn konfiguriert) ---
+    if (strlen(wifi_ssid) == 0) {
+        Serial.println("WiFi nicht konfiguriert – per CONFIG-Befehl setzen (wifi_ssid/wifi_pass/mqtt_host).");
+    }
     WiFi.begin(wifi_ssid, wifi_password);
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 30) {
@@ -239,14 +256,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.printf("MQTT [%s]: %s\n", topic, message.c_str());
 
     if (message.indexOf("ALARM") >= 0) {
+        // Non-blocking: 5 Blinkzyklen über millis() – blockiert nicht die
+        // MQTT/LoRa-Verarbeitung im loop().
+        alarmStartMs = millis();
         alarmActive = true;
-        for (int i = 0; i < 5; i++) {
-            digitalWrite(2, HIGH);
-            delay(200);
-            digitalWrite(2, LOW);
-            delay(200);
-        }
-        alarmActive = false;
     } else if (message.indexOf("LIGHT") >= 0) {
         digitalWrite(2, HIGH);
         delay(5000);
@@ -324,10 +337,11 @@ void parseAndSaveConfig(String json) {
     String pass = extractJsonValue(json, "wifi_pass");
     String mqttH = extractJsonValue(json, "mqtt_host");
     String portStr = extractJsonValue(json, "mqtt_port");
+    String devid = extractJsonValue(json, "device_id");
     int port = portStr.length() > 0 ? portStr.toInt() : 1883;
 
     if (ssid.length() > 0 && mqttH.length() > 0) {
-        saveConfig(ssid.c_str(), pass.c_str(), mqttH.c_str(), port);
+        saveConfig(ssid.c_str(), pass.c_str(), mqttH.c_str(), port, devid.c_str());
     } else {
         Serial.println("CONFIG unvollständig – ignoriert");
     }
@@ -339,10 +353,12 @@ void reconnect() {
         Serial.printf("MQTT verbinden mit %s:%d...", mqtt_host, mqtt_port);
         if (client.connect(device_id)) {
             Serial.println("ok");
-            char cmdTopic[64];
+            // NUR das eigene Topic abonnieren! Die frühere Wildcard
+            // "secureguard/+/command" führte dazu, dass JEDES Gateway JEDEN
+            // Befehl ausführte (z. B. ALARM an allen Gateways).
+            char cmdTopic[96];
             snprintf(cmdTopic, sizeof(cmdTopic), "secureguard/%s/command", device_id);
             client.subscribe(cmdTopic);
-            client.subscribe("secureguard/+/command");
             // Online-Status melden
             char statusTopic[64];
             snprintf(statusTopic, sizeof(statusTopic), "secureguard/%s/status", device_id);

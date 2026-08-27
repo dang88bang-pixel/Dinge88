@@ -22,17 +22,34 @@ import javax.inject.Singleton
 @Singleton
 class BackupManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val database: SecureGuardDatabase
+    private val database: SecureGuardDatabase,
+    private val databaseKeyManager: com.secureguard.enterprise.security.DatabaseKeyManager
 ) {
 
     private val dbFile: File
         get() = File(database.openHelper.writableDatabase.path)
 
+    /**
+     * Backup-Ordner. `getExternalFilesDir` kann null liefern (z. B. im
+     * Direct-Boot-Modus oder bei fehlendem externem Speicher) – dann wird auf
+     * den app-internen Speicher ausgewichen, damit kein NPE entsteht.
+     */
     private val backupDir: File
-        get() = File(context.getExternalFilesDir(null), "backups").apply { mkdirs() }
+        get() {
+            val external = context.getExternalFilesDir(null)
+            val base = external ?: context.filesDir
+            return File(base, "backups").apply { mkdirs() }
+        }
 
-    /** Kopiert die aktuelle Datenbank in den Backup-Ordner. */
+    /**
+     * Kopiert die aktuelle Datenbank in den Backup-Ordner.
+     * Vor dem Kopieren wird ein WAL-Checkpoint (TRUNCATE) ausgeführt, damit die
+     * -wal-Datei geleert ist und die Kopie alle committeten Transaktionen enthält.
+     */
     suspend fun createBackup(name: String = "secureguard_backup"): File {
+        runCatching {
+            database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
+        }
         val source = dbFile
         val target = File(backupDir, "${name}_${System.currentTimeMillis()}.db")
         source.inputStream().use { input ->
@@ -42,20 +59,29 @@ class BackupManager @Inject constructor(
     }
 
     /**
-     * Stellt ein Backup wieder her. Die Datei wird auf ein gültiges
-     * SQLite-Header-Signatur geprüft; der eigentliche Austausch passiert
-     * über [restorePending] beim nächsten Start, um Room-Konsistenz zu wahren.
+     * Stellt ein Backup wieder her. Die Datei wird hart validiert (Plain-SQLite
+     * **oder** mit dem aktuellen SQLCipher-Key öffnbar); der eigentliche
+     * Austausch passiert über [restorePending] beim nächsten Start, um
+     * Room-Konsistenz zu wahren.
      */
-    suspend fun stageRestore(backupFile: File): Boolean {
-        if (!backupFile.exists() || !isValidSqlite(backupFile)) return false
-        val staged = File(backupDir, "restore_pending.db")
-        backupFile.copyTo(staged, overwrite = true)
-        return true
-    }
+    suspend fun stageRestore(backupFile: File): Boolean =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            if (!backupFile.exists() || backupFile.length() < 512L) return@withContext false
+            if (!isValidSqlite(backupFile)) return@withContext false
+            val staged = File(backupDir, "restore_pending.db")
+            backupFile.copyTo(staged, overwrite = true)
+            true
+        }
 
-    /** Führt ein zuvor gestagtes Restore aus (im Application.onCreate). */
+    /**
+     * Führt ein zuvor gestagtes Restore aus (im Application.onCreate).
+     * Robust gegen Direct-Boot: `getExternalFilesDir` liefert hier ggf. null –
+     * [backupDir] weicht dann auf `filesDir` aus, zusätzlich schützt
+     * `runCatching` vor jedem Startup-Crash.
+     */
     fun applyPendingRestoreIfPresent() {
-        val staged = File(backupDir, "restore_pending.db")
+        val staged = runCatching { File(backupDir, "restore_pending.db") }.getOrNull()
+            ?: return
         if (!staged.exists()) return
         runCatching {
             val target = dbFile
@@ -70,9 +96,19 @@ class BackupManager @Inject constructor(
             ?: emptyList()
 
     private fun isValidSqlite(file: File): Boolean {
-        // Plain SQLite ODER SQLCipher (kein Klartext-Header)
-        return SqlCipherHelper.isPlainSqlite(file) || SqlCipherHelper.isSqlCipherDatabase(file)
+        // 1) Plain SQLite: Header direkt prüfbar.
+        if (SqlCipherHelper.isPlainSqlite(file)) return true
+        // 2) SQLCipher: alles, was kein Plain-Header ist, war vorher jede
+        //    beliebige Datei → zusätzlich verlangen, dass die Datei sich mit
+        //    dem aktuellen Passphrase als SQLCipher-DB öffnen lässt.
+        return runCatching {
+            SqlCipherHelper.validateSqlCipherFile(file, currentPassphrase())
+        }.getOrDefault(false)
     }
+
+    /** Liest die aktuelle SQLCipher-Passphrase (KeyStore-wrapped). */
+    private fun currentPassphrase(): ByteArray =
+        databaseKeyManager.getOrCreatePassphrase()
 
     private fun copyFile(source: File, target: File) {
         FileChannel.open(source.toPath()).use { src ->

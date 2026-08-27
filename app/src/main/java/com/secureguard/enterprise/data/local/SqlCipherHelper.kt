@@ -148,4 +148,47 @@ object SqlCipherHelper {
         if (!file.exists() || file.length() < 512L) return false
         return !isPlainSqlite(file)
     }
+
+    /**
+     * Harte Validierung einer SQLCipher-Datei: Die Datei wird mit dem
+     * übergebenen Passphrase tatsächlich geöffnet und per Query geprüft.
+     * Damit wird verhindert, dass beliebige (korrupte/fremde) Dateien als
+     * „Backup" durch einen Restore die Live-DB überschreiben.
+     *
+     * @return true, wenn die Datei eine gültige, mit [passphrase] verschlüsselte
+     *         SQLCipher-Datenbank ist.
+     */
+    fun validateSqlCipherFile(file: File, passphrase: ByteArray): Boolean {
+        if (!file.exists() || file.length() < 512L) return false
+        loadNativeMustHaveContext() // no-op, setzt nur den loaded-Flag
+        return try {
+            val db = SQLiteDatabase.openDatabase(
+                file.absolutePath,
+                passphrase,
+                null,
+                SQLiteDatabase.OPEN_READONLY,
+                null,
+                null
+            )
+            try {
+                db.rawQuery("SELECT count(*) FROM sqlite_master", emptyArray()).use { cursor ->
+                    cursor.moveToFirst() && cursor.columnCount > 0
+                }
+            } finally {
+                db.close()
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Hinweis: [loadNative] benötigt einen Context zum Laden der nativen Libs.
+     * Für die Validierung setzen wir voraus, dass sie bereits geladen ist
+     * (der Aufrufer – BackupManager – läuft im laufenden App-Kontext). Ist das
+     * nicht der Fall, wird die Validierung mit Fehler abgelehnt.
+     */
+    private fun loadNativeMustHaveContext() {
+        check(loaded) { "SQLCipher native libs nicht geladen – BackupManager läuft im App-Kontext" }
+    }
 }

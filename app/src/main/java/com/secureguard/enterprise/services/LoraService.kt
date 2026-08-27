@@ -11,6 +11,8 @@ import com.secureguard.enterprise.services.apis.HeliumNetworkApi
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import retrofit2.Retrofit
@@ -56,12 +58,12 @@ class LoraService @Inject constructor(
     var gateways: List<Gateway> = emptyList()
         private set
 
-    suspend fun searchAsset(asset: Asset): Detection? {
+    suspend fun searchAsset(asset: Asset): Detection? = withContext(Dispatchers.IO) {
         // 1) Eigenes LoRa-Gateway
-        searchLocalGateway(asset)?.let { return it }
+        searchLocalGateway(asset)?.let { return@withContext it }
 
         // 2) Helium
-        return searchHelium(asset)
+        searchHelium(asset)
     }
 
     private fun searchLocalGateway(asset: Asset): Detection? {

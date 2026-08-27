@@ -13,7 +13,9 @@ sdk.dir=/home/USER/.secureguard/android-sdk
 # sdk.dir=C:/Users/USER/.secureguard/android-sdk
 
 # ---- API-Keys (niemals committen) ----
-WIGLE_API_KEY=your_wigle_key_here
+# WiGle verlangt HTTP-Basic: Format <API-Token>:<API-Name>
+# (z. B. "AbCdEf123456:MeinAccountName"). Ein Wert ohne ":" wird als Bearer gesendet.
+WIGLE_API_KEY=your_wigle_token:your_wigle_name
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
 NETATMO_TOKEN=your_netatmo_token_here
 GOOGLE_API_KEY=your_google_key_here

@@ -7,7 +7,9 @@ import com.secureguard.enterprise.config.EndpointConfig
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -124,7 +126,7 @@ class MCPClient @Inject constructor(
         if (!isConfigured) return null
         // REST-Fallback (Backend /api/mcp/*), wenn URL kein WebSocket-Schema hat
         if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) {
-            return createInboxHttp()
+            return withContext(Dispatchers.IO) { createInboxHttp() }
         }
         connect()
         val id = ++requestId
@@ -177,7 +179,7 @@ class MCPClient @Inject constructor(
     suspend fun waitForOTP(inboxToken: String, timeoutMs: Long = TIMEOUT_MS): OTPResult? {
         if (!isConfigured) return null
         if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) {
-            return waitForOtpHttp(inboxToken, timeoutMs)
+            return withContext(Dispatchers.IO) { waitForOtpHttp(inboxToken, timeoutMs) }
         }
         connect()
         val id = ++requestId
@@ -215,7 +217,7 @@ class MCPClient @Inject constructor(
     suspend fun extractMagicLink(inboxToken: String): MagicLinkResult? {
         if (!isConfigured) return null
         if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) {
-            return extractMagicLinkHttp(inboxToken)
+            return withContext(Dispatchers.IO) { extractMagicLinkHttp(inboxToken) }
         }
         connect()
         val id = ++requestId

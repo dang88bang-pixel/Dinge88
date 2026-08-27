@@ -17,12 +17,14 @@ import json
 import logging
 import os
 import sqlite3
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import List, Optional, Set
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, BackgroundTasks
+from fastapi import FastAPI, Header, HTTPException, WebSocket, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 logging.basicConfig(
@@ -39,12 +41,36 @@ except ImportError:
 DB_PATH = os.environ.get("DATABASE_PATH", "secureguard.db")
 MQTT_BROKER = os.environ.get("MQTT_BROKER", "mqtt:1883")
 
-app = FastAPI(title="SecureGuard API", version="1.0.0")
+# Optionale API-Key-Absicherung: Ist SECUREGUARD_API_KEY gesetzt, verlangen alle
+# schreibenden Endpunkte den Header `X-API-Key: <key>`. Lesen bleibt offen
+# (Pilot-Betrieb im LAN) – für Produktion Reverse-Proxy/TLS vorschalten.
+API_KEY = os.environ.get("SECUREGUARD_API_KEY", "").strip()
+# CORS: Komma-getrennte Origins; "*" = offen (dann ohne Credentials, siehe unten).
+CORS_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 
+
+async def require_api_key(x_api_key: str = Header(default="", alias="X-API-Key")) -> None:
+    """Prüft den X-API-Key gegen SECUREGUARD_API_KEY (wenn konfiguriert)."""
+    if API_KEY and x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Ungültiger oder fehlender X-API-Key")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    start_mqtt_subscriber()
+    logger.info("SecureGuard Backend gestartet")
+    yield
+
+
+app = FastAPI(title="SecureGuard API", version="1.0.1", lifespan=lifespan)
+
+_allow_all = "*" in CORS_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    # "*" + allow_credentials=True ist per CORS-Spec ungültig (Browser lehnen ab):
+    # nur bei konkreten Origins werden Credentials erlaubt.
+    allow_origins=["*"] if _allow_all else CORS_ORIGINS,
+    allow_credentials=not _allow_all,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -181,11 +207,14 @@ def get_mqtt_client():
 
 
 def publish_command(asset_mac: str, command: str) -> bool:
+    """Publishet einen Befehl. Topic-MAC wird wie in der App (MqttConfig)
+    GROSSGESCHRIEBEN – MQTT-Topics sind case-sensitiv."""
     client = get_mqtt_client()
     if client is None:
         return False
     try:
-        client.publish(f"secureguard/{asset_mac}/command", command, qos=1)
+        topic = f"secureguard/{asset_mac.strip().upper()}/command"
+        client.publish(topic, command, qos=1)
         return True
     except Exception:
         return False
@@ -253,19 +282,34 @@ async def broadcast_websocket(message: str):
 # ============ API-ENDPUNKTE ============
 
 @app.get("/api/health")
-async def health():
+def health():
     """Ops-Health: Status + DB-Zähler für Monitoring/Dashboard."""
-    conn = get_db()
+    try:
+        conn = get_db()
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "degraded",
+                "timestamp": datetime.now().isoformat(),
+                "error": f"DB nicht öffnbar: {e}",
+            },
+        )
     try:
         assets = conn.execute("SELECT COUNT(*) AS c FROM assets").fetchone()["c"]
         detections = conn.execute("SELECT COUNT(*) AS c FROM detections").fetchone()["c"]
         alerts = conn.execute("SELECT COUNT(*) AS c FROM alerts").fetchone()["c"]
     except Exception as e:
-        return {
-            "status": "degraded",
-            "timestamp": datetime.now().isoformat(),
-            "error": str(e),
-        }
+        # Degraded als 503, damit Monitoring/Compose-Healthcheck echte
+        # DB-Probleme erkennen (200 + "degraded" war für Checkes unsichtbar).
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "degraded",
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e),
+            },
+        )
     finally:
         conn.close()
     return {
@@ -279,15 +323,15 @@ async def health():
 
 
 @app.get("/api/assets")
-async def get_assets():
+def get_assets():
     conn = get_db()
     assets = conn.execute("SELECT * FROM assets").fetchall()
     conn.close()
     return [dict(a) for a in assets]
 
 
-@app.post("/api/assets")
-async def create_asset(asset: Asset):
+@app.post("/api/assets", dependencies=[Depends(require_api_key)])
+def create_asset(asset: Asset):
     conn = get_db()
     conn.execute(
         "INSERT OR REPLACE INTO assets "
@@ -303,8 +347,8 @@ async def create_asset(asset: Asset):
     return asset
 
 
-@app.post("/api/detections")
-async def add_detection(detection: Detection):
+@app.post("/api/detections", dependencies=[Depends(require_api_key)])
+def add_detection(detection: Detection):
     conn = get_db()
     conn.execute(
         "INSERT INTO detections "
@@ -322,7 +366,7 @@ async def add_detection(detection: Detection):
 
 
 @app.get("/api/detections")
-async def list_detections(limit: int = 100):
+def list_detections(limit: int = 100):
     conn = get_db()
     rows = conn.execute(
         "SELECT * FROM detections ORDER BY timestamp DESC LIMIT ?", (limit,)
@@ -331,8 +375,8 @@ async def list_detections(limit: int = 100):
     return [dict(r) for r in rows]
 
 
-@app.post("/api/alerts")
-async def add_alert(alert: Alert):
+@app.post("/api/alerts", dependencies=[Depends(require_api_key)])
+def add_alert(alert: Alert):
     conn = get_db()
     conn.execute(
         "INSERT INTO alerts (asset_id, type, severity, message, timestamp, resolved) "
@@ -346,7 +390,7 @@ async def add_alert(alert: Alert):
 
 
 @app.get("/api/alerts")
-async def list_alerts(unresolved_only: bool = False):
+def list_alerts(unresolved_only: bool = False):
     conn = get_db()
     query = "SELECT * FROM alerts"
     if unresolved_only:
@@ -357,8 +401,8 @@ async def list_alerts(unresolved_only: bool = False):
     return [dict(r) for r in rows]
 
 
-@app.post("/api/actions/execute")
-async def execute_action(action: Action, background_tasks: BackgroundTasks):
+@app.post("/api/actions/execute", dependencies=[Depends(require_api_key)])
+def execute_action(action: Action, background_tasks: BackgroundTasks):
     """Queues an action: sent asynchronously via MQTT to the gateway/asset."""
     conn = get_db()
     conn.execute(
@@ -372,7 +416,7 @@ async def execute_action(action: Action, background_tasks: BackgroundTasks):
 
 
 @app.get("/api/commands")
-async def list_commands(limit: int = 50):
+def list_commands(limit: int = 50):
     conn = get_db()
     rows = conn.execute(
         "SELECT * FROM commands ORDER BY timestamp DESC LIMIT ?", (limit,)
@@ -382,7 +426,7 @@ async def list_commands(limit: int = 50):
 
 
 @app.get("/api/stats")
-async def stats():
+def stats():
     conn = get_db()
     assets = conn.execute("SELECT COUNT(*) AS c FROM assets").fetchone()["c"]
     detections = conn.execute("SELECT COUNT(*) AS c FROM detections").fetchone()["c"]
@@ -391,7 +435,7 @@ async def stats():
     return {"assets": assets, "detections": detections, "alerts": alerts}
 
 
-async def process_action(action: Action) -> None:
+def process_action(action: Action) -> None:
     """Executes the action: sends MQTT command to the asset."""
     conn = get_db()
     row = conn.execute("SELECT mac FROM assets WHERE id = ?", (action.asset_id,)).fetchone()
@@ -401,12 +445,20 @@ async def process_action(action: Action) -> None:
     ok = publish_command(mac, action.action_type)
 
     conn = get_db()
-    conn.execute(
-        "UPDATE commands SET status = ? WHERE asset_id = ? AND command = ? "
+    # Portables SQL: UPDATE ... ORDER BY ... LIMIT benötigt
+    # SQLITE_ENABLE_UPDATE_DELETE_LIMIT (nicht in jedem Build vorhanden) –
+    # daher die neueste Command-ID vorher per SELECT ermitteln.
+    last = conn.execute(
+        "SELECT id FROM commands WHERE asset_id = ? AND command = ? "
         "ORDER BY timestamp DESC LIMIT 1",
-        ("delivered" if ok else "failed", action.asset_id, action.action_type),
-    )
-    conn.commit()
+        (action.asset_id, action.action_type),
+    ).fetchone()
+    if last is not None:
+        conn.execute(
+            "UPDATE commands SET status = ? WHERE id = ?",
+            ("delivered" if ok else "failed", last["id"]),
+        )
+        conn.commit()
     conn.close()
 
     logger.info(
@@ -418,8 +470,8 @@ async def process_action(action: Action) -> None:
 
 # ============ CROWD SOURCE ============
 
-@app.post("/api/crowd/report")
-async def report_crowd_sighting(sighting: dict):
+@app.post("/api/crowd/report", dependencies=[Depends(require_api_key)])
+def report_crowd_sighting(sighting: dict):
     """Reports an anonymous crowd sighting (MAC + position + RSSI)."""
     mac = sighting.get("mac", "").upper()
     if not mac:
@@ -476,7 +528,7 @@ class TempMessageIn(BaseModel):
     from_addr: str = "noreply@example.com"
 
 
-@app.post("/api/mcp/create_inbox")
+@app.post("/api/mcp/create_inbox", dependencies=[Depends(require_api_key)])
 async def mcp_create_inbox(body: Optional[TempInboxCreate] = None):
     import secrets
     import uuid
@@ -489,7 +541,7 @@ async def mcp_create_inbox(body: Optional[TempInboxCreate] = None):
     return {"email": email, "token": token, "inboxId": inbox_id}
 
 
-@app.post("/api/mcp/inject_message")
+@app.post("/api/mcp/inject_message", dependencies=[Depends(require_api_key)])
 async def mcp_inject_message(msg: TempMessageIn):
     """Test-Helfer: legt eine Nachricht (z. B. OTP) in die Inbox."""
     if msg.token not in _temp_inboxes:
@@ -578,11 +630,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 # ============ STARTUP ============
-
-@app.on_event("startup")
-async def startup_event():
-    start_mqtt_subscriber()
-    logger.info("SecureGuard Backend gestartet")
+# (lifespan-Handler oben: startet den MQTT-Subscriber beim App-Start;
+#  das deprecated @app.on_event("startup") wurde ersetzt)
 
 
 if __name__ == "__main__":

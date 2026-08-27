@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -86,6 +88,9 @@ class AgentService @Inject constructor(
     val agentStatus: StateFlow<AgentStatus> = _agentStatus.asStateFlow()
 
     private val cycleCount = AtomicLong(0)
+
+    /** Schützt gegen überlappende Zyklen (FGS-Loop + WorkManager-Worker). */
+    private val cycleMutex = Mutex()
 
     /** Recent channel hits per MAC, used for learning-mode prioritisation. */
     private val learningMemory = mutableMapOf<String, DetectionSource>()
@@ -161,7 +166,7 @@ class AgentService @Inject constructor(
                 detectionsThisCycle = result.detections
             )
 
-            notificationService.buildAgentNotification(
+            notificationService.notifyAgentStatus(
                 "Zyklus ${cycleCount.get()} · ${result.assetsChecked} Assets geprüft · " +
                     "${result.detections} Treffer"
             )
@@ -173,6 +178,7 @@ class AgentService @Inject constructor(
 
     /** Runs one complete cycle over all whitelisted assets. */
     suspend fun runCycle(settings: AgentSettings = _agentStatus.value.settings): AgentCycleResult {
+        return cycleMutex.withLock {
         val snapshot = currentWhitelistedAssets()
         var hits = 0
         val channelHits = mutableMapOf<String, Int>()
@@ -289,11 +295,12 @@ class AgentService @Inject constructor(
                 .onFailure { errorHandler.handleError(it, "BackendSync") }
         }
 
-        return AgentCycleResult(
+        AgentCycleResult(
             assetsChecked = snapshot.size,
             detections = hits,
             channelHits = channelHits
         )
+        }
     }
 
     private suspend fun currentWhitelistedAssets(): List<Asset> {
@@ -530,13 +537,11 @@ class AgentService @Inject constructor(
 
         var delivered = false
 
-        // 1. MQTT
-        mqttService.sendCommand(asset.mac, action)
-        if (mqttService.isConnected) delivered = true
+        // 1. MQTT (Ergebnis des Publish, nicht der globale Verbindungsstatus)
+        if (mqttService.sendCommand(asset.mac, action)) delivered = true
 
-        // 2. WebSocket
-        if (webSocketService.isConfigured) {
-            webSocketService.sendCommand(asset.id, action)
+        // 2. WebSocket (nur wenn tatsächlich gesendet)
+        if (webSocketService.isConfigured && webSocketService.sendCommand(asset.id, action)) {
             delivered = true
         }
 
@@ -563,7 +568,6 @@ class AgentService @Inject constructor(
         if (!mqttService.isConnected) return 0
         return offlineQueue.retryPending { action ->
             mqttService.sendCommand(action.assetMac, action.actionType)
-            mqttService.isConnected
         }
     }
 
@@ -649,8 +653,8 @@ class AgentService @Inject constructor(
         url: String,
         data: Map<String, String>,
         email: String
-    ): Boolean {
-        return try {
+    ): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
             val client = OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)

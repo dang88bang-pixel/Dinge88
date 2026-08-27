@@ -86,6 +86,31 @@ class NotificationService @Inject constructor(
         )
     }
 
+    /**
+     * Aktualisiert die persistente Agent-Status-Benachrichtigung (gleiche ID wie
+     * der Foreground-Service). Ohne laufenden FGS erscheint eine normale
+     * Agent-Kanal-Meldung.
+     */
+    fun notifyAgentStatus(content: String) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_AGENT)
+            .setContentTitle("🛡️ SecureGuard Agent")
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_shield)
+            .setOngoing(true)
+            .setContentIntent(pendingIntent)
+            .build()
+        runCatching { notificationManager.notify(AGENT_NOTIFICATION_ID, notification) }
+    }
+
     fun sendActionNotification(asset: Asset, actionType: Any, success: Boolean) {
         val title = if (success) "Aktion ausgeführt" else "Aktion fehlgeschlagen"
         val body = "${actionType::class.simpleName ?: "Aktion"} · ${asset.shortName}"

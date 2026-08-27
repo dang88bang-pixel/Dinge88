@@ -1,7 +1,16 @@
-# Mosquitto ACL example (acl_file /mosquitto/config/acl)
+# SecureGuard MQTT-ACL (Produktion)
+# Aktivieren in mosquitto.conf:  acl_file /mosquitto/config/acl
 #
-# user secureguard
-# topic readwrite secureguard/#
-#
-# user readonly
-# topic read secureguard/#
+# App/Backend: volle Rechte auf alle SecureGuard-Topics
+user secureguard
+topic readwrite secureguard/#
+
+# ESP32-Gateway: eigenes Command-Topic + eigene Telemetrie/Status
+# Hinweis: %u = MQTT-Username → jedes Gateway bekommt seinen eigenen User
+# (z. B. Username "AA:BB:CC:DD:EE:01"), pattern-Regeln gelten je Verbindung.
+pattern readwrite secureguard/%u/#
+pattern read secureguard/broadcast
+
+# Nur-Lese-Beobachter (Node-RED-Dashboard etc.)
+user readonly
+topic read secureguard/#

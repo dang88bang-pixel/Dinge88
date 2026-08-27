@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
+import com.secureguard.enterprise.services.AgentSettingsStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,7 @@ data class AgentUiState(
 @HiltViewModel
 class AgentViewModel @Inject constructor(
     private val agentService: AgentService,
+    private val agentSettingsStore: AgentSettingsStore,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -108,6 +110,7 @@ class AgentViewModel @Inject constructor(
             offlineOnly = prefs.getBoolean("offline_only", true),
             externalSources = prefs.getBoolean("external_crowd", false)
         )
+        agentSettingsStore.save(settings)
         agentService.start(settings)
     }
 

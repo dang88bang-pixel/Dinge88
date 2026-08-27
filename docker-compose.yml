@@ -2,8 +2,11 @@
 #   ./scripts/start-stack.sh
 #   docker compose up --build -d
 #
-# Enthält: MQTT-Broker (Mosquitto), FastAPI-Backend, Node-RED-Dashboard.
+# Enthält: MQTT-Broker (Mosquitto), FastAPI-Backend, Node-RED-Flows.
 # Passwörter/MQTT-Auth: Anwender setzt selbst (siehe mosquitto/config/*.example).
+# Optionale Umgebungsvariablen (werden aus .env gelesen, siehe .env.example):
+#   SECUREGUARD_API_KEY – schützt alle schreibenden Backend-Endpunkte (X-API-Key)
+#   CORS_ORIGINS        – kommaseparierte erlaubte Origins (Default: *)
 
 services:
   mqtt:
@@ -20,7 +23,10 @@ services:
     networks:
       - secureguard-network
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -i healthcheck -W 3 || exit 1"]
+      # Port-Check statt Auth-Bindung: funktioniert auch, wenn später
+      # allow_anonymous=false gesetzt wird (mosquitto_sub würde sonst immer
+      # scheitern, solange kein Healthcheck-User in der passwd-Datei steht).
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 1883 2>/dev/null || mosquitto_sub -h 127.0.0.1 -t '$$SYS/#' -C 1 -i healthcheck -W 3 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -35,16 +41,18 @@ services:
     environment:
       - DATABASE_PATH=/data/secureguard.db
       - MQTT_BROKER=mqtt:1883
+      # Optional (aus .env): schreibende Endpunkte per X-API-Key schützen
+      - SECUREGUARD_API_KEY=${SECUREGUARD_API_KEY:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
     volumes:
-      - ./backend:/app
       - ./data:/data
     depends_on:
       - mqtt
     networks:
       - secureguard-network
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    # Kein --reload im Stack (Dev-Flag); CMD kommt aus dem Dockerfile.
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3); exit(0 if r.status==200 else 1)\""]
       interval: 20s
       timeout: 5s
       retries: 5

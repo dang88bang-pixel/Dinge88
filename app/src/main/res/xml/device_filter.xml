@@ -11,8 +11,8 @@
     <usb-device vendor-id="4292" product-id="60016" />
     <usb-device vendor-id="4292" product-id="60017" />
     <!-- WCH CH340 / CH341 -->
-    <usb-device vendor-id="1a86" product-id="21795" />
-    <usb-device vendor-id="1a86" product-id="21972" />
+    <usb-device vendor-id="0x1a86" product-id="21795" />
+    <usb-device vendor-id="0x1a86" product-id="21972" />
     <!-- Prolific PL2303 -->
     <usb-device vendor-id="1659" product-id="8963" />
     <usb-device vendor-id="1659" product-id="9123" />
