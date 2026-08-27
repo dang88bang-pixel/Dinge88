@@ -78,7 +78,7 @@ fun HealthScreen(
         ) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             if (health?.allCriticalOk == true) "✅ Kritische Systeme OK"
                             else if (loading) "⏳ Prüfe …"
