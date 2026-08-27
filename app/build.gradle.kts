@@ -13,11 +13,49 @@ plugins {
 }
 
 // Keystore from environment (CI) or local.properties; falls back to the debug
-// keystore so `assembleRelease` always produces an installable signed APK.
+// keystore so `assembleRelease` ALWAYS produces an installable SIGNED APK.
+// Eine unsignierte APK lässt sich auf Android (auch Honeywell CT45P / Android 11)
+// NICHT installieren ("App wurde nicht installiert").
 val keystoreFile = rootProject.file("secureguard-keystore.jks")
 val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
 val keyAlias = System.getenv("KEY_ALIAS") ?: "secureguard"
 val keyPassword = System.getenv("KEY_PASSWORD") ?: keystorePassword
+
+/**
+ * Liefert einen garantiert existierenden Debug-Keystore als Fallback.
+ * Auf frischen CI-Runnern existiert kein ~/.android/debug.keystore (er wird
+ * erst vom Android-Gradle-Plugin während des *Debug*-Builds angelegt; der
+ * parallele Release-Build-Job hat keine Debug-Konfiguration). Wir erzeugen
+ * den Keystore hier gezielt per `keytool`, damit auch der Release-Build immer
+ * signieren kann. Das Passwort/die Alias-Werte entsprechen dem
+ * Android-Standard-Debug-Keystore.
+ */
+fun ensureDebugKeystore(): File {
+    val debugKeystore = File(System.getProperty("user.home"), ".android/debug.keystore")
+    if (debugKeystore.exists() && debugKeystore.length() > 0) return debugKeystore
+    debugKeystore.parentFile?.mkdirs()
+    val javaHome = System.getProperty("java.home")
+    val keytool = File(javaHome, "bin/keytool").let {
+        if (it.exists()) it.absolutePath else "keytool"
+    }
+    val cmd = listOf(
+        keytool, "-genkeypair", "-v",
+        "-keystore", debugKeystore.absolutePath,
+        "-storepass", "android",
+        "-keypass", "android",
+        "-alias", "androiddebugkey",
+        "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000",
+        "-dname", "CN=Android Debug,O=Android,C=US"
+    )
+    val proc = ProcessBuilder(cmd).redirectErrorStream(true).start()
+    val out = proc.inputStream.bufferedReader().readText()
+    val code = proc.waitFor()
+    if (code != 0 || !debugKeystore.exists()) {
+        throw GradleException("Fallback-Debug-Keystore konnte nicht erzeugt werden (keytool exit=$code): $out")
+    }
+    logger.lifecycle("Fallback-Debug-Keystore erzeugt: ${debugKeystore.absolutePath}")
+    return debugKeystore
+}
 
 /**
  * Reads an API key from gradle.properties / local.properties / -P args
@@ -43,8 +81,8 @@ android {
         applicationId = "com.secureguard.enterprise"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -80,38 +118,40 @@ android {
         buildConfigField("String", "MQTT_PASSWORD", "\"${apiKey("MQTT_PASSWORD")}\"")
     }
 
+    // Signatur-Material: Produktiv-Keystore (CI-Secret / lokale Datei) hat
+    // Vorrang; ohne diesen wird immer der (ggf. erzeugte) Debug-Keystore
+    // verwendet. So ist JEDES Release-APK signiert und installierbar.
+    val hasReleaseKeystore = keystoreFile.exists() && keystorePassword.isNotBlank()
+    if (keystoreFile.exists() && keystorePassword.isBlank()) {
+        logger.warn("⚠️ secureguard-keystore.jks vorhanden, aber KEYSTORE_PASSWORD leer – Signatur schlägt fehl. Nutze Debug-Fallback.")
+    }
+    val fallbackDebugKeystore = if (!hasReleaseKeystore) ensureDebugKeystore() else null
+
     val releaseSigning = signingConfigs.create("release") {
-        if (keystoreFile.exists()) {
+        if (hasReleaseKeystore) {
             storeFile = keystoreFile
             storePassword = keystorePassword
             this.keyAlias = keyAlias
             keyPassword = keyPassword
         } else {
-            // No release keystore supplied — sign with the debug key so the
-            // release APK is installable. Override via KEYSTORE_* in CI.
-            val debugKeystore = file("${System.getProperty("user.home")}/.android/debug.keystore")
-            if (debugKeystore.exists()) {
-                storeFile = debugKeystore
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
+            // Kein Produktiv-Keystore: mit Debug-Key signieren, damit die
+            // Release-APK installierbar ist (verhindert "App nicht installiert").
+            // WICHTIG: Debug-signierte APKs sind NICHT update-kompatibel zu
+            // später produktiv-signierten (andere Signatur) → dann vorher
+            // deinstallieren. Für Produktion KEYSTORE_*-Secrets setzen.
+            storeFile = fallbackDebugKeystore
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
-
-    // Nur signieren, wenn wirklich eine Keystore-Datei existiert (auf
-    // GitHub-Runnern gibt es z. B. keinen ~/.android/debug.keystore).
-    // Ohne Keystore wird die Release-APK unsigniert gebaut
-    // (app-release-unsigned.apk) – so schlägt packageRelease nicht fehl.
-    val debugKeystorePath = file("${System.getProperty("user.home")}/.android/debug.keystore")
-    val hasAnyKeystore = keystoreFile.exists() || debugKeystorePath.exists()
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            if (hasAnyKeystore) {
-                signingConfig = releaseSigning
-            }
+            // IMMER signieren (Produktiv- oder Fallback-Debug-Key) – eine
+            // unsignierte APK ist auf Android nicht installierbar.
+            signingConfig = releaseSigning
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

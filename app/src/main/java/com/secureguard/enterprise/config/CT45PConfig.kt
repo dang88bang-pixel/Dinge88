@@ -14,9 +14,11 @@ import android.os.Build
  *   [needsLocationForBle] und `BleService`.
  * - **WiFi-Scan:** `WifiManager.getScanResults()` benötigt auf Android 11
  *   die Standortberechtigung (in `WifiService` berücksichtigt).
- * - **MQTT (tcp):** Lokale Broker (Mosquitto) sprechen Klartext –
- *   `android:usesCleartextTraffic="true"` ist im Manifest gesetzt
- *   (Android 9+ blockiert Klartext sonst).
+ * - **MQTT (tcp):** Lokale Broker (Mosquitto) sprechen Klartext. Klartext
+ *   wird über die Network-Security-Config geregelt: der **Debug**-Build
+ *   erlaubt Klartext (LAN-Broker), der **Release**-Build erzwingt TLS.
+ *   Für einen lokalen Klartext-Broker im Produktivbetrieb die Domain/IP in
+ *   `res/xml/network_security_config.xml` (release) freigeben.
  * - **Barcode-Scanner:** Der integrierte 2D-Imager arbeitet als
  *   HID-Keyboard (Enterprise-Profile); der ZXing-Kamera-Scan bleibt
  *   zusätzlich verfügbar.
