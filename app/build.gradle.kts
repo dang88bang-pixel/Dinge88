@@ -278,7 +278,7 @@ tasks.register("publishApkDelivery") {
     group = "build"
     description = "Publiziert die gebaute APK + Prüfsummen als apk-delivery-* Git-Branch (nur CI)."
     doLast {
-        if (!isCi || ghToken.isNullOrBlank() || ghRepo.isNullOrBlank()) {
+        if (!isCi || ghRepo.isNullOrBlank()) {
             logger.lifecycle("publishApkDelivery: nicht auf GitHub Actions – übersprungen.")
             return@doLast
         }
@@ -359,8 +359,16 @@ tasks.register("publishApkDelivery") {
             File(dist, "BUILD-INFO.txt").writeText(info)
 
             // 4) Orphan-Branch committen + pushen
-            val branch = "apk-delivery-$buildType"
-            val remote = "https://x-access-token:$ghToken@github.com/$ghRepo.git"
+            // Auth: bevorzugt GITHUB_TOKEN; sonst den von actions/checkout
+            // persistierten extraheader aus dem Checkout uebernehmen.
+            val remote = if (ghToken.isNullOrBlank()) "https://github.com/$ghRepo.git"
+                         else "https://x-access-token:$ghToken@github.com/$ghRepo.git"
+            val (hc, ho) = sh(listOf("git", "-C", rootProject.projectDir.absolutePath,
+                                      "config", "--get", "http.https://github.com/.extraheader"))
+            if (hc == 0 && ho.isNotBlank() && ghToken.isNullOrBlank()) {
+                sh(listOf("git", "-C", workDir.absolutePath,
+                          "config", "http.https://github.com/.extraheader", ho))
+            }
             var (c, o) = sh(listOf("git", "init", "-q", "-b", branch, workDir.absolutePath))
             if (c != 0) throw GradleException("git init: $o")
             sh(listOf("git", "-C", workDir.absolutePath, "add", "-f", "apk-dist")).let { (cc, oo) ->
@@ -375,6 +383,7 @@ tasks.register("publishApkDelivery") {
             logger.lifecycle("publishApkDelivery: OK -> Branch '$branch' (run=$ghRunId). Dateien: ${dist.listFiles()?.joinToString { it.name }}")
         } catch (e: Exception) {
             logger.warn("publishApkDelivery FEHLGESCHLAGEN (Build selbst bleibt unberührt): ${e.message}")
+            println("##[error]PUBLISH-FAIL " + (e.message ?: e.javaClass.simpleName).take(400))
         }
     }
 }
