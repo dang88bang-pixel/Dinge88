@@ -82,7 +82,7 @@ class OfflineMapService @Inject constructor() {
             center.latitude + latDelta, center.longitude + lonDelta,
             center.latitude - latDelta, center.longitude - lonDelta
         )
-        val manager = org.osmdroid.tileprovider.cachemanager.CacheManager(mapView, mapView.zoomLevelDouble.toInt().coerceIn(10, 17), 17)
+        val manager = org.osmdroid.tileprovider.cachemanager.CacheManager(mapView)
         manager.downloadAreaNoUI(mapView.context, box)
         true
     }.getOrDefault(false)
