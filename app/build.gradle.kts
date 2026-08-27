@@ -401,11 +401,20 @@ val ciDiagnose = tasks.register("ciDiagnose") {
         }
     }
 }
-// An JEDER Task hängen: finalizer der FEHLGESCHLAGENEN Task laufen garantiert
-// (assembleDebug selbst läuft bei Compile-Fehler nie -> dort würde ciDiagnose
-// nie ausgeführt). Selbstreferenz ausgenommen (Zirkularität).
-tasks.configureEach {
-    if (it.name != "ciDiagnose") {
-        it.finalizedBy(ciDiagnose)
+// Finalizer direkt an die Tasks hängen, an denen der Build typischerweise
+// scheitert (die FAILED Task läuft -> ihre Finalizer laufen garantiert;
+// assembleDebug selbst läuft bei Compile-Fehler nie).
+listOf(
+    "compileDebugKotlin", "compileReleaseKotlin",
+    "kaptDebugKotlin", "kaptReleaseKotlin",
+    "kaptGenerateStubsDebugKotlin", "kaptGenerateStubsReleaseKotlin",
+    "compileDebugJavaWithJavac", "compileReleaseJavaWithJavac",
+    "mergeDebugResources", "mergeReleaseResources",
+    "processDebugResources", "processReleaseResources",
+    "checkDebugAarMetadata", "checkReleaseAarMetadata",
+    "assembleDebug", "assembleRelease"
+).forEach { tn ->
+    tasks.matching { it.name == tn }.configureEach {
+        finalizedBy(ciDiagnose)
     }
 }
