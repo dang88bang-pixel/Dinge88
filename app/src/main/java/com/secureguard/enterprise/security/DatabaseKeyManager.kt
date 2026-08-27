@@ -103,7 +103,7 @@ class DatabaseKeyManager @Inject constructor(
     /** StrongBox existiert erst ab API 28 und ist nicht auf jedem Gerät vorhanden. */
     private fun supportsStrongBox(): Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
-            context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEEP)
+            context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)
 
     private fun generateWrappingKey(strongBox: Boolean): SecretKey {
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
