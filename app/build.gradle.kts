@@ -181,6 +181,10 @@ dependencies {
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
 
+    // SQLCipher (verschlüsselte Room-DB)
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite)
+
     // WorkManager (Hintergrund-Agent)
     implementation(libs.androidx.work.runtime.ktx)
 
