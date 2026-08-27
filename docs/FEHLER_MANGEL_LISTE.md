@@ -354,3 +354,36 @@ Bei der Umsetzung der Runde-2-Befunde wurden zehn weitere Schwachstellen identif
 **68 behoben/wire-ready**, 2 bewusst offen/teilweise (F-44 RBAC-Enforcement Phase 2,
 F-45 i18n-Deep-Screens Phase 2), F-56 System-Broadcast ohne Handlungsbedarf.
 
+### 11.6 Re-Audit Runde 3 – Berechtigungen, Anbindungen, fehlende Parts (2026-08-27)
+
+Erneute systematische Prüfung (Manifest↔Runtime-Permissions, DI/Room/Navigation,
+Retrofit↔Backend-Verträge, MQTT-Topics App↔Firmware↔Backend↔Node-RED↔ACL,
+NSC/Backup-Regeln). **Vier neue Befunde, alle sofort behoben:**
+
+| ID | Befund | Status | Fix |
+|---|---|---|---|
+| F-71 | **X-API-Key fehlte app-seitig**: Backend verlangt den Header auf 7 POST-Endpunkten, die App sendete ihn nirgends → `pushAsset` (POST /api/assets) und `createInbox` (POST /api/mcp/create_inbox) liefen bei gesetztém `SECUREGUARD_API_KEY` blind in 401 | ✅ behoben | `EndpointConfig.backendApiKey` (Prefs `backend_api_key` → BuildConfig `SECUREGUARD_API_KEY`), Header in BackendSyncService + MCPClient; Settings-Update/Snapshot erweitert; local.properties.example + .env.example dokumentiert |
+| F-72 | **Mosquitto-ACL-Lücken**: `pattern read secureguard/broadcast` deckt `secureguard/broadcast/command` NICHT ab (Topic-Ebenen matchen exakt); Node-RED-User war read-only → `sg_inject_alarm` Publish wäre in Produktion still verworfen worden | ✅ behoben | acl.example: `pattern read secureguard/broadcast/#` für Gateways + eigener `nodered`-User mit `write` auf broadcast/command und +/command |
+| F-73 | **Backend-MQTT ohne Credentials**: `mqtt.Client()` setzte nie username/pass; bei Produktion (`allow_anonymous=false`) wäre die ganze Bridge (inkl. publish_command) tot gewesen, compose übergab die Werte nicht einmal | ✅ behoben | `MQTT_USERNAME`/`MQTT_PASSWORD`-Env + `username_pw_set()` in main.py; compose-Durchgriff + .env.example |
+| F-75 | **GPS im Hintergrunddienst tot**: Agent-FGS war nur `dataSync` getypt – Android 14 verlangt für Standortzugriff im Dienst den `location`-Typ, sonst wirft FusedLocationProvider im Agent-Zyklus SecurityException | ✅ behoben | `FOREGROUND_SERVICE_LOCATION`-Permission + `foregroundServiceType="dataSync\|location"` + getyptes startForeground mit beiden Typen |
+
+**Geprüft und in Ordnung (kein Handlungsbedarf):**
+Manifest-Permissions vollständig/konsistent mit Runtime-Requests (BLE_SCAN/CONNECT,
+FINE+BACKGROUND-Location, CAMERA, POST_NOTIFICATIONS; maxSdkVersion-Annotationen
+korrekt; BootReceiver exported=true ist Pflicht); startForeground getypt (targetSdk-34-
+Pflicht); Room 5 Entities ↔ 5 DAOs + Migration; Hilt-Bindings vollständig (DB, DAOs,
+Repository; alle Imports auflösbar); alle 17 Nav-Routen registriert (assetDetail mit
+Argument); REST-Pfade App↔Backend deckungsgleich (/api/assets, /api/crowd/search,
+/api/mcp/*); MQTT-Verträge konsistent inkl. broadcast/command beidseitig; Node-RED
+Broker `mqtt:1883` + Health-Probe `backend:8000/api/health`; NSC debug=offen/
+release=strikt; Backup-/Extraction-Rules exkludieren DB + alle sensiblen Prefs
+(SQLCipher-Key, PIN, Endpunkte); USB/NFC-Filter vorhanden; Backend-Ports/Healthcheck/
+pytest 7/7.
+
+**Bewusst dokumentiert, kein Fix:** Node-RED `sg_inject_telemetry` sendet an die
+Default-Device-ID `ESP32_SecureGuard` – wirksam nur für Gateways ohne CONFIG-`device_id`
+(produktive Gateways nutzen ihre MAC als Username/ID).
+
+**Gesamtstand:** 75 Befundpositionen bearbeitet – **73 behoben/wire-ready**, 2 Phase-2
+(F-44 RBAC-Enforcement, F-45 i18n-Deep-Screens), F-56 System-Broadcast ohne
+Handlungsbedarf.

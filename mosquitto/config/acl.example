@@ -9,8 +9,20 @@ topic readwrite secureguard/#
 # Hinweis: %u = MQTT-Username → jedes Gateway bekommt seinen eigenen User
 # (z. B. Username "AA:BB:CC:DD:EE:01"), pattern-Regeln gelten je Verbindung.
 pattern readwrite secureguard/%u/#
+# Broadcasts BOTH hören: Klartext-Legacy (secureguard/broadcast) UND
+# strukturierte Befehle (secureguard/broadcast/command) – MQTT-ACLs matchen
+# Topic-Ebenen exakt, "/" endet NICHT automatisch die Regel (F-72).
 pattern read secureguard/broadcast
+pattern read secureguard/broadcast/#
 
-# Nur-Lese-Beobachter (Node-RED-Dashboard etc.)
+# Node-RED: darf lesen UND den Alarm-/Befehls-Broadcast PUBLISHEN
+# (sg_inject_alarm → secureguard/broadcast/command). Ein reiner
+# "read"-User würde die Inject-Nodes still verwerfen (F-72).
+user nodered
+topic read secureguard/#
+topic write secureguard/broadcast/command
+topic write secureguard/+/command
+
+# Nur-Lese-Beobachter (reine Dashboards ohne Publish)
 user readonly
 topic read secureguard/#

@@ -88,6 +88,8 @@ android {
         buildConfigField("String", "OPEN_DATA_API_URL", "\"${apiKey("OPEN_DATA_API_URL")}\"")
         buildConfigField("String", "FIND_MY_PROXY_URL", "\"${apiKey("FIND_MY_PROXY_URL")}\"")
         buildConfigField("String", "DHL_API_URL", "\"${apiKey("DHL_API_URL").ifBlank { "https://api.dhl.de/" }}\"")
+        // Schreibende SecureGuard-Backend-Endpunkte (X-API-Key); leer = Pilot ohne API-Schutz
+        buildConfigField("String", "SECUREGUARD_API_KEY", "\"${apiKey("SECUREGUARD_API_KEY")}\"")
         buildConfigField("String", "DHL_API_TOKEN", "\"${apiKey("DHL_API_TOKEN")}\"")
     }
 

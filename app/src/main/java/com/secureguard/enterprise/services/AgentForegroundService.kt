@@ -37,7 +37,9 @@ class AgentForegroundService : Service() {
             startForeground(
                 NotificationService.AGENT_NOTIFICATION_ID,
                 notificationService.buildAgentNotification("Agent wird initialisiert …"),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                // dataSync (MQTT/WS/Sync) + location (SatelliteService-GPS im Zyklus)
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             )
         } else {
             startForeground(

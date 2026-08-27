@@ -98,6 +98,16 @@ class EndpointConfig @Inject constructor(
         get() = prefs.getString(KEY_DHL_TOKEN, null).orEmpty()
             .ifBlank { BuildConfig.DHL_API_TOKEN }
 
+    /**
+     * X-API-Key für schreibende Backend-Endpunkte (F-71). Leerer Prefs-Eintrag
+     * fällt auf BuildConfig.SECUREGUARD_API_KEY zurück; beides leer = Header
+     * entfällt (Pilot ohne API-Schutz).
+     */
+    val backendApiKey: String
+        get() = prefs.getString(KEY_API_KEY, null).orEmpty()
+            .ifBlank { BuildConfig.SECUREGUARD_API_KEY }
+            .trim()
+
     // ---- Mutators (Settings-UI) ----
 
     fun update(
@@ -112,7 +122,8 @@ class EndpointConfig @Inject constructor(
         ckanUrl: String? = null,
         findMyUrl: String? = null,
         dhlUrl: String? = null,
-        dhlToken: String? = null
+        dhlToken: String? = null,
+        apiKey: String? = null
     ) {
         prefs.edit().apply {
             mqttUrl?.let { putString(KEY_MQTT_URL, it.trim()) }
@@ -127,6 +138,7 @@ class EndpointConfig @Inject constructor(
             findMyUrl?.let { putString(KEY_FIND_MY_URL, it.trim()) }
             dhlUrl?.let { putString(KEY_DHL_URL, it.trim()) }
             dhlToken?.let { putString(KEY_DHL_TOKEN, it.trim()) }
+            apiKey?.let { putString(KEY_API_KEY, it.trim()) }
         }.apply()
     }
 
@@ -143,7 +155,8 @@ class EndpointConfig @Inject constructor(
         openDataApiUrl = openDataApiUrl.trimEnd('/'),
         findMyProxyUrl = findMyProxyUrl,
         dhlApiUrl = dhlApiUrl,
-        dhlApiToken = dhlApiToken
+        dhlApiToken = dhlApiToken,
+        backendApiKey = backendApiKey
     )
 
     companion object {
@@ -158,6 +171,7 @@ class EndpointConfig @Inject constructor(
         private const val KEY_YOLO_URL = "yolo_url"
         private const val KEY_CKAN_URL = "ckan_url"
         private const val KEY_FIND_MY_URL = "find_my_url"
+        private const val KEY_API_KEY = "backend_api_key"
         private const val KEY_DHL_URL = "dhl_url"
         private const val KEY_DHL_TOKEN = "dhl_token"
 
@@ -206,5 +220,6 @@ data class EndpointSnapshot(
     val openDataApiUrl: String = "",
     val findMyProxyUrl: String = "",
     val dhlApiUrl: String = "",
-    val dhlApiToken: String = ""
+    val dhlApiToken: String = "",
+    val backendApiKey: String = ""
 )

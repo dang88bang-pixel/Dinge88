@@ -48,3 +48,7 @@ FIND_MY_PROXY_URL=https://find-my-proxy.example.com
 # KEYSTORE_PASSWORD=
 # KEY_ALIAS=secureguard
 # KEY_PASSWORD=
+
+# ---- SecureGuard-Backend: X-API-Key für schreibende Endpunkte (POST) ----
+# Muss zum SECUREGUARD_API_KEY im Backend-.env passen; leer = ohne API-Schutz.
+# SECUREGUARD_API_KEY=bitte-selbst-setzen

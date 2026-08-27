@@ -60,6 +60,11 @@ BleService).
 | MCP/DB (F-61h/i) | `requestId` atomar; `detectionCount()` via `COUNT(*)` |
 | Offline-Karte (F-61j) | `preloadRegion()` (CacheManager) für planbares Vorab-Laden |
 | Broadcast-Alarm (F-05-Rest) | Topic `secureguard/broadcast/command` beidseitig (App-Subscription+Handler, Node-RED-Inject strukturiert) |
+| **Re-Audit Runde 3 (Berechtigungen/Anbindungen, s. Mängelliste §11.6):** | |
+| X-API-Key (F-71) | App sendet `X-API-Key` auf POST /api/assets + /api/mcp/create_inbox (`EndpointConfig.backendApiKey`: Prefs → BuildConfig `SECUREGUARD_API_KEY`) |
+| Mosquitto-ACL (F-72) | `secureguard/broadcast/#` für Gateways lesbar; eigener `nodered`-User mit Publish-Recht auf broadcast/command |
+| Backend-MQTT-Auth (F-73) | `MQTT_USERNAME/MQTT_PASSWORD`-Env + `username_pw_set` (compose/.env durchgereicht) |
+| FGS-Location (F-75) | Agent-Dienst `dataSync|location` + `FOREGROUND_SERVICE_LOCATION` → GPS-Kanal funktioniert im Hintergrund auf Android 14 |
 | Backend | optionale `X-API-Key`-Auth (Env `SECUREGUARD_API_KEY`), CORS korrigiert (`CORS_ORIGINS`), `/api/health` → 503 bei degraded, DB-Endpunkte im Threadpool (`def`), portables Command-UPDATE, lifespan-Startup, paho `<2.0` gepinnt |
 
 ## 3. Bekannte, bewusst offene Punkte (Stand dieses Branches)

@@ -40,6 +40,10 @@ except ImportError:
 
 DB_PATH = os.environ.get("DATABASE_PATH", "secureguard.db")
 MQTT_BROKER = os.environ.get("MQTT_BROKER", "mqtt:1883")
+# F-73: Broker-Credentials (Produktion mit allow_anonymous=false).
+# Leer = anonym (Pilot).
+MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "")
+MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
 
 # Optionale API-Key-Absicherung: Ist SECUREGUARD_API_KEY gesetzt, verlangen alle
 # schreibenden Endpunkte den Header `X-API-Key: <key>`. Lesen bleibt offen
@@ -207,6 +211,10 @@ def get_mqtt_client():
         try:
             host, _, port = MQTT_BROKER.partition(":")
             _mqtt_client = mqtt.Client(client_id="secureguard-backend")
+            # F-73: Credentials setzen, wenn konfiguriert – sonst schlägt bei
+            # allow_anonymous=false JEDE Verbindung fehl (Bridge + publish_command tot).
+            if MQTT_USERNAME:
+                _mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD or None)
             _mqtt_client.connect(host, int(port or 1883), 60)
             _mqtt_client.loop_start()
         except Exception:

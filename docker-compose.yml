@@ -46,6 +46,9 @@ services:
     environment:
       - DATABASE_PATH=/data/secureguard.db
       - MQTT_BROKER=mqtt:1883
+      # Optional (aus .env): MQTT-Broker-Auth (Produktion: allow_anonymous=false)
+      - MQTT_USERNAME=${MQTT_USERNAME:-}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-}
       # Optional (aus .env): schreibende Endpunkte per X-API-Key schützen
       - SECUREGUARD_API_KEY=${SECUREGUARD_API_KEY:-}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}

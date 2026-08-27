@@ -157,6 +157,8 @@ class MCPClient @Inject constructor(
             val base = serverUrl.trimEnd('/')
             val req = Request.Builder()
                 .url("$base/api/mcp/create_inbox")
+                // F-71: schreibender Endpunkt → X-API-Key mitsenden
+                .header("X-API-Key", endpointConfig.backendApiKey.ifBlank { null })
                 .post(ByteArray(0).toRequestBody(null))
                 .build()
             client.newCall(req).execute().use { resp ->
