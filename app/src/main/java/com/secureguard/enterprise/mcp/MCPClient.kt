@@ -70,7 +70,7 @@ class MCPClient @Inject constructor(
     }
 
     private var webSocket: WebSocket? = null
-    private var requestId = 0
+    private val requestId = java.util.concurrent.atomic.AtomicInteger(0)
 
     private val pendingRequests = ConcurrentHashMap<Int, (JsonObject) -> Unit>()
 
@@ -129,7 +129,7 @@ class MCPClient @Inject constructor(
             return withContext(Dispatchers.IO) { createInboxHttp() }
         }
         connect()
-        val id = ++requestId
+        val id = requestId.incrementAndGet()
         val request = JsonObject().apply {
             addProperty("jsonrpc", "2.0")
             addProperty("id", id)
@@ -182,7 +182,7 @@ class MCPClient @Inject constructor(
             return withContext(Dispatchers.IO) { waitForOtpHttp(inboxToken, timeoutMs) }
         }
         connect()
-        val id = ++requestId
+        val id = requestId.incrementAndGet()
         val request = JsonObject().apply {
             addProperty("jsonrpc", "2.0")
             addProperty("id", id)
@@ -220,7 +220,7 @@ class MCPClient @Inject constructor(
             return withContext(Dispatchers.IO) { extractMagicLinkHttp(inboxToken) }
         }
         connect()
-        val id = ++requestId
+        val id = requestId.incrementAndGet()
         val request = JsonObject().apply {
             addProperty("jsonrpc", "2.0")
             addProperty("id", id)

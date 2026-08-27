@@ -47,6 +47,17 @@ class AuthManager @Inject constructor(
         get() = prefs.getInt(KEY_FAILED_ATTEMPTS, 0)
         set(value) = prefs.edit().putInt(KEY_FAILED_ATTEMPTS, value).apply()
 
+    /** Auto-Lock-Dauer in Minuten (persistent, 1–60 Min, F-49). */
+    var autoLockMinutes: Int
+        get() = prefs.getInt(KEY_AUTO_LOCK_MINUTES, AUTO_LOCK_MINUTES).coerceIn(1, 60)
+        private set(value) = prefs.edit().putInt(KEY_AUTO_LOCK_MINUTES, value).apply()
+
+    /** Setzt die Auto-Lock-Dauer (UI: Security-Center). */
+    fun setAutoLockMinutes(minutes: Int) {
+        autoLockMinutes = minutes.coerceIn(1, 60)
+        _state.value = _state.value.copy(autoLockAfterMinutes = autoLockMinutes)
+    }
+
     private val secureRandom = SecureRandom()
 
     fun isPinConfigured(): Boolean = prefs.contains(KEY_HASH)
@@ -103,6 +114,7 @@ class AuthManager @Inject constructor(
             _state.value = _state.value.copy(
                 locked = false,
                 attemptsRemaining = MAX_ATTEMPTS,
+                autoLockAfterMinutes = autoLockMinutes,
                 lockoutSecondsRemaining = 0
             )
         } else {
@@ -151,7 +163,7 @@ class AuthManager @Inject constructor(
         if (!_state.value.enabled || _state.value.locked) return
         val lastUnlock = prefs.getLong(KEY_LAST_UNLOCK, 0L)
         if (lastUnlock > 0 &&
-            System.currentTimeMillis() - lastUnlock > AUTO_LOCK_MINUTES * 60_000L
+            System.currentTimeMillis() - lastUnlock > autoLockMinutes * 60_000L
         ) {
             lock()
         }
@@ -179,6 +191,7 @@ class AuthManager @Inject constructor(
             enabled = enabled,
             locked = enabled,
             attemptsRemaining = if (lockout > 0) 0 else MAX_ATTEMPTS - usedAttempts,
+            autoLockAfterMinutes = autoLockMinutes,
             lockoutSecondsRemaining = lockout
         )
     }
@@ -216,5 +229,6 @@ class AuthManager @Inject constructor(
         private const val KEY_LOCKED_AT = "locked_at"
         private const val KEY_LAST_UNLOCK = "last_unlock"
         private const val KEY_FAILED_ATTEMPTS = "failed_attempts"
+        private const val KEY_AUTO_LOCK_MINUTES = "auto_lock_minutes"
     }
 }

@@ -72,6 +72,10 @@ android {
         buildConfigField("String", "WIGLE_API_KEY", "\"${apiKey("WIGLE_API_KEY")}\"")
         buildConfigField("String", "OPEN_CHARGE_MAP_KEY", "\"${apiKey("OPEN_CHARGE_MAP_KEY")}\"")
         buildConfigField("String", "NETATMO_TOKEN", "\"${apiKey("NETATMO_TOKEN")}\"")
+        // Netatmo-OAuth2 (F-19): App-Registrierung auf dev.netatmo.com; leer = Refresh deaktiviert
+        buildConfigField("String", "NETATMO_CLIENT_ID", "\"${apiKey("NETATMO_CLIENT_ID")}\"")
+        buildConfigField("String", "NETATMO_CLIENT_SECRET", "\"${apiKey("NETATMO_CLIENT_SECRET")}\"")
+        buildConfigField("String", "NETATMO_REFRESH_TOKEN", "\"${apiKey("NETATMO_REFRESH_TOKEN")}\"")
         buildConfigField("String", "GOOGLE_API_KEY", "\"${apiKey("GOOGLE_API_KEY")}\"")
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
         buildConfigField("String", "MQTT_USERNAME", "\"${apiKey("MQTT_USERNAME")}\"")
@@ -83,6 +87,8 @@ android {
         buildConfigField("String", "YOLO_SERVER_URL", "\"${apiKey("YOLO_SERVER_URL")}\"")
         buildConfigField("String", "OPEN_DATA_API_URL", "\"${apiKey("OPEN_DATA_API_URL")}\"")
         buildConfigField("String", "FIND_MY_PROXY_URL", "\"${apiKey("FIND_MY_PROXY_URL")}\"")
+        buildConfigField("String", "DHL_API_URL", "\"${apiKey("DHL_API_URL").ifBlank { "https://api.dhl.de/" }}\"")
+        buildConfigField("String", "DHL_API_TOKEN", "\"${apiKey("DHL_API_TOKEN")}\"")
     }
 
     if (keystoreFile.exists() && keystorePassword.isBlank()) {
@@ -222,7 +228,6 @@ dependencies {
 
     // Networking (Retrofit + OkHttp)
     implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.gson)
     implementation(libs.retrofit.converter.moshi)
     implementation(libs.retrofit.adapter.rxjava3)
     implementation(libs.okhttp)

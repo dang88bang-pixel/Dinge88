@@ -1,6 +1,6 @@
 package com.secureguard.enterprise.services.apis
 
-import com.google.gson.annotations.SerializedName
+import com.squareup.moshi.Json
 import io.reactivex.rxjava3.core.Single
 import retrofit2.http.GET
 import retrofit2.http.Query
@@ -11,6 +11,10 @@ import retrofit2.http.Query
  * Basis-URL: `https://api.openchargemap.io/`, Pfad `v3/poi`.
  * Antwort ist ein JSON-Array von POIs – das DTO bildet die reale
  * (verschachtelte) Antwortstruktur ab.
+ *
+ * Hinweis Konsolidierung (F-27): Die Retrofit-Schicht nutzt ausschließlich
+ * Moshi (siehe ApiServiceManager); die DTOs sind daher mit `@Json`
+ * annotiert. Gson bleibt nur für App-interne Services im Einsatz.
  */
 interface OpenChargeMapApi {
 
@@ -28,8 +32,8 @@ interface OpenChargeMapApi {
 
 /**
  * RxJava-Variante derselben Abfrage (nicht-suspend), für Aufrufer außerhalb
- * von Coroutines. Wird vom ApiServiceManager über den RxJava3-Call-Adapter
- * aufgelöst.
+ * von Coroutines. Wird vom ApiServiceManager über die geteilte
+ * Retrofit-Instanz (gleicher Converter + RxJava3-Adapter) aufgelöst.
  */
 interface OpenChargeMapRxApi {
 
@@ -46,12 +50,12 @@ interface OpenChargeMapRxApi {
 }
 
 data class ChargingStation(
-    @SerializedName("ID") val id: Long = 0,
-    @SerializedName("Title") val title: String? = null,
-    @SerializedName("AddressInfo") val addressInfo: ChargingStationAddress? = null,
-    @SerializedName("OperatorInfo") val operatorInfo: ChargingStationOperator? = null,
-    @SerializedName("UsageType") val usageType: ChargingStationUsage? = null,
-    @SerializedName("StatusType") val statusType: ChargingStationStatus? = null
+    @Json(name = "ID") val id: Long = 0,
+    @Json(name = "Title") val title: String? = null,
+    @Json(name = "AddressInfo") val addressInfo: ChargingStationAddress? = null,
+    @Json(name = "OperatorInfo") val operatorInfo: ChargingStationOperator? = null,
+    @Json(name = "UsageType") val usageType: ChargingStationUsage? = null,
+    @Json(name = "StatusType") val statusType: ChargingStationStatus? = null
 ) {
     val latitude: Double? get() = addressInfo?.latitude
     val longitude: Double? get() = addressInfo?.longitude
@@ -62,21 +66,21 @@ data class ChargingStation(
 }
 
 data class ChargingStationAddress(
-    @SerializedName("Title") val title: String? = null,
-    @SerializedName("AddressLine1") val addressLine1: String? = null,
-    @SerializedName("Town") val town: String? = null,
-    @SerializedName("Latitude") val latitude: Double? = null,
-    @SerializedName("Longitude") val longitude: Double? = null
+    @Json(name = "Title") val title: String? = null,
+    @Json(name = "AddressLine1") val addressLine1: String? = null,
+    @Json(name = "Town") val town: String? = null,
+    @Json(name = "Latitude") val latitude: Double? = null,
+    @Json(name = "Longitude") val longitude: Double? = null
 )
 
 data class ChargingStationOperator(
-    @SerializedName("Title") val title: String? = null
+    @Json(name = "Title") val title: String? = null
 )
 
 data class ChargingStationUsage(
-    @SerializedName("Title") val title: String? = null
+    @Json(name = "Title") val title: String? = null
 )
 
 data class ChargingStationStatus(
-    @SerializedName("Title") val title: String? = null
+    @Json(name = "Title") val title: String? = null
 )

@@ -83,6 +83,21 @@ class EndpointConfig @Inject constructor(
             .ifBlank { BuildConfig.FIND_MY_PROXY_URL }
             .trimEnd('/')
 
+    /**
+     * DHL-Location-API: Basis-URL zur Laufzeit austauschbar (Sandbox/Prod),
+     * da der öffentliche Endpunkt + OAuth2-Client-Credentials einen Vertrag
+     * voraussetzen (siehe IMPLEMENTIERUNGS_INVENTUR.md §3).
+     */
+    val dhlApiUrl: String
+        get() = prefs.getString(KEY_DHL_URL, null).orEmpty()
+            .ifBlank { BuildConfig.DHL_API_URL }
+            .trimEnd('/')
+
+    /** Optionaler Bearer-Token (DHL OAuth2 Access-Token); leer = ohne Auth-Header. */
+    val dhlApiToken: String
+        get() = prefs.getString(KEY_DHL_TOKEN, null).orEmpty()
+            .ifBlank { BuildConfig.DHL_API_TOKEN }
+
     // ---- Mutators (Settings-UI) ----
 
     fun update(
@@ -95,7 +110,9 @@ class EndpointConfig @Inject constructor(
         loraUrl: String? = null,
         yoloUrl: String? = null,
         ckanUrl: String? = null,
-        findMyUrl: String? = null
+        findMyUrl: String? = null,
+        dhlUrl: String? = null,
+        dhlToken: String? = null
     ) {
         prefs.edit().apply {
             mqttUrl?.let { putString(KEY_MQTT_URL, it.trim()) }
@@ -108,6 +125,8 @@ class EndpointConfig @Inject constructor(
             yoloUrl?.let { putString(KEY_YOLO_URL, it.trim()) }
             ckanUrl?.let { putString(KEY_CKAN_URL, it.trim()) }
             findMyUrl?.let { putString(KEY_FIND_MY_URL, it.trim()) }
+            dhlUrl?.let { putString(KEY_DHL_URL, it.trim()) }
+            dhlToken?.let { putString(KEY_DHL_TOKEN, it.trim()) }
         }.apply()
     }
 
@@ -122,7 +141,9 @@ class EndpointConfig @Inject constructor(
         loraGatewayUrl = loraGatewayUrl,
         yoloServerUrl = yoloServerUrl,
         openDataApiUrl = openDataApiUrl.trimEnd('/'),
-        findMyProxyUrl = findMyProxyUrl
+        findMyProxyUrl = findMyProxyUrl,
+        dhlApiUrl = dhlApiUrl,
+        dhlApiToken = dhlApiToken
     )
 
     companion object {
@@ -137,6 +158,8 @@ class EndpointConfig @Inject constructor(
         private const val KEY_YOLO_URL = "yolo_url"
         private const val KEY_CKAN_URL = "ckan_url"
         private const val KEY_FIND_MY_URL = "find_my_url"
+        private const val KEY_DHL_URL = "dhl_url"
+        private const val KEY_DHL_TOKEN = "dhl_token"
 
         private const val DEFAULT_MQTT = "tcp://10.0.2.2:1883"
         private const val DEFAULT_CKAN = "https://demo.ckan.org/"
@@ -181,5 +204,7 @@ data class EndpointSnapshot(
     val loraGatewayUrl: String = "",
     val yoloServerUrl: String = "",
     val openDataApiUrl: String = "",
-    val findMyProxyUrl: String = ""
+    val findMyProxyUrl: String = "",
+    val dhlApiUrl: String = "",
+    val dhlApiToken: String = ""
 )

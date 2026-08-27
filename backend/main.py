@@ -18,7 +18,7 @@ import logging
 import os
 import sqlite3
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Set
 
 import uvicorn
@@ -57,12 +57,20 @@ async def require_api_key(x_api_key: str = Header(default="", alias="X-API-Key")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    global main_event_loop
+    main_event_loop = asyncio.get_running_loop()
     start_mqtt_subscriber()
     logger.info("SecureGuard Backend gestartet")
     yield
 
 
 app = FastAPI(title="SecureGuard API", version="1.0.1", lifespan=lifespan)
+
+# F-61c: Referenz auf die Haupt-Event-Loop. Der Paho-Callback laeuft in einem
+# eigenen Thread – dort gibt es KEINEN aktuellen Loop mehr (Python >= 3.10/3.12:
+# asyncio.get_event_loop() -> RuntimeError). Ohne diese Referenz blieb die
+# MQTT->WS-Bridge stumm (RuntimeError wurde still verschluckt).
+main_event_loop: asyncio.AbstractEventLoop | None = None
 
 _allow_all = "*" in CORS_ORIGINS
 app.add_middleware(
@@ -251,14 +259,10 @@ def start_mqtt_subscriber():
         else:
             ws_msg = json.dumps({"type": "unknown", "topic": topic, "data": payload})
 
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.run_coroutine_threadsafe(
-                    broadcast_websocket(ws_msg), loop
-                )
-        except RuntimeError:
-            pass
+        loop = main_event_loop
+        if loop is not None and loop.is_running():
+            # Thread-sichere Uebergabe an die Haupt-Loop (Paho-Thread -> uvicorn)
+            asyncio.run_coroutine_threadsafe(broadcast_websocket(ws_msg), loop)
 
     client.subscribe("secureguard/+/telemetry")
     client.subscribe("secureguard/+/alert")
@@ -487,7 +491,10 @@ def report_crowd_sighting(sighting: dict):
             sighting.get("rssi", 0),
             sighting.get("latitude"),
             sighting.get("longitude"),
-            datetime.now(),
+            # UTC im SQLite-Format – die Suche vergleicht mit datetime('now')
+            # (ebenfalls UTC). datetime.now() (Lokalzeit) lief sonst um die
+            # TZ-Differenz daneben (F-61d).
+            datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         ),
     )
     conn.commit()
@@ -561,8 +568,9 @@ async def mcp_wait_for_otp(token: str, timeout: int = 5):
     import re
     if token not in _temp_inboxes:
         return {"success": False, "error": "unknown token"}
-    deadline = asyncio.get_event_loop().time() + max(1, min(timeout, 45))
-    while asyncio.get_event_loop().time() < deadline:
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max(1, min(timeout, 45))
+    while loop.time() < deadline:
         for m in _temp_messages.get(token, []):
             match = re.search(r"\b(\d{4,8})\b", m.get("body", ""))
             if match:

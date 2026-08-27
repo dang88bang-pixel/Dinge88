@@ -50,6 +50,14 @@ class SecurityViewModel @Inject constructor(
         }
     }
 
+    /** Auto-Lock-Dauer setzen (F-49): 5/10/30 Minuten. Sichtbar über [authState]. */
+    fun setAutoLockMinutes(minutes: Int) {
+        authManager.setAutoLockMinutes(minutes)
+        viewModelScope.launch {
+            auditLogService.log(action = "AUTO_LOCK_SET", details = "Auto-Lock: $minutes Min")
+        }
+    }
+
     fun disablePin() {
         authManager.disablePin()
         _pinConfigured.value = false

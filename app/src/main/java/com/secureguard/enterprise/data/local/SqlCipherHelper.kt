@@ -122,7 +122,14 @@ object SqlCipherHelper {
                 encryptedTmp.delete()
             }
 
-            Log.i(TAG, "Migration OK – Klartext-Backup: ${plainBackup.name}")
+            // F-61g: Klartext-Backup nach erfolgreicher Migration LÖSCHEN –
+            // eine .plain.bak auf dem Speicher ist ein Klartext-Leak der
+            // gesamten Datenbank. (Rollback-Fälle nutzen die Kopie im
+            // Fehlerpfad unten; dort bleibt sie bewusst erhalten.)
+            if (plainBackup.exists() && !plainBackup.delete()) {
+                Log.w(TAG, "Klartext-Backup konnte nicht gelöscht werden: ${plainBackup.name}")
+            }
+            Log.i(TAG, "Migration OK – Klartext-Backup entfernt")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Migration fehlgeschlagen – stelle Backup wieder her", e)

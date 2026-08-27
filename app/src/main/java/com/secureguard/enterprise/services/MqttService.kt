@@ -65,6 +65,8 @@ class MqttService @Inject constructor(
                 subscribe(MqttConfig.TOPIC_ALERT)
                 subscribe(MqttConfig.TOPIC_STATUS)
                 subscribe(MqttConfig.TOPIC_BROADCAST)
+                // Strukturierter Broadcast-Befehl (F-05): Node-RED-Alarm & Co.
+                subscribe(MqttConfig.TOPIC_BROADCAST_COMMAND)
             }
 
             override fun connectionLost(cause: Throwable?) {
@@ -209,7 +211,7 @@ class MqttService @Inject constructor(
                     _events.tryEmit(MqttEvent.Status(t, payload))
                 }
 
-                t == MqttConfig.TOPIC_BROADCAST -> {
+                t == MqttConfig.TOPIC_BROADCAST || t == MqttConfig.TOPIC_BROADCAST_COMMAND -> {
                     _events.tryEmit(MqttEvent.Broadcast(payload))
                 }
             }

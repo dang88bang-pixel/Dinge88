@@ -9,15 +9,18 @@ import retrofit2.http.Query
  * Netatmo Weathermap API – Wetterstationen.
  *
  * Basis-URL: `https://api.netatmo.com/`, Pfad `api/getstationsdata`.
- * Authentifizierung per Bearer-Token (Netatmo OAuth2), siehe
- * `BuildConfig.NETATMO_TOKEN`.
+ * Authentifizierung: der Authorization-Header wird **dynamisch** vom
+ * [com.secureguard.enterprise.services.ApiServiceManager] gesetzt
+ * (OAuth2-Refresh mit NETATMO_CLIENT_ID/SECRET/REFRESH_TOKEN, Fallback
+ * legacy NETATMO_TOKEN) – kein Build-zeitiger Default mehr, damit
+ * abgelaufene Tokens nicht dauerhaft 401 liefern.
  */
 interface NetatmoWeatherApi {
 
     @GET("api/getstationsdata")
     suspend fun getStations(
         @Query("device_id") deviceId: String? = null,
-        @Header("Authorization") auth: String = "Bearer ${com.secureguard.enterprise.BuildConfig.NETATMO_TOKEN}"
+        @Header("Authorization") auth: String
     ): NetatmoResponse
 }
 

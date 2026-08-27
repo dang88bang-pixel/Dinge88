@@ -124,6 +124,9 @@ class AgentService @Inject constructor(
         nfcCollectorJob = null
         mqttService.disconnect()
         webSocketService.disconnect()
+        // API-Node-Hintergrundloops anhalten (F-38); queryAllNodes startet
+        // sie bei Bedarf wieder.
+        runCatching { apiNodeManager.shutdown() }
         _agentStatus.value = _agentStatus.value.copy(running = false)
         scope.launch {
             auditLogService.log(action = "AGENT_STOP", details = "Agent gestoppt")
@@ -261,7 +264,12 @@ class AgentService @Inject constructor(
             }
             snapshot.forEach { asset ->
                 val probability = learningEngine.getSuccessProbability(asset.id)
-                if (probability < 0.2f) {
+                // F-61f: Throttle – sonst landet pro Asset pro Zyklus eine
+                // LOW_PROBABILITY-Zeile im Audit-Log (Spam). Je Asset nur
+                // alle LOW_PROBABILITY_EVERY_CYCLES Zyklen.
+                if (probability < 0.2f &&
+                    cycleCount.get() % LOW_PROBABILITY_EVERY_CYCLES == 0L
+                ) {
                     auditLogService.log(
                         action = "LOW_PROBABILITY",
                         details = "${asset.shortName}: Erfolgswahrscheinlichkeit ${"%.0f".format(probability * 100)}%"
@@ -278,6 +286,10 @@ class AgentService @Inject constructor(
                     action = "QUEUE_FLUSH",
                     details = "$flushed Aktionen aus Offline-Queue zugestellt"
                 )
+                notificationService.sendSystemNotification(
+                    "Offline-Queue",
+                    "$flushed Aktion(en) nachträglich zugestellt"
+                )
             }
         }
 
@@ -289,6 +301,10 @@ class AgentService @Inject constructor(
                         auditLogService.log(
                             action = "BACKEND_SYNC",
                             details = "pull=${r.pulled} push=${r.pushed}"
+                        )
+                        notificationService.sendSystemNotification(
+                            "Backend-Sync",
+                            "pull=${r.pulled} · push=${r.pushed}"
                         )
                     }
                 }
@@ -307,26 +323,29 @@ class AgentService @Inject constructor(
         return database.assetDao().observeWhitelisted().first()
     }
 
-    /** Queries every channel for [asset] and returns the best detection (lowest RSSI). */
+    /**
+     * Queries every channel for [asset] and returns the best detection.
+     * Auswahl tier-basiert (F-61a/b), siehe [selectBestDetection].
+     */
     suspend fun comprehensiveSearch(
         asset: Asset,
         settings: AgentSettings = _agentStatus.value.settings
     ): SearchResult = coroutineScope {
         val channels = buildChannelList(asset, settings)
 
-        val results = channels.map { (source, block) ->
-            async {
-                runCatching { block() }.getOrNull()?.also { detection ->
-                    persist(detection)
-                    if (settings.learningMode) {
-                        learningMemory[asset.mac.uppercase()] = source
-                    }
-                }
-            }
-        }.awaitAll()
+        val results = channels.map { (_, block) ->
+            async { runCatching { block() }.getOrNull() }
+        }.awaitAll().filterNotNull()
 
-        val best = results.filterNotNull().minByOrNull { it.rssi }
+        // Alles persistieren (Historie), aber Lernen nur auf den GEWONNENEN
+        // Kanal stützen – nicht auf jeden Nebenlauf (Learning-Noise).
+        results.forEach { persist(it) }
+
+        val best = selectBestDetection(results)
         if (best != null) {
+            if (settings.learningMode) {
+                learningMemory[asset.mac.uppercase()] = best.sourceType
+            }
             // Geofence check: alert if asset found >5km from last known position
             if (asset.latitude != null && asset.longitude != null &&
                 best.latitude != null && best.longitude != null
@@ -347,9 +366,36 @@ class AgentService @Inject constructor(
             applyDetectionToAsset(asset, best)
             SearchResult(found = true, detection = best, accuracy = best.rssi)
         } else {
+            // Auch der Satellite-Sentinel hält ein Asset nicht mehr künstlich
+            // "online" (F-61a): ohne belastbaren Treffer → offline.
             markOffline(asset)
             SearchResult.NotFound
         }
+    }
+
+    /**
+     * F-61a/b: Bisher gewann `minByOrNull { rssi }` den SCHWÄCHSTEN Wert –
+     * der SATELLITE-Sentinel (-100 = eigener GPS-Fix, kein Asset-Beweis)
+     * machte jedes Asset zum "Fund", und exakte Sichtungen (OPTICAL/NFC,
+     * rssi=0) verloren gegen alle negativen Messwerte.
+     *
+     * Neu: tier-basierte Auswahl –
+     *  0 = exakte Sichtung (OPTICAL, NFC),
+     *  1 = echte Funkmessung (BLE/WIFI/LORA/TELEMETRY/MQTT/WEBSOCKET):
+     *      stärkstes (höchstes) RSSI gewinnt,
+     *  2 = Positions-/Schätzquellen (URBAN/CROWD/API): höchster Pseudo-RSSI.
+     * SATELLITE wird persistiert, fließt aber NICHT in die Auswahl ein.
+     */
+    private fun selectBestDetection(detections: List<Detection>): Detection? {
+        val candidates = detections.filter { it.sourceType != DetectionSource.SATELLITE }
+        if (candidates.isEmpty()) return null
+        fun tier(d: Detection): Int = when (d.sourceType) {
+            DetectionSource.OPTICAL, DetectionSource.NFC -> 0
+            DetectionSource.BLE, DetectionSource.WIFI, DetectionSource.LORA,
+            DetectionSource.TELEMETRY, DetectionSource.MQTT, DetectionSource.WEBSOCKET -> 1
+            else -> 2
+        }
+        return candidates.sortedWith(compareBy(::tier).thenByDescending { it.rssi }).first()
     }
 
     private fun buildChannelList(
@@ -443,6 +489,11 @@ class AgentService @Inject constructor(
                 )
                 persist(detection)
                 updateAssetIfKnown(detection)
+                // Telemetrie-Kanal (F-50): gedrosselt (1 Meldung/Min/Asset)
+                notificationService.sendTelemetryNotification(
+                    event.assetMac,
+                    "${event.assetMac}: ${event.payload.take(80)}"
+                )
             }
 
             is MqttEvent.Alert -> {
@@ -456,6 +507,28 @@ class AgentService @Inject constructor(
                     )
                 )
                 notificationService.sendAlertNotification("MQTT-Alert", event.message)
+                alertSoundManager.playForSeverity("WARNING")
+            }
+
+            is MqttEvent.Broadcast -> {
+                // F-05-Rest: Broadcast-Alarme (z. B. Node-RED sg_inject_alarm auf
+                // secureguard/broadcast/command) wurden emittiert, aber nie
+                // behandelt. Jetzt: Alert + System-Benachrichtigung.
+                val message = runCatching {
+                    com.google.gson.JsonParser.parseString(event.payload)
+                        .asJsonObject?.get("message")?.takeIf { !it.isJsonNull }?.asString
+                }.getOrNull() ?: event.payload
+                database.alertDao().insert(
+                    Alert(
+                        assetId = "broadcast",
+                        type = AlertType.SECURITY,
+                        severity = AlertSeverity.WARNING,
+                        message = "Broadcast: $message",
+                        timestamp = Date()
+                    )
+                )
+                notificationService.sendAlertNotification("Broadcast-Alarm", message)
+                notificationService.sendSystemNotification("Broadcast", message)
                 alertSoundManager.playForSeverity("WARNING")
             }
 
@@ -721,6 +794,8 @@ class AgentService @Inject constructor(
     companion object {
         private const val STALE_MS = 5 * 60 * 1000L // 5 minutes
         private const val GEOFENCE_RADIUS_KM = 5.0
+        /** LOW_PROBABILITY-Audit-Eintrag je Asset nur alle n Zyklen (F-61f). */
+        private const val LOW_PROBABILITY_EVERY_CYCLES = 10L
 
         /** Haversine formula: distance in km between two lat/lon points. */
         private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {

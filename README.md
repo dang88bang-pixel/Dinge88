@@ -27,7 +27,7 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 - [Backend (FastAPI)](#-backend-fastapi)
 - [Firmware (ESP32)](#-firmware-esp32)
 - [Docker-Stack](#-docker-stack)
-- [Abhängigkeiten (64 Libraries)](#-abhängigkeiten-64-libraries)
+- [Abhängigkeiten (63 Libraries)](#-abhängigkeiten-63-libraries)
 - [Build & CI](#-build--ci)
 - [Konfiguration](#️-konfiguration)
 - [Offline-Setup (air-gapped)](#-offline-setup-air-gapped)

@@ -2,15 +2,19 @@ package com.secureguard.enterprise.services.apis
 
 import com.squareup.moshi.Json
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.Query
 
 /**
  * DHL/Post API – Paketstationen.
  *
- * Hinweis: Die öffentliche DHL-Business-API benötigt eine
- * Client-Credentials-Authentifizierung (kein freier Key). Der Endpunkt ist
- * daher als Vertrag hinterlegt und über den [ApiServiceManager]-Client
- * austauschbar (z. B. gegen den Sandbox-Endpunkt mit API-Key).
+ * Hinweis: Die DHL-API benötigt einen Vertrag (OAuth2-Client-Credentials
+ * bzw. Sandbox-Key). Der Kanal ist dadurch voll **wire-ready**:
+ *  - Basis-URL: zur Laufzeit austauschbar ([com.secureguard.enterprise.config.EndpointConfig.dhlApiUrl],
+ *    Default/BuildConfig `DHL_API_URL`)
+ *  - Auth: optionaler Bearer-Token ([com.secureguard.enterprise.config.EndpointConfig.dhlApiToken],
+ *    Default/BuildConfig `DHL_API_TOKEN`); ohne Token wird kein Header gesetzt
+ * Ohne Vertrag liefert der Aufruf konsequent eine leere Liste.
  */
 interface DhlPackstationApi {
 
@@ -18,7 +22,8 @@ interface DhlPackstationApi {
     suspend fun getPackstations(
         @Query("lat") lat: Double,
         @Query("lng") lon: Double,
-        @Query("radius") radius: Int = 1000
+        @Query("radius") radius: Int = 1000,
+        @Header("Authorization") auth: String? = null
     ): List<Packstation>
 }
 

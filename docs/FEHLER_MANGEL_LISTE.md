@@ -287,48 +287,70 @@ Funktioniert, aber auth/core-Pfade werden nie auf modernen API-Leveln getestet (
 | F-15 | Health `degraded` = HTTP 200 | ✅ behoben | `/api/health` → 503 bei DB-Fehler (inkl. `get_db`-Fehlern) |
 | F-16 | Mosquitto-Beispiele gefährlich | ✅ behoben | Reihenfolge-Warnung in `mosquitto.conf`, `acl.example` mit echten Regeln (+`pattern`-Gateways), Healthcheck auth-unabhängig (`nc -z` + Fallback) |
 | F-17 | WiGle Bearer vs Basic | ✅ behoben | `WiGleAuth.header()`: `token:name` → HTTP-Basic, sonst Bearer; Key-Format in `local.properties.example` dokumentiert |
-| F-18 | DHL-Endpunkt/Auth existieren nicht | 🟡 dokumentiert | nur Vertrag möglich (keine freien DHL-Credentials); Status in INVENTUR §3 |
-| F-19 | Netatmo ohne Refresh | 🟡 dokumentiert | OAuth-Refresh benötigt App-Credentials; INVENTUR §3 |
-| F-20 | Helium v1 Risiko | 🟡 dokumentiert | INVENTUR §3 |
+| F-18 | DHL-Endpunkt/Auth existieren nicht | ✅ wire-ready | `DHL_API_URL`/`DHL_API_TOKEN` (BuildConfig + Runtime-Settings), optionaler Bearer; echte Credentials = Anwendervertrag |
+| F-19 | Netatmo ohne Refresh | ✅ behoben | OAuth2-Refresh-Flow (`NETATMO_CLIENT_ID/SECRET/REFRESH_TOKEN`), Token-Cache, Legacy-Fallback |
+| F-20 | Helium v1 Risiko | ✅ behoben (konfig) | `requiresAuth=false`, zentrale `HELIUM_BASE_URL`, Fehlerfall leer; Restrisiko dokumentiert |
 | F-21 | Node-RED tote Dashboard-Deps | ✅ behoben | `package.json` ohne Zusatzdeps (Flows sind Core-only) |
 | F-22 | `.env.example` tot | ✅ behoben | compose liest `.env` (`SECUREGUARD_API_KEY`, `CORS_ORIGINS`), `.env.example` funktional |
 | F-23 | compose `--reload` im Stack | ✅ behoben | CMD aus Dockerfile, Bind-Mount des Codes entfernt, Backend-Healthcheck prüft HTTP 200 |
 | F-24 | NDEF-Status-Byte hartkodiert | ✅ behoben | RTD-Text korrekt geparst (Sprachlänge aus Status-Byte, UTF-16-Fall) |
 | F-25 | 5 ungenutzte Libraries | ✅ behoben | `rxandroid`, `okhttp-sse`, `accompanist-permissions`, `nordic-ble-ktx`, `zxing-core` aus build + TOML entfernt (69 → 64 Aliase) |
 | F-26 | KSP-Alias ungenutzt | ✅ behoben | aus TOML entfernt (kapt beibehalten) |
-| F-27 | Gson+Moshi dual | 🟡 offen (bewusst) | INVENTUR §3 – Konsolidierung später |
+| F-27 | Gson+Moshi dual | ✅ Retro-Schicht konsolidiert | Retrofit **Moshi-only** (OCM/Google-DTOs konvertiert, `converter-gson` entfernt); Gson nur noch app-intern |
 | F-28 | Room-Schemas/Migration-Tests | ✅ behoben | `exportSchema=true` + `room.schemaLocation` → `app/schemas` |
 | F-29 | Backend-Deps ungepinnt | ✅ behoben | ranges gebunden, `paho-mqtt<2.0`; verifiziert mit 7 laufenden pytest-Tests |
 | F-30 | ArduinoJson ungenutzt (FW) | ✅ behoben | aus `platformio.ini` entfernt |
 | F-31 | Keystore-Passwort-Falle | ✅ behoben | Gradle-`logger.warn`, wenn Keystore ohne Passwort existiert |
 | F-32 | CI ohne Tests | ✅ behoben | `testDebugUnitTest`-Step (Debug-Job, fail-hard) + Report-Artefakte + `arena/**`-Trigger |
 | F-33 | Kein Lint/Backend-Tests | ✅ behoben | `lintDebug`-Step (soft-fail) + eigener `backend-tests`-Job (pytest, release needs both) |
-| F-34 | Robolectric nur SDK 28 | ⚪ offen | bewusst (Suite-Laufzeit); neue AuthManager-Pfade sind versionstolerant |
+| F-34 | Robolectric nur SDK 28 | ✅ ergänzt | neuer `AuthManagerLockoutTest` auf SDK 34 (Lockout/Auto-Lock-Pfade) |
 | F-35 | Mosquitto-Healthcheck vs. Auth | ✅ behoben | siehe F-16 |
 | F-36 | Backend-Healthcheck prüft nur 200 | ✅ behoben | compose-Check prüft `r.status==200` (503 → unhealthy) |
-| F-37 | Node-RED ohne Settings/Credential-Secret | ⚪ offen | Pilot bewusst ohne; Doku folgt bei Produktions-Setup |
-| F-38 | ApiNodeManager-Lifecycles | ⚪ offen | Singleton-Loops bewusst (Agent-Kern); dokumentiert |
+| F-37 | Node-RED ohne Settings/Credential-Secret | ✅ behoben | `nodered/settings.js` + `NODE_RED_CREDENTIAL_SECRET` (compose/.env) |
+| F-38 | ApiNodeManager-Lifecycles | ✅ behoben | `startLoops()/shutdown()`, AgentService.stop() hält an, queryAllNodes() startet wieder |
 | F-39 | AgentSettings nicht persistiert | ✅ behoben | neuer `AgentSettingsStore`; Dashboard/Agent-Config/Settings schreiben+lesen |
 | F-40 | runLoop wirft Notification weg | ✅ behoben | `NotificationService.notifyAgentStatus()` aktualisiert die persistente Notification |
 | F-41 | `IMPLEMENTIERUNGS_INVENTUR.md` fehlt | ✅ behoben | Datei erstellt (Abweichungen, Schnittstellen-Änderungen, offene Punkte) |
-| F-42 | README-Zähler falsch | ✅ behoben | 18 Screens, 33 Services, 64 Libraries |
+| F-42 | README-Zähler falsch | ✅ behoben | 18 Screens, 33 Services, **63** Libraries (Gson-Converter entfernt, Runde 2) |
 | F-43 | „4 Zustellkanäle" | ✅ behoben | README: 3 Kanäle + Offline-Queue |
 | F-44 | RBAC-Deko | 🟡 dokumentiert | README markiert „vorbereitet"; Enforcement Phase 2 |
-| F-45 | i18n fehlt | ⚪ offen | bewusst (DE-first), INVENTUR §3 |
-| F-46 | Kanal-Strings ungenutzt | ⚪ offen | kosmetisch |
+| F-45 | i18n fehlt | 🟡 Grundlage | Bottom-Nav/Kanalnamen über String-Ressourcen; Deep-Screen-Texte Phase 2 |
+| F-46 | Kanal-Strings ungenutzt | ✅ behoben | NotificationService nutzt `alerts_channel_name` etc. |
 | F-47 | Staler TempMail-Kommentar | ✅ behoben | korrigiert |
 | F-48 | Branch-Referenzen alt | ✅ behoben | GO_LIVE/CHECKLISTE aktualisiert |
-| F-49 | Auto-Lock fix 5 min | ⚪ offen | INVENTUR §3 |
-| F-50 | Telemetrie/System-Kanäle ungenutzt | ⚪ offen | bewusst (Reserved) |
+| F-49 | Auto-Lock fix 5 min | ✅ behoben | konfigurierbar 1–60 Min (persistent) + Security-Center-UI (5/10/30) |
+| F-50 | Telemetrie/System-Kanäle ungenutzt | ✅ behoben | Telemetrie (throttled 1/Min/Asset) + System (Sync/Queue-Flush) beschickt |
 | F-51 | Dashboard stoppt FGS nicht | ✅ behoben | `toggleAgent()` stoppt `AgentForegroundService` mit |
 | F-52 | Doppelte Zyklen möglich | ✅ behoben | `cycleMutex` in `runCycle` |
-| F-53 | Endlos-Alarm ohne Auto-Stop | 🟡 offen | bewusst (Bewacher-Konzept), `stop()` verfügbar |
-| F-54 | Terminal `cycle` auf Main | ✅ behoben (durch F-02) | alle IO-Pfade jetzt intern auf IO |
-| F-55 | CacheManager O(n)-Copy | ⚪ offen | 100-Entry-Budget ok |
+| F-53 | Endlos-Alarm ohne Auto-Stop | ✅ behoben | Auto-Stop nach 30 s (`ALARM_AUTO_STOP_MS`), `stop()` weiter möglich |
+| F-54 | Terminal `cycle` auf Main | ✅ behoben | Terminal-Befehle `cycle`/`flush` jetzt `launch(Dispatchers.IO)` |
+| F-55 | CacheManager O(n)-Copy | ✅ behoben | echtes O(1)-LRU (access-order LinkedHashMap) |
 | F-56 | registerReceiver-Sichtbarkeit | ⚪ offen | System-Broadcast, kein Handlungsbedarf |
-| F-57 | Doppelte OCM-Retrofit-Instanz | ⚪ offen | funktional, Kosmetik |
-| F-58 | Mosquitto-Log-Rotation | ⚪ offen | Pilot; Volumen `/mosquitto/log` |
+| F-57 | Doppelte OCM-Retrofit-Instanz | ✅ behoben | eine geteilte Retrofit-Instanz (Moshi + RxJava3-Adapter) |
+| F-58 | Mosquitto-Log-Rotation | ✅ behoben | stdout-only + Docker-Log-Rotation (3×10 MB) für alle Services |
 | F-59 | deprecated `on_event` | ✅ behoben | FastAPI `lifespan`-Handler |
 | F-60 | Cleartext-Doku Release | ✅ behoben | Manifest-Flag entfernt, Doku in INVENTUR/GO_LIVE |
 
-**Ergebnis:** 46 Befunde behoben, 9 bewusst dokumentiert-offen (externe Credentials, Phase-2-Features, Kosmetik), 5 durch umbau mit abgedeckt.
+### 11.5 Nachaudit Runde 2 – neue Befunde F-61 bis F-70 (2026-08-27)
+
+Bei der Umsetzung der Runde-2-Befunde wurden zehn weitere Schwachstellen identifiziert
+(F-61a–j) und **sofort im selben Zug behoben**:
+
+| ID | Befund | Status | Fix |
+|---|---|---|---|
+| F-61a | **Satellite-Sentinel gewinnt**: `comprehensiveSearch` wählte per `minByOrNull { rssi }` den *schwächsten* Wert – der SATELLITE-Sentinel (−100 = eigener GPS-Fix) machte jedes Asset zum „Fund“ → Assets nie offline, Learning prämierte SATELLITE | ✅ behoben | tier-basierte `selectBestDetection()` (exakt > Funkmessung > Schätzung), SATELLITE fließt nicht in die Auswahl ein; Learning lernt nur den Gewinner-Kanal |
+| F-61b | **Exakte Sichtungen verloren**: OPTICAL/QR (rssi=0) verlor gegen alle negativen RSSI; URBAN-Fixwerte (−75/−80) konnten echte Messungen schlagen | ✅ behoben | dieselbe Tier-Logik: OPTICAL/NFC vor Funkmessungen vor Schätzquellen; innerhalb einer Tier gewinnt das stärkste Signal |
+| F-61c | **MQTT→WS-Bridge stumm**: `on_message` läuft im Paho-Thread; `asyncio.get_event_loop()` wirft dort ab Python 3.10+ `RuntimeError` (still gefangen) → WS-Clients empfingen nie MQTT-Events | ✅ behoben | Haupt-Event-Loop wird beim Lifespan-Start in `main_event_loop` gecappt; Bridge nutzt `asyncio.run_coroutine_threadsafe(..., main_event_loop)` |
+| F-61d | **Crowd-Zeitbasis-Mismatch**: Report-INSERT mit `datetime.now()` (Lokalzeit) vs. Suche mit `datetime('now')` (UTC) → Sichtungen in TZ≠UTC bis zur Differenz falsch ein-/ausgeblendet | ✅ behoben | INSERT schreibt `datetime.now(timezone.utc)` im SQLite-Format |
+| F-61e | **OfflineQueue ohne Dead-Letter**: `executor == false` (ohne Exception) erhöhte `attempts` nicht → Einträge liefen endlos weiter | ✅ behoben | `false` zählt als Versuch (`markAttempt`); nach `MAX_ATTEMPTS` Dead-Letter (Entfernung + `Log.w`) |
+| F-61f | **LOW_PROBABILITY-Spam**: Audit-Log-Eintrag pro Asset pro Zyklus | ✅ behoben | Throttle: je Asset nur alle 10 Zyklen (`LOW_PROBABILITY_EVERY_CYCLES`) |
+| F-61g | **Klartext-Backup blieb liegen**: SQLCipher-Migration hinterließ `$dbName.plain.bak` (Klartext-Kopie der ganzen DB) | ✅ behoben | Backup wird nach erfolgreicher Migration gelöscht (Rollback-Pfad im Fehlerfall bleibt) |
+| F-61h | **MCPClient `requestId` nicht atomar**: `++requestId` auf `var` aus mehreren Coroutines → doppelte IDs möglich | ✅ behoben | `AtomicInteger.incrementAndGet()` |
+| F-61i | **`detectionCount()` materialisierte ganze Tabelle**: `observeAll().first().size` | ✅ behoben | `detectionDao().count()` (SQL `COUNT(*)`) |
+| F-61j | **Offline-Karte nur Zufalls-Cache**: Offline-Modus stützte sich allein auf zufällig angesammelte osmdroid-Kacheln | ✅ behoben | `OfflineMapService.preloadRegion()` (osmdroid `CacheManager.downloadAreaNoUI`, Radius um Center, Zoom 10–17) für planbares Vorab-Laden |
+| F-05-Rest | **Broadcast-Alarm verworfen**: `MqttEvent.Broadcast` wurde emittiert, aber nirgends behandelt; Node-RED-Alarminject ging ins Leere | ✅ behoben | beidseitig: neues Topic `secureguard/broadcast/command` (MqttConfig + Subscription + Handler → Alert/Notification/Sound); Node-RED `sg_inject_alarm` sendet strukturiertes JSON auf das neue Topic |
+
+**Gesamtergebnis (2026-08-27, beide Runden):** 70 Befundpositionen bearbeitet –
+**68 behoben/wire-ready**, 2 bewusst offen/teilweise (F-44 RBAC-Enforcement Phase 2,
+F-45 i18n-Deep-Screens Phase 2), F-56 System-Broadcast ohne Handlungsbedarf.
+

@@ -32,27 +32,28 @@ class NotificationService @Inject constructor(
 
     private fun createChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Kanalnamen aus den String-Ressourcen (i18n, F-46)
             val alerts = NotificationChannel(
                 CHANNEL_ALERTS,
-                "Sicherheitsalarme",
+                context.getString(R.string.alerts_channel_name),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply { description = "Alarme und sicherheitsrelevante Ereignisse" }
 
             val agent = NotificationChannel(
                 CHANNEL_AGENT,
-                "Agent-Status",
+                context.getString(R.string.agent_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply { description = "Statusmeldungen des selbstlernenden Agenten" }
 
             val telemetry = NotificationChannel(
                 CHANNEL_TELEMETRY,
-                "Telemetriedaten",
+                context.getString(R.string.telemetry_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply { description = "Fahrzeug-/Asset-Telemetrie" }
 
             val system = NotificationChannel(
                 CHANNEL_SYSTEM,
-                "Systemmeldungen",
+                context.getString(R.string.system_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply { description = "Systembenachrichtigungen (Backup, Sync, Fehler)" }
 
@@ -111,6 +112,23 @@ class NotificationService @Inject constructor(
         runCatching { notificationManager.notify(AGENT_NOTIFICATION_ID, notification) }
     }
 
+    /**
+     * Telemetrie-Hinweis auf dem Telemetrie-Kanal (F-50: Kanal wird jetzt
+     * genutzt). Throttled: max. eine Meldung pro Asset und Minute.
+     */
+    fun sendTelemetryNotification(assetMac: String, summary: String) {
+        val now = System.currentTimeMillis()
+        val last = lastTelemetryNotify[assetMac] ?: 0L
+        if (now - last < TELEMETRY_THROTTLE_MS) return
+        lastTelemetryNotify[assetMac] = now
+        notify((now and 0x7FFFFFFFL).toInt(), "📡 Telemetrie", summary, CHANNEL_TELEMETRY)
+    }
+
+    /** System-Hinweis (Backup, Sync, Wartung) auf dem System-Kanal (F-50). */
+    fun sendSystemNotification(title: String, body: String) {
+        notify((System.currentTimeMillis() and 0x7FFFFFFFL).toInt(), title, body, CHANNEL_SYSTEM)
+    }
+
     fun sendActionNotification(asset: Asset, actionType: Any, success: Boolean) {
         val title = if (success) "Aktion ausgeführt" else "Aktion fehlgeschlagen"
         val body = "${actionType::class.simpleName ?: "Aktion"} · ${asset.shortName}"
@@ -160,7 +178,11 @@ class NotificationService @Inject constructor(
         notificationManager.notify(id, notification)
     }
 
+    private val lastTelemetryNotify = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
     companion object {
+        private const val TELEMETRY_THROTTLE_MS = 60_000L
+
         const val CHANNEL_ALERTS = "secureguard_alerts"
         const val CHANNEL_AGENT = "secureguard_agent"
         const val CHANNEL_TELEMETRY = "secureguard_telemetry"
