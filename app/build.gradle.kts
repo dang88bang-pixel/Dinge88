@@ -381,40 +381,30 @@ tasks.configureEach {
     }
 }
 
-// ==================== CI-Diagnose (minimal) ====================
-val ciDiagnose = tasks.register("ciDiagnose") {
-    doLast {
-        println("##[error]DIAG ciDiagnose LIEF (Tasks im Graph: " + gradle.taskGraph.allTasks.size + ")")
-        gradle.taskGraph.allTasks.forEach { t ->
-            val f = t.state.failure
-            if (f != null) {
-                println("##[error]DIAG ROOT " + t.path + " :: " + f.javaClass.name + ": " + (f.message ?: "-"))
-                var c: Throwable? = f.cause
-                var n = 0
-                while (c != null && n < 12) {
-                    val cc = c
-                    println("##[error]DIAG CAUSE " + t.path + " :: " + cc.javaClass.name + ": " + (cc.message ?: "-").take(1800).replace('\n', ' '))
-                    c = cc.cause
-                    n++
+// ==================== Kotlin-Fehler -> Annotations ====================
+// Haengt StandardError/Output-Listener an die Compile-Tasks: jede Zeile des
+// Kotlin-Compilers (e: file:...) wird als ##[error]-Annotation gespiegelt.
+afterEvaluate {
+    listOf(
+        "compileDebugKotlin", "compileReleaseKotlin",
+        "kaptDebugKotlin", "kaptReleaseKotlin",
+        "compileDebugJavaWithJavac", "compileReleaseJavaWithJavac"
+    ).forEach { tn ->
+        tasks.matching { it.name == tn }.configureEach {
+            logging.addStandardErrorListener(object : org.gradle.api.logging.StandardOutputListener {
+                override fun onOutput(message: CharSequence) {
+                    val m = message.toString()
+                    if (m.isNotBlank()) println("##[error]KOTLIN-ERR " + m.take(1600).replace('\n', ' '))
                 }
-            }
+            })
+            logging.addStandardOutputListener(object : org.gradle.api.logging.StandardOutputListener {
+                override fun onOutput(message: CharSequence) {
+                    val m = message.toString()
+                    if (m.contains("e: ") || m.contains("error:")) {
+                        println("##[error]KOTLIN-OUT " + m.take(1600).replace('\n', ' '))
+                    }
+                }
+            })
         }
-    }
-}
-// Finalizer direkt an die Tasks hängen, an denen der Build typischerweise
-// scheitert (die FAILED Task läuft -> ihre Finalizer laufen garantiert;
-// assembleDebug selbst läuft bei Compile-Fehler nie).
-listOf(
-    "compileDebugKotlin", "compileReleaseKotlin",
-    "kaptDebugKotlin", "kaptReleaseKotlin",
-    "kaptGenerateStubsDebugKotlin", "kaptGenerateStubsReleaseKotlin",
-    "compileDebugJavaWithJavac", "compileReleaseJavaWithJavac",
-    "mergeDebugResources", "mergeReleaseResources",
-    "processDebugResources", "processReleaseResources",
-    "checkDebugAarMetadata", "checkReleaseAarMetadata",
-    "assembleDebug", "assembleRelease"
-).forEach { tn ->
-    tasks.matching { it.name == tn }.configureEach {
-        finalizedBy(ciDiagnose)
     }
 }
