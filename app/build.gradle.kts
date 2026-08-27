@@ -401,8 +401,11 @@ val ciDiagnose = tasks.register("ciDiagnose") {
         }
     }
 }
-afterEvaluate {
-    tasks.matching { it.name == "assembleDebug" || it.name == "assembleRelease" }.configureEach {
-        finalizedBy(ciDiagnose)
+// An JEDER Task hängen: finalizer der FEHLGESCHLAGENEN Task laufen garantiert
+// (assembleDebug selbst läuft bei Compile-Fehler nie -> dort würde ciDiagnose
+// nie ausgeführt). Selbstreferenz ausgenommen (Zirkularität).
+tasks.configureEach {
+    if (it.name != "ciDiagnose") {
+        it.finalizedBy(ciDiagnose)
     }
 }
