@@ -55,3 +55,4 @@ backend/secureguard.db
 # Keystore base64 export
 *.b64
 app/secureguard-keystore.*
+dist/
