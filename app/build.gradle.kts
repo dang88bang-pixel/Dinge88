@@ -369,6 +369,7 @@ tasks.register("publishApkDelivery") {
                 sh(listOf("git", "-C", workDir.absolutePath,
                           "config", "http.https://github.com/.extraheader", ho))
             }
+            val branch = "apk-delivery-$buildType"
             var (c, o) = sh(listOf("git", "init", "-q", "-b", branch, workDir.absolutePath))
             if (c != 0) throw GradleException("git init: $o")
             sh(listOf("git", "-C", workDir.absolutePath, "add", "-f", "apk-dist")).let { (cc, oo) ->
