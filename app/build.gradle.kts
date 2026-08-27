@@ -62,15 +62,19 @@ android {
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
         buildConfigField("String", "WEBSOCKET_URL", "\"${apiKey("WEBSOCKET_URL")}\"")
         buildConfigField("String", "MCP_SERVER_URL", "\"${apiKey("MCP_SERVER_URL")}\"")
+        // Netatmo-OAuth2 (F-19); leer = Refresh deaktiviert
+        buildConfigField("String", "NETATMO_CLIENT_ID", "\"${apiKey("NETATMO_CLIENT_ID")}\"")
+        buildConfigField("String", "NETATMO_CLIENT_SECRET", "\"${apiKey("NETATMO_CLIENT_SECRET")}\"")
+        buildConfigField("String", "NETATMO_REFRESH_TOKEN", "\"${apiKey("NETATMO_REFRESH_TOKEN")}\"")
         buildConfigField("String", "BACKEND_BASE_URL", "\"${apiKey("BACKEND_BASE_URL")}\"")
         buildConfigField("String", "LORA_GATEWAY_URL", "\"${apiKey("LORA_GATEWAY_URL")}\"")
         buildConfigField("String", "YOLO_SERVER_URL", "\"${apiKey("YOLO_SERVER_URL")}\"")
         buildConfigField("String", "OPEN_DATA_API_URL", "\"${apiKey("OPEN_DATA_API_URL")}\"")
         buildConfigField("String", "FIND_MY_PROXY_URL", "\"${apiKey("FIND_MY_PROXY_URL")}\"")
-        // Runtime austauschbar (EndpointConfig); Default https://api.dhl.de/
+        // DHL runtime austauschbar (F-18); Default https://api.dhl.de/
         buildConfigField("String", "DHL_API_URL", "\"${apiKey("DHL_API_URL").ifBlank { "https://api.dhl.de/" }}\"")
         buildConfigField("String", "DHL_API_TOKEN", "\"${apiKey("DHL_API_TOKEN")}\"")
-        // Schreibende SecureGuard-Backend-Endpunkte (X-API-Key, F-71)
+        // X-API-Key für schreibende Backend-Endpunkte (F-71)
         buildConfigField("String", "SECUREGUARD_API_KEY", "\"${apiKey("SECUREGUARD_API_KEY")}\"")
         buildConfigField("String", "MQTT_USERNAME", "\"${apiKey("MQTT_USERNAME")}\"")
         buildConfigField("String", "MQTT_PASSWORD", "\"${apiKey("MQTT_PASSWORD")}\"")
@@ -398,12 +402,13 @@ val ciDiag = tasks.register("ciDiagnose") {
             println("##[error]DIAG: keine Task-Fehler sichtbar")
         }
         for ((path, f, _) in failures) {
-            var c: Throwable? = f
+            var cause: Throwable? = f
             var d = 0
-            while (c != null && d < 12) {
-                println("##[error]DIAG $path :: ${c.javaClass.name}: ${c.message?.take(1500)?.replace('\n', ' ')}")
-                sb.appendLine("FAILED $path [${c.javaClass.name}] ${c.message}")
-                c = c.cause; d++
+            while (cause != null && d < 12) {
+                val cc: Throwable = cause
+                println("##[error]DIAG " + path + " :: " + cc.javaClass.name + ": " + (cc.message ?: "(keine Meldung)").take(1500).replace("\n", " "))
+                sb.appendLine("FAILED " + path + " [" + cc.javaClass.name + "] " + (cc.message ?: "(keine Meldung)"))
+                cause = cc.cause; d++
             }
         }
         try {
