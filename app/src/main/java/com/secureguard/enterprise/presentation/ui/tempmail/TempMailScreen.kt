@@ -50,6 +50,7 @@ fun TempMailScreen(
     val currentInbox by viewModel.currentInbox.collectAsState()
     val lastOTP by viewModel.lastOTP.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
+    val isConfigured = viewModel.isConfigured
 
     Scaffold(
         topBar = {
