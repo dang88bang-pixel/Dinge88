@@ -1,6 +1,7 @@
 package com.secureguard.enterprise.services
 
 import android.content.Context
+import android.content.Intent
 import android.hardware.usb.UsbManager
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
@@ -33,6 +34,31 @@ class UsbSerialService @Inject constructor(
 
     fun hasPermission(driver: UsbSerialDriver): Boolean =
         usbManager.hasPermission(driver.device)
+
+    /**
+     * Fordert die USB-Berechtigung für ein Gerät an. Das Ergebnis kommt als
+     * Broadcast mit [ACTION_USB_PERMISSION] zurück (Empfänger: MainActivity).
+     * Der Aufruf muss aus einer Activity heraus geschehen (PendingIntent).
+     */
+    fun requestPermission(driver: UsbSerialDriver) {
+        val intent = Intent(ACTION_USB_PERMISSION).apply {
+            setPackage(context.packageName)
+        }
+        // FLAG_MUTABLE erst ab API 31 setzen (Parsen der Extras durch das System
+        // erfordert mutable); davor ist mutabel das Standardverhalten.
+        val flags = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE
+        } else {
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        val pendingIntent = android.app.PendingIntent.getBroadcast(context, 0, intent, flags)
+        usbManager.requestPermission(driver.device, pendingIntent)
+    }
+
+    companion object {
+        /** Broadcast-Action für das USB-Permission-Ergebnis. */
+        const val ACTION_USB_PERMISSION = "com.secureguard.enterprise.USB_PERMISSION"
+    }
 
     /**
      * Liest eine Zeile (bis `\n`) vom ersten verfügbaren Port.

@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Date
@@ -71,10 +73,34 @@ class ApiNodeManager @Inject constructor(
     private val consecutiveFailures = ConcurrentHashMap<String, Int>()
     private val lastFailureAt = ConcurrentHashMap<String, Long>()
 
+    private val monitorScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var healthMonitorJob: Job? = null
+    private var learningLoopJob: Job? = null
+
     init {
         registerAllNodes()
-        startHealthMonitor()
-        startLearningLoop()
+        startLoops()
+    }
+
+    /**
+     * Startet Health-Monitor + Learning-Loop (idempotent). Nach [shutdown]
+     * werden die Loops beim nächsten [queryAllNodes] automatisch wieder
+     * gestartet – der Manager bleibt damit steuerbar (F-38) und läuft nicht
+     * unnötig im Hintergrund, wenn der Agent gestoppt wurde.
+     */
+    @Synchronized
+    fun startLoops() {
+        if (healthMonitorJob?.isActive != true) healthMonitorJob = startHealthMonitor()
+        if (learningLoopJob?.isActive != true) learningLoopJob = startLearningLoop()
+    }
+
+    /** Stoppt Hintergrund-Loops (z. B. wenn der Agent gestoppt wird). */
+    @Synchronized
+    fun shutdown() {
+        healthMonitorJob?.cancel()
+        healthMonitorJob = null
+        learningLoopJob?.cancel()
+        learningLoopJob = null
     }
 
     // ============ NODES REGISTRIEREN ============
@@ -387,14 +413,12 @@ class ApiNodeManager @Inject constructor(
 
     // ============ HEALTH-MONITOR (CIRCUIT BREAKER) ============
 
-    private fun startHealthMonitor() {
-        CoroutineScope(Dispatchers.IO).launch {
-            while (isActive) {
-                nodeRegistry.keys.forEach { nodeId ->
-                    updateNodeStatus(nodeId, currentStatus(nodeId))
-                }
-                delay(60_000) // Alle 60 Sekunden
+    private fun startHealthMonitor(): Job = monitorScope.launch {
+        while (isActive) {
+            nodeRegistry.keys.forEach { nodeId ->
+                updateNodeStatus(nodeId, currentStatus(nodeId))
             }
+            delay(60_000) // Alle 60 Sekunden
         }
     }
 
@@ -419,12 +443,10 @@ class ApiNodeManager @Inject constructor(
 
     // ============ LEARNING-LAYER ============
 
-    private fun startLearningLoop() {
-        CoroutineScope(Dispatchers.IO).launch {
-            while (isActive) {
-                adaptPriorities()
-                delay(300_000) // Alle 5 Minuten
-            }
+    private fun startLearningLoop(): Job = monitorScope.launch {
+        while (isActive) {
+            adaptPriorities()
+            delay(300_000) // Alle 5 Minuten
         }
     }
 
@@ -471,6 +493,8 @@ class ApiNodeManager @Inject constructor(
         longitude: Double? = null,
         deviceId: String? = null
     ): List<Detection> {
+        // Falls nach einem shutdown() wieder abgefragt wird: Loops starten.
+        startLoops()
         val context = SearchContext(mac, latitude, longitude, deviceId)
         val results = mutableListOf<Detection>()
         _isQuerying.value = true

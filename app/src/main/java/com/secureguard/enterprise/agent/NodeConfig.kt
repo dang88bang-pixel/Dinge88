@@ -66,7 +66,10 @@ object DefaultNodeConfigs {
         priority = 70,
         rateLimitPerMinute = 15,
         timeoutMs = 10_000,
-        requiresAuth = true
+        // api.helium.io v1 benötigt KEINEN API-Key (Kontradiktion behoben);
+        // nach der Solana-Migration teils verändert/deprecated → im
+        // Fehlerfall liefert der Kanal leer (siehe ApiServiceManager.HELIUM_BASE_URL).
+        requiresAuth = false
     )
 
     val MQTT = NodeConfig(

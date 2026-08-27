@@ -95,7 +95,7 @@ class TempMailViewModel @Inject constructor(
     fun autoRegisterService(serviceName: String, url: String) {
         viewModelScope.launch {
             addLog("🌐 Auto-Register bei $serviceName...")
-            // Uses AgentService.autoRegisterExternalService indirectly via TempMailService
+            // Nutzt den MCPClient-REST-Fallback (Backend /api/mcp/*) via TempMailService.
             val inbox = tempMailService.createInbox()
             if (inbox?.success == true) {
                 addLog("✅ Inbox: ${inbox.email}")

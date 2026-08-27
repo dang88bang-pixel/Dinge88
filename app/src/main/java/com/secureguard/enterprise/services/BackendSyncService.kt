@@ -122,6 +122,12 @@ class BackendSyncService @Inject constructor(
         val body = payload.toRequestBody(JSON)
         val request = Request.Builder()
             .url("$base/api/assets")
+            // F-71: Backend verlangt X-API-Key auf schreibenden Endpunkten
+            // (Header nur setzen, wenn Key konfiguriert ist)
+            .apply {
+                val key = endpointConfig.backendApiKey
+                if (key.isNotBlank()) header("X-API-Key", key)
+            }
             .post(body)
             .build()
         http.newCall(request).execute().use { it.isSuccessful }

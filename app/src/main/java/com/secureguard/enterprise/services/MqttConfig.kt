@@ -19,6 +19,8 @@ object MqttConfig {
     const val TOPIC_COMMAND = "secureguard/+/command"
     const val TOPIC_STATUS = "secureguard/+/status"
     const val TOPIC_BROADCAST = "secureguard/broadcast"
+    /** Strukturierter Broadcast-Befehl (z. B. Node-RED-Alarm, F-05). */
+    const val TOPIC_BROADCAST_COMMAND = "secureguard/broadcast/command"
 
     // QoS
     const val QOS_TELEMETRY = 1

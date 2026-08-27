@@ -19,15 +19,15 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 - [Detection-Kanäle](#-detection-kanäle-9)
 - [Echtzeit-Kanäle](#-echtzeit-kanäle-3)
 - [Externe APIs (8)](#-externe-apis-8)
-- [Services (30)](#-services-30)
-- [UI-Screens (13)](#-ui-screens-13)
+- [Services (33)](#-services-33)
+- [UI-Screens (18)](#-ui-screens-18)
 - [Datenmodelle (8)](#-datenmodelle-8)
 - [Datenbank (Room v2)](#-datenbank-room-v2)
 - [Sicherheit & Berechtigungen](#-sicherheit--berechtigungen)
 - [Backend (FastAPI)](#-backend-fastapi)
 - [Firmware (ESP32)](#-firmware-esp32)
 - [Docker-Stack](#-docker-stack)
-- [Abhängigkeiten (48 Libraries)](#-abhängigkeiten-48-libraries)
+- [Abhängigkeiten (63 Libraries)](#-abhängigkeiten-63-libraries)
 - [Build & CI](#-build--ci)
 - [Konfiguration](#️-konfiguration)
 - [Offline-Setup (air-gapped)](#-offline-setup-air-gapped)
@@ -46,12 +46,12 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 | **Multi-Channel-Suche** | 9 parallele Detection-Kanäle pro Asset | `AgentService.comprehensiveSearch()` |
 | **Selbstlernender Agent** | Adaptive Intervalle, Kanal-Priorisierung | `LearningEngine` + `AgentService` |
 | **Echtzeit-Monitoring** | MQTT + WebSocket + NFC parallel | `startRealtimeChannels()` |
-| **Aktionen** | 8 Befehle über 4 Zustellkanäle | `AgentService.sendAction()` |
+| **Aktionen** | 8 Befehle über 3 direkte Zustellkanäle (MQTT, WebSocket, BLE/GATT) + persistente Offline-Queue | `AgentService.sendAction()` |
 | **Offline-Queue** | Persistierte Aktionen bei Netzverlust | `OfflineQueue` (Room) |
 | **Alarm-Sound** | Töne pro Schweregrad | `AlertSoundManager` |
-| **PIN-Sperre** | PBKDF2 + Auto-Lock + 5-Versuch-Limit | `AuthManager` |
+| **PIN-Sperre** | PBKDF2 + Auto-Lock + persistenter 5-Versuch-Lockout (exponentielle Zeitsperre) | `AuthManager` |
 | **Verschlüsselung** | AES/GCM via AndroidKeyStore | `EncryptionService` |
-| **RBAC** | 4 Rollen, 7 Permissions | `RoleManager` |
+| **RBAC** | 4 Rollen, 7 Permissions (vorbereitet; App läuft aktuell im ADMIN-Kontext) | `RoleManager` |
 | **Backup/Restore** | SQLite-Datei-Kopie + Validierung | `BackupManager` |
 | **CSV/PDF-Export** | Assets, Detektionen, Alarme | `ExportService` |
 | **QR-Scan** | ZXing-Kamera + HID-Barcode-Scanner | `ScanQrScreen` → `OpticalService` |
@@ -59,6 +59,7 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 | **USB-Serial** | FTDI/CP210x/CH34x/PL2303 Adapter | `UsbSerialService` |
 | **Karte** | OpenStreetMap + Offline-Kacheln | `MapScreen` + `OfflineMapService` |
 | **API-Node-Manager** | Circuit-Breaker, Rate-Limits, Health | `ApiNodeManager` (11 Nodes) |
+| **Agent-Einstellungen** | Persistiert über Neustarts | `AgentSettingsStore` |
 | **Hintergrund-Agent** | WorkManager 15-Min + ForegroundService | `SecureAgentWorker` + `AgentForegroundService` |
 | **Boot-Restart** | Agent startet nach Geräteneustart | `BootReceiver` |
 | **Datenbereinigung** | Retention: 30d/90d/365d | `DatabaseCleanup` |
@@ -371,7 +372,7 @@ secureguard/{MAC}/command  (publish für spezifisches Asset)
 
 ---
 
-## 📱 UI-Screens (13)
+## 📱 UI-Screens (18)
 
 | Screen | ViewModel | Route | Funktionen |
 |--------|-----------|-------|-----------|

@@ -1,238 +1,295 @@
 [
-  {
-    "id": "sg_tab_main",
-    "type": "tab",
-    "label": "SecureGuard",
-    "disabled": false,
-    "info": "SecureGuard Enterprise – MQTT Telemetrie & Befehle"
-  },
-  {
-    "id": "sg_mqtt_broker",
-    "type": "mqtt-broker",
-    "name": "SecureGuard MQTT",
-    "broker": "mqtt",
-    "port": "1883",
-    "clientid": "nodered-secureguard",
-    "autoConnect": true,
-    "usetls": false,
-    "protocolVersion": "4",
-    "keepalive": "60",
-    "cleansession": true
-  },
-  {
-    "id": "sg_in_telemetry",
-    "type": "mqtt in",
-    "z": "sg_tab_main",
-    "name": "Telemetrie",
-    "topic": "secureguard/+/telemetry",
-    "qos": "1",
-    "datatype": "json",
-    "broker": "sg_mqtt_broker",
-    "nl": false,
-    "rap": true,
-    "rh": 0,
-    "inputs": 0,
-    "x": 150,
-    "y": 120,
-    "wires": [["sg_debug_tel", "sg_ui_tel"]]
-  },
-  {
-    "id": "sg_in_status",
-    "type": "mqtt in",
-    "z": "sg_tab_main",
-    "name": "Status",
-    "topic": "secureguard/+/status",
-    "qos": "1",
-    "datatype": "utf8",
-    "broker": "sg_mqtt_broker",
-    "x": 130,
-    "y": 200,
-    "wires": [["sg_debug_status"]]
-  },
-  {
-    "id": "sg_in_alert",
-    "type": "mqtt in",
-    "z": "sg_tab_main",
-    "name": "Alerts",
-    "topic": "secureguard/+/alert",
-    "qos": "2",
-    "datatype": "json",
-    "broker": "sg_mqtt_broker",
-    "x": 130,
-    "y": 280,
-    "wires": [["sg_debug_alert"]]
-  },
-  {
-    "id": "sg_debug_tel",
-    "type": "debug",
-    "z": "sg_tab_main",
-    "name": "telemetry",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": true,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "payload.device",
-    "statusType": "auto",
-    "x": 400,
-    "y": 100,
-    "wires": []
-  },
-  {
-    "id": "sg_debug_status",
-    "type": "debug",
-    "z": "sg_tab_main",
-    "name": "status",
-    "active": true,
-    "tosidebar": true,
-    "x": 390,
-    "y": 200,
-    "wires": []
-  },
-  {
-    "id": "sg_debug_alert",
-    "type": "debug",
-    "z": "sg_tab_main",
-    "name": "alert",
-    "active": true,
-    "tosidebar": true,
-    "x": 380,
-    "y": 280,
-    "wires": []
-  },
-  {
-    "id": "sg_ui_tel",
-    "type": "function",
-    "z": "sg_tab_main",
-    "name": "format telemetry",
-    "func": "const p = msg.payload || {};\nconst topic = msg.topic || '';\nconst device = p.device || topic.split('/')[1] || 'unknown';\nmsg.payload = {\n  device,\n  battery: p.battery,\n  wifi_rssi: p.wifi_rssi,\n  lora_rssi: p.lora_rssi,\n  uptime: p.uptime,\n  ip: p.ip,\n  ts: new Date().toISOString()\n};\nmsg.topic = device;\nreturn msg;",
-    "outputs": 1,
-    "x": 420,
-    "y": 140,
-    "wires": [["sg_join_tel"]]
-  },
-  {
-    "id": "sg_join_tel",
-    "type": "join",
-    "z": "sg_tab_main",
-    "name": "last N",
-    "mode": "custom",
-    "build": "array",
-    "property": "payload",
-    "propertyType": "msg",
-    "key": "topic",
-    "joiner": "\\n",
-    "joinerType": "str",
-    "accumulate": true,
-    "timeout": "",
-    "count": "20",
-    "reduceRight": false,
-    "x": 610,
-    "y": 140,
-    "wires": [["sg_debug_table"]]
-  },
-  {
-    "id": "sg_debug_table",
-    "type": "debug",
-    "z": "sg_tab_main",
-    "name": "table",
-    "active": true,
-    "tosidebar": true,
-    "x": 770,
-    "y": 140,
-    "wires": []
-  },
-  {
-    "id": "sg_inject_alarm",
-    "type": "inject",
-    "z": "sg_tab_main",
-    "name": "ALARM broadcast",
-    "props": [{ "p": "payload" }, { "p": "topic", "vt": "str" }],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "secureguard/broadcast",
-    "payload": "ALARM",
-    "payloadType": "str",
-    "x": 160,
-    "y": 400,
-    "wires": [["sg_out_cmd"]]
-  },
-  {
-    "id": "sg_inject_telemetry",
-    "type": "inject",
-    "z": "sg_tab_main",
-    "name": "TELEMETRY request",
-    "props": [{ "p": "payload" }, { "p": "topic", "vt": "str" }],
-    "topic": "secureguard/ESP32_SecureGuard/command",
-    "payload": "TELEMETRY",
-    "payloadType": "str",
-    "x": 170,
-    "y": 460,
-    "wires": [["sg_out_cmd"]]
-  },
-  {
-    "id": "sg_out_cmd",
-    "type": "mqtt out",
-    "z": "sg_tab_main",
-    "name": "commands",
-    "topic": "",
-    "qos": "1",
-    "retain": "false",
-    "respTopic": "",
-    "broker": "sg_mqtt_broker",
-    "x": 420,
-    "y": 430,
-    "wires": []
-  },
-  {
-    "id": "sg_http_health",
-    "type": "http request",
-    "z": "sg_tab_main",
-    "name": "API health",
-    "method": "GET",
-    "ret": "obj",
-    "paytoqs": "ignore",
-    "url": "http://backend:8000/api/health",
-    "tls": "",
-    "persist": false,
-    "proxy": "",
-    "insecureHTTPParser": false,
-    "authType": "",
-    "senderr": false,
-    "headers": [],
-    "x": 400,
-    "y": 540,
-    "wires": [["sg_debug_health"]]
-  },
-  {
-    "id": "sg_inject_health",
-    "type": "inject",
-    "z": "sg_tab_main",
-    "name": "every 60s health",
-    "props": [{ "p": "payload" }],
-    "repeat": "60",
-    "crontab": "",
-    "once": true,
-    "onceDelay": "2",
-    "topic": "",
-    "payload": "",
-    "payloadType": "date",
-    "x": 180,
-    "y": 540,
-    "wires": [["sg_http_health"]]
-  },
-  {
-    "id": "sg_debug_health",
-    "type": "debug",
-    "z": "sg_tab_main",
-    "name": "health",
-    "active": true,
-    "tosidebar": true,
-    "x": 570,
-    "y": 540,
-    "wires": []
-  }
+ {
+  "id": "sg_tab_main",
+  "type": "tab",
+  "label": "SecureGuard",
+  "disabled": false,
+  "info": "SecureGuard Enterprise – MQTT Telemetrie & Befehle"
+ },
+ {
+  "id": "sg_mqtt_broker",
+  "type": "mqtt-broker",
+  "name": "SecureGuard MQTT",
+  "broker": "mqtt",
+  "port": "1883",
+  "clientid": "nodered-secureguard",
+  "autoConnect": true,
+  "usetls": false,
+  "protocolVersion": "4",
+  "keepalive": "60",
+  "cleansession": true
+ },
+ {
+  "id": "sg_in_telemetry",
+  "type": "mqtt in",
+  "z": "sg_tab_main",
+  "name": "Telemetrie",
+  "topic": "secureguard/+/telemetry",
+  "qos": "1",
+  "datatype": "json",
+  "broker": "sg_mqtt_broker",
+  "nl": false,
+  "rap": true,
+  "rh": 0,
+  "inputs": 0,
+  "x": 150,
+  "y": 120,
+  "wires": [
+   [
+    "sg_debug_tel",
+    "sg_ui_tel"
+   ]
+  ]
+ },
+ {
+  "id": "sg_in_status",
+  "type": "mqtt in",
+  "z": "sg_tab_main",
+  "name": "Status",
+  "topic": "secureguard/+/status",
+  "qos": "1",
+  "datatype": "utf8",
+  "broker": "sg_mqtt_broker",
+  "x": 130,
+  "y": 200,
+  "wires": [
+   [
+    "sg_debug_status"
+   ]
+  ]
+ },
+ {
+  "id": "sg_in_alert",
+  "type": "mqtt in",
+  "z": "sg_tab_main",
+  "name": "Alerts",
+  "topic": "secureguard/+/alert",
+  "qos": "2",
+  "datatype": "json",
+  "broker": "sg_mqtt_broker",
+  "x": 130,
+  "y": 280,
+  "wires": [
+   [
+    "sg_debug_alert"
+   ]
+  ]
+ },
+ {
+  "id": "sg_debug_tel",
+  "type": "debug",
+  "z": "sg_tab_main",
+  "name": "telemetry",
+  "active": true,
+  "tosidebar": true,
+  "console": false,
+  "tostatus": true,
+  "complete": "payload",
+  "targetType": "msg",
+  "statusVal": "payload.device",
+  "statusType": "auto",
+  "x": 400,
+  "y": 100,
+  "wires": []
+ },
+ {
+  "id": "sg_debug_status",
+  "type": "debug",
+  "z": "sg_tab_main",
+  "name": "status",
+  "active": true,
+  "tosidebar": true,
+  "x": 390,
+  "y": 200,
+  "wires": []
+ },
+ {
+  "id": "sg_debug_alert",
+  "type": "debug",
+  "z": "sg_tab_main",
+  "name": "alert",
+  "active": true,
+  "tosidebar": true,
+  "x": 380,
+  "y": 280,
+  "wires": []
+ },
+ {
+  "id": "sg_ui_tel",
+  "type": "function",
+  "z": "sg_tab_main",
+  "name": "format telemetry",
+  "func": "const p = msg.payload || {};\nconst topic = msg.topic || '';\nconst device = p.device || topic.split('/')[1] || 'unknown';\nmsg.payload = {\n  device,\n  battery: p.battery,\n  wifi_rssi: p.wifi_rssi,\n  lora_rssi: p.lora_rssi,\n  uptime: p.uptime,\n  ip: p.ip,\n  ts: new Date().toISOString()\n};\nmsg.topic = device;\nreturn msg;",
+  "outputs": 1,
+  "x": 420,
+  "y": 140,
+  "wires": [
+   [
+    "sg_join_tel"
+   ]
+  ]
+ },
+ {
+  "id": "sg_join_tel",
+  "type": "join",
+  "z": "sg_tab_main",
+  "name": "last N",
+  "mode": "custom",
+  "build": "array",
+  "property": "payload",
+  "propertyType": "msg",
+  "key": "topic",
+  "joiner": "\\n",
+  "joinerType": "str",
+  "accumulate": true,
+  "timeout": "",
+  "count": "20",
+  "reduceRight": false,
+  "x": 610,
+  "y": 140,
+  "wires": [
+   [
+    "sg_debug_table"
+   ]
+  ]
+ },
+ {
+  "id": "sg_debug_table",
+  "type": "debug",
+  "z": "sg_tab_main",
+  "name": "table",
+  "active": true,
+  "tosidebar": true,
+  "x": 770,
+  "y": 140,
+  "wires": []
+ },
+ {
+  "id": "sg_inject_alarm",
+  "type": "inject",
+  "z": "sg_tab_main",
+  "name": "ALARM broadcast/command",
+  "props": [
+   {
+    "p": "payload"
+   },
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "",
+  "crontab": "",
+  "once": false,
+  "onceDelay": 0.1,
+  "topic": "secureguard/broadcast/command",
+  "payload": "{\"type\":\"alarm\",\"message\":\"ALARM\",\"source\":\"node-red\"}",
+  "payloadType": "json",
+  "x": 160,
+  "y": 400,
+  "wires": [
+   [
+    "sg_out_cmd"
+   ]
+  ]
+ },
+ {
+  "id": "sg_inject_telemetry",
+  "type": "inject",
+  "z": "sg_tab_main",
+  "name": "TELEMETRY request (Default-Gateway)",
+  "props": [
+   {
+    "p": "payload"
+   },
+   {
+    "p": "topic",
+    "vt": "env"
+   }
+  ],
+  "topic": "SG_DEFAULT_DEVICE_ID",
+  "payload": "TELEMETRY",
+  "payloadType": "str",
+  "x": 170,
+  "y": 460,
+  "wires": [
+   [
+    "sg_out_cmd"
+   ]
+  ]
+ },
+ {
+  "id": "sg_out_cmd",
+  "type": "mqtt out",
+  "z": "sg_tab_main",
+  "name": "commands",
+  "topic": "",
+  "qos": "1",
+  "retain": "false",
+  "respTopic": "",
+  "broker": "sg_mqtt_broker",
+  "x": 420,
+  "y": 430,
+  "wires": []
+ },
+ {
+  "id": "sg_http_health",
+  "type": "http request",
+  "z": "sg_tab_main",
+  "name": "API health",
+  "method": "GET",
+  "ret": "obj",
+  "paytoqs": "ignore",
+  "url": "http://backend:8000/api/health",
+  "tls": "",
+  "persist": false,
+  "proxy": "",
+  "insecureHTTPParser": false,
+  "authType": "",
+  "senderr": false,
+  "headers": [],
+  "x": 400,
+  "y": 540,
+  "wires": [
+   [
+    "sg_debug_health"
+   ]
+  ]
+ },
+ {
+  "id": "sg_inject_health",
+  "type": "inject",
+  "z": "sg_tab_main",
+  "name": "every 60s health",
+  "props": [
+   {
+    "p": "payload"
+   }
+  ],
+  "repeat": "60",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "2",
+  "topic": "",
+  "payload": "",
+  "payloadType": "date",
+  "x": 180,
+  "y": 540,
+  "wires": [
+   [
+    "sg_http_health"
+   ]
+  ]
+ },
+ {
+  "id": "sg_debug_health",
+  "type": "debug",
+  "z": "sg_tab_main",
+  "name": "health",
+  "active": true,
+  "tosidebar": true,
+  "x": 570,
+  "y": 540,
+  "wires": []
+ }
 ]

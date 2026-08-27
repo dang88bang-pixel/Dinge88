@@ -25,7 +25,9 @@ import com.secureguard.enterprise.data.model.PendingAction
         PendingAction::class
     ],
     version = 2,
-    exportSchema = false
+    // Schemas werden nach app/schemas exportiert (room.schemaLocation in build.gradle.kts)
+    // → Voraussetzung für automatische Migration-Tests (room-testing).
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class SecureGuardDatabase : RoomDatabase() {

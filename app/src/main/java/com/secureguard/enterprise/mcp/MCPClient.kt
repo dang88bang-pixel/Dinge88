@@ -7,7 +7,9 @@ import com.secureguard.enterprise.config.EndpointConfig
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -68,7 +70,7 @@ class MCPClient @Inject constructor(
     }
 
     private var webSocket: WebSocket? = null
-    private var requestId = 0
+    private val requestId = java.util.concurrent.atomic.AtomicInteger(0)
 
     private val pendingRequests = ConcurrentHashMap<Int, (JsonObject) -> Unit>()
 
@@ -124,10 +126,10 @@ class MCPClient @Inject constructor(
         if (!isConfigured) return null
         // REST-Fallback (Backend /api/mcp/*), wenn URL kein WebSocket-Schema hat
         if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) {
-            return createInboxHttp()
+            return withContext(Dispatchers.IO) { createInboxHttp() }
         }
         connect()
-        val id = ++requestId
+        val id = requestId.incrementAndGet()
         val request = JsonObject().apply {
             addProperty("jsonrpc", "2.0")
             addProperty("id", id)
@@ -155,6 +157,12 @@ class MCPClient @Inject constructor(
             val base = serverUrl.trimEnd('/')
             val req = Request.Builder()
                 .url("$base/api/mcp/create_inbox")
+                // F-71: schreibender Endpunkt → X-API-Key mitsenden
+                // (Header nur setzen, wenn Key konfiguriert ist)
+                .apply {
+                    val key = endpointConfig.backendApiKey
+                    if (key.isNotBlank()) header("X-API-Key", key)
+                }
                 .post(ByteArray(0).toRequestBody(null))
                 .build()
             client.newCall(req).execute().use { resp ->
@@ -177,10 +185,10 @@ class MCPClient @Inject constructor(
     suspend fun waitForOTP(inboxToken: String, timeoutMs: Long = TIMEOUT_MS): OTPResult? {
         if (!isConfigured) return null
         if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) {
-            return waitForOtpHttp(inboxToken, timeoutMs)
+            return withContext(Dispatchers.IO) { waitForOtpHttp(inboxToken, timeoutMs) }
         }
         connect()
-        val id = ++requestId
+        val id = requestId.incrementAndGet()
         val request = JsonObject().apply {
             addProperty("jsonrpc", "2.0")
             addProperty("id", id)
@@ -215,10 +223,10 @@ class MCPClient @Inject constructor(
     suspend fun extractMagicLink(inboxToken: String): MagicLinkResult? {
         if (!isConfigured) return null
         if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) {
-            return extractMagicLinkHttp(inboxToken)
+            return withContext(Dispatchers.IO) { extractMagicLinkHttp(inboxToken) }
         }
         connect()
-        val id = ++requestId
+        val id = requestId.incrementAndGet()
         val request = JsonObject().apply {
             addProperty("jsonrpc", "2.0")
             addProperty("id", id)

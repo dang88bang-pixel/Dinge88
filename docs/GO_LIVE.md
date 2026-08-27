@@ -1,6 +1,6 @@
 # SecureGuard Enterprise – Go-Live (alle Parts)
 
-**Stand:** 2026-08-26 · Branch `arena/01a03c79-dinge88`
+**Stand:** 2026-08-27 · Branch `arena/01a0412d-dinge88` · Audit-Fixes siehe `docs/FEHLER_MANGEL_LISTE.md`
 
 > **Passwörter / PINs / Keystore:** legt der **Anwender selbst** fest.  
 > Kein Script und keine App-Logik erzeugen Produktionsgeheimnisse.
@@ -30,7 +30,8 @@
 # 0) Integritäts-Check (ohne Secrets)
 ./scripts/prepare-all.sh
 
-# 1) Backend-Stack
+# 1) Backend-Stack (optional .env anlegen: SECUREGUARD_API_KEY / CORS_ORIGINS)
+cp .env.example .env   # Werte setzen – schützt POST-Endpunkte per X-API-Key
 ./scripts/start-stack.sh
 ./scripts/smoke-check.sh
 

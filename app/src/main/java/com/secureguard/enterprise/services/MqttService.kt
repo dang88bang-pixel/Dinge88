@@ -65,6 +65,8 @@ class MqttService @Inject constructor(
                 subscribe(MqttConfig.TOPIC_ALERT)
                 subscribe(MqttConfig.TOPIC_STATUS)
                 subscribe(MqttConfig.TOPIC_BROADCAST)
+                // Strukturierter Broadcast-Befehl (F-05): Node-RED-Alarm & Co.
+                subscribe(MqttConfig.TOPIC_BROADCAST_COMMAND)
             }
 
             override fun connectionLost(cause: Throwable?) {
@@ -135,24 +137,28 @@ class MqttService @Inject constructor(
         }
     }
 
-    /** Veröffentlicht eine Nachricht auf einem Topic. */
-    fun publish(topic: String, payload: String, qos: Int = MqttConfig.QOS_COMMAND) {
-        val c = client ?: return
+    /**
+     * Veröffentlicht eine Nachricht auf einem Topic.
+     * @return true, wenn der Publish tatsächlich an den Broker übergeben wurde.
+     */
+    fun publish(topic: String, payload: String, qos: Int = MqttConfig.QOS_COMMAND): Boolean {
+        val c = client ?: return false
         if (!c.isConnected) {
             _events.tryEmit(MqttEvent.Error("MQTT nicht verbunden – Nachricht verworfen: $topic"))
-            return
+            return false
         }
-        try {
+        return try {
             c.publish(topic, MqttMessage(payload.toByteArray()).apply { this.qos = qos })
+            true
         } catch (e: Exception) {
             _events.tryEmit(MqttEvent.Error("MQTT-Publish-Fehler: ${e.message}"))
+            false
         }
     }
 
-    /** Sendet einen Befehl an ein Asset. */
-    fun sendCommand(assetMac: String, command: String) {
+    /** Sendet einen Befehl an ein Asset. @return true bei erfolgreicher Übergabe an den Broker. */
+    fun sendCommand(assetMac: String, command: String): Boolean =
         publish(MqttConfig.commandTopic(assetMac), command, MqttConfig.QOS_COMMAND)
-    }
 
     @Synchronized
     fun disconnect() {
@@ -205,7 +211,7 @@ class MqttService @Inject constructor(
                     _events.tryEmit(MqttEvent.Status(t, payload))
                 }
 
-                t == MqttConfig.TOPIC_BROADCAST -> {
+                t == MqttConfig.TOPIC_BROADCAST || t == MqttConfig.TOPIC_BROADCAST_COMMAND -> {
                     _events.tryEmit(MqttEvent.Broadcast(payload))
                 }
             }

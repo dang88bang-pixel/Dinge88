@@ -8,6 +8,8 @@ import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.Date
@@ -40,14 +42,14 @@ class CrowdService @Inject constructor(
     private val backendUrl: String
         get() = endpointConfig.backendBaseUrl
 
-    suspend fun searchAsset(asset: Asset): Detection? {
-        if (!asset.externalAllowed) return null
+    suspend fun searchAsset(asset: Asset): Detection? = withContext(Dispatchers.IO) {
+        if (!asset.externalAllowed) return@withContext null
 
         // 1) Eigenes Backend
-        searchBackend(asset)?.let { return it }
+        searchBackend(asset)?.let { return@withContext it }
 
         // 2) Find-My-Proxy (optional)
-        return searchFindMyProxy(asset)
+        searchFindMyProxy(asset)
     }
 
     private fun searchBackend(asset: Asset): Detection? {

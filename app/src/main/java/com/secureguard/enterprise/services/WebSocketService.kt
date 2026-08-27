@@ -98,15 +98,19 @@ class WebSocketService @Inject constructor(
         if (isConfigured) connect()
     }
 
-    fun sendMessage(data: Any) {
-        try {
-            webSocket?.send(gson.toJson(data))
+    /** @return true, wenn die Nachricht tatsächlich in den Socket geschrieben wurde. */
+    fun sendMessage(data: Any): Boolean {
+        val ws = webSocket ?: return false
+        return try {
+            ws.send(gson.toJson(data))
         } catch (e: Exception) {
             _events.tryEmit(WebSocketEvent.Error("Senden fehlgeschlagen: ${e.message}"))
+            false
         }
     }
 
-    fun sendCommand(assetId: String, action: String) {
+    /** @return true, wenn der Befehl tatsächlich gesendet wurde. */
+    fun sendCommand(assetId: String, action: String): Boolean =
         sendMessage(
             mapOf(
                 "type" to "command",
@@ -114,7 +118,6 @@ class WebSocketService @Inject constructor(
                 "action" to action
             )
         )
-    }
 
     fun disconnect() {
         try {

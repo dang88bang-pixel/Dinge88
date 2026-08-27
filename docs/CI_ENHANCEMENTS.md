@@ -1,3 +1,18 @@
+> **2026-08-27: Die Komplett-Erweiterung ist fertig entwickelt** – als kopierfertige
+> Vorlage unter **`docs/ci/build-release.yml`** (enthält: `arena/**`-Trigger, `Unit tests`-Step,
+> Android-Lint, Test-Report-Artefakte, Backend-pytest-Job).
+>
+> **Einmalig manuell aktivieren** (GitHub-App ohne `workflows`-Permission darf
+> `.github/workflows/` nicht ändern):
+>
+> ```bash
+> cp docs/ci/build-release.yml .github/workflows/build-release.yml
+> git add .github/workflows/build-release.yml && git commit -m "ci: activate extended workflow"
+> git push
+> ```
+>
+> Der folgende Text ist historisch.
+
 # CI-Erweiterungen (manuell mergen)
 
 Der Arena-Agent darf Workflow-Dateien unter `.github/workflows/` nicht

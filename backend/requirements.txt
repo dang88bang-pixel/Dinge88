@@ -1,4 +1,7 @@
-fastapi>=0.111
-uvicorn[standard]>=0.30
-paho-mqtt>=1.6
-pydantic>=2.7
+# Getestete Bereiche, bewusst eingegrenzt (reproduzierbare Builds).
+# paho-mqtt <2.0: die 2.x-API erfordert CallbackAPIVersion – der Backend-Code
+# nutzt die 1.x-API (Client(client_id=...)) und würde unter 3.x brechen.
+fastapi>=0.111,<0.116
+uvicorn[standard]>=0.30,<0.36
+paho-mqtt>=1.6,<2.0
+pydantic>=2.7,<3.0

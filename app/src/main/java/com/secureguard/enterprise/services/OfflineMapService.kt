@@ -3,6 +3,8 @@ package com.secureguard.enterprise.services
 import android.content.Context
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import java.io.File
 import javax.inject.Inject
@@ -58,6 +60,33 @@ class OfflineMapService @Inject constructor() {
             true
         }.getOrDefault(false)
     }
+
+    /**
+     * F-61j: Lädt eine Region VORAB in den osmdroid-Kachel-Cache. Der
+     * Offline-Modus war bisher auf den zufälligen Cache angewiesen – mit
+     * gezieltem Pre-Load ist er planbar (z. B. Einsatzgebiet vor Abfahrt).
+     *
+     * Netzwerklastig und blockierend: NICHT im Main-Thread aufrufen
+     * (UI kapselt das in viewModelScope(Dispatchers.IO)).
+     * @param radiusKm Radius um [center] in Kilometern
+     * @return true, wenn der Download ohne Fehler durchlief
+     */
+    fun preloadRegion(
+        mapView: MapView,
+        center: GeoPoint,
+        radiusKm: Double = 5.0
+    ): Boolean = runCatching {
+        val latDelta = radiusKm / 111.0
+        val lonDelta = radiusKm / (111.0 * Math.cos(Math.toRadians(center.latitude)).coerceAtLeast(0.1))
+        val box = BoundingBox(
+            center.latitude + latDelta, center.longitude + lonDelta,
+            center.latitude - latDelta, center.longitude - lonDelta
+        )
+        val manager = org.osmdroid.tileprovider.cachemanager.CacheManager(mapView)
+        // osmdroid 6.x: downloadAreaAsync(Context, BoundingBox, zoomMin, zoomMax)
+        manager.downloadAreaAsync(mapView.context, box, 10, 17)
+        true
+    }.getOrDefault(false)
 
     /**
      * Liefert die Download-URL für eine Region (Geofabrik-Exporte).

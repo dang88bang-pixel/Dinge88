@@ -1,5 +1,6 @@
 package com.secureguard.enterprise.presentation.ui.security
 
+import com.secureguard.enterprise.security.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -180,6 +181,58 @@ fun SecurityScreen(
                         pinMessage?.let {
                             Spacer(Modifier.height(4.dp))
                             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        // Auto-Lock-Dauer (F-49): konfigurierbar statt fix 5 Min
+                        val currentAutoLock by viewModel.authState.collectAsState()
+                        Text(
+                            "Auto-Lock nach Inaktivität: ${currentAutoLock.autoLockAfterMinutes} Min",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(5, 10, 30).forEach { minutes ->
+                                Button(
+                                    onClick = { viewModel.setAutoLockMinutes(minutes) },
+                                    modifier = Modifier.testTag("security_autolock_$minutes")
+                                ) {
+                                    Text(
+                                        "$minutes Min",
+                                        fontWeight = if (currentAutoLock.autoLockAfterMinutes == minutes) {
+                                            FontWeight.Bold
+                                        } else {
+                                            FontWeight.Normal
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        // Aktive RBAC-Rolle (F-44): Enforcement an allen
+                        // Mutations-Sites; Wechsel nur mit MANAGE_USERS.
+                        val currentRole by viewModel.role.collectAsState()
+                        val canSwitch = viewModel.canSwitchRoles
+                        Text(
+                            "Aktive Rolle: ${currentRole.name}" +
+                                if (!canSwitch) " (Wechsel gesperrt)" else "",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("ADMIN", "MANAGER", "OPERATOR", "VIEWER").forEach { roleName ->
+                                Button(
+                                    onClick = { viewModel.setRole(Role.valueOf(roleName)) },
+                                    enabled = canSwitch && currentRole.name != roleName,
+                                    modifier = Modifier.testTag("security_role_$roleName")
+                                ) {
+                                    Text(
+                                        roleName.lowercase().replaceFirstChar { it.uppercase() },
+                                        fontWeight = if (currentRole.name == roleName) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
                         }
                     }
                 }

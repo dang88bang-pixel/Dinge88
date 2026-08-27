@@ -23,7 +23,10 @@ object SqlCipherHelper {
     @Synchronized
     fun loadNative(context: Context) {
         if (loaded) return
-        SQLiteDatabase.loadLibs(context)
+        // sqlcipher-android 4.x: natives Laden via System.loadLibrary
+        // (das alte SQLiteDatabase.loadLibs(context) stammt aus der
+        // eingestellten Lib android-database-sqlcipher).
+        System.loadLibrary("sqlcipher")
         loaded = true
         Log.i(TAG, "SQLCipher native libs geladen")
     }
@@ -70,10 +73,11 @@ object SqlCipherHelper {
             dbPath.copyTo(plainBackup, overwrite = true)
 
             // Plain öffnen (leerer Key = unverschlüsselt). API sqlcipher-android 4.x:
-            // openDatabase(path, password, cursorFactory, flags, databaseHook, errorHandler)
+            // openDatabase(path, password: ByteArray?, factory, flags, hook, errorHandler)
+            // – leerer Key öffnet eine Plaintext-Datenbank.
             val plain = SQLiteDatabase.openDatabase(
                 dbPath.absolutePath,
-                "",
+                ByteArray(0),
                 null,
                 SQLiteDatabase.OPEN_READWRITE,
                 null,
@@ -122,7 +126,14 @@ object SqlCipherHelper {
                 encryptedTmp.delete()
             }
 
-            Log.i(TAG, "Migration OK – Klartext-Backup: ${plainBackup.name}")
+            // F-61g: Klartext-Backup nach erfolgreicher Migration LÖSCHEN –
+            // eine .plain.bak auf dem Speicher ist ein Klartext-Leak der
+            // gesamten Datenbank. (Rollback-Fälle nutzen die Kopie im
+            // Fehlerpfad unten; dort bleibt sie bewusst erhalten.)
+            if (plainBackup.exists() && !plainBackup.delete()) {
+                Log.w(TAG, "Klartext-Backup konnte nicht gelöscht werden: ${plainBackup.name}")
+            }
+            Log.i(TAG, "Migration OK – Klartext-Backup entfernt")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Migration fehlgeschlagen – stelle Backup wieder her", e)
@@ -147,5 +158,48 @@ object SqlCipherHelper {
     fun isSqlCipherDatabase(file: File): Boolean {
         if (!file.exists() || file.length() < 512L) return false
         return !isPlainSqlite(file)
+    }
+
+    /**
+     * Harte Validierung einer SQLCipher-Datei: Die Datei wird mit dem
+     * übergebenen Passphrase tatsächlich geöffnet und per Query geprüft.
+     * Damit wird verhindert, dass beliebige (korrupte/fremde) Dateien als
+     * „Backup" durch einen Restore die Live-DB überschreiben.
+     *
+     * @return true, wenn die Datei eine gültige, mit [passphrase] verschlüsselte
+     *         SQLCipher-Datenbank ist.
+     */
+    fun validateSqlCipherFile(file: File, passphrase: ByteArray): Boolean {
+        if (!file.exists() || file.length() < 512L) return false
+        loadNativeMustHaveContext() // no-op, setzt nur den loaded-Flag
+        return try {
+            val db = SQLiteDatabase.openDatabase(
+                file.absolutePath,
+                passphrase,
+                null,
+                SQLiteDatabase.OPEN_READONLY,
+                null,
+                null
+            )
+            try {
+                db.rawQuery("SELECT count(*) FROM sqlite_master", emptyArray()).use { cursor ->
+                    cursor.moveToFirst() && cursor.columnCount > 0
+                }
+            } finally {
+                db.close()
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Hinweis: [loadNative] benötigt einen Context zum Laden der nativen Libs.
+     * Für die Validierung setzen wir voraus, dass sie bereits geladen ist
+     * (der Aufrufer – BackupManager – läuft im laufenden App-Kontext). Ist das
+     * nicht der Fall, wird die Validierung mit Fehler abgelehnt.
+     */
+    private fun loadNativeMustHaveContext() {
+        check(loaded) { "SQLCipher native libs nicht geladen – BackupManager läuft im App-Kontext" }
     }
 }

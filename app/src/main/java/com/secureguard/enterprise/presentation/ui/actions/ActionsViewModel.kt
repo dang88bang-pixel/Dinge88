@@ -8,7 +8,6 @@ import com.secureguard.enterprise.presentation.ui.common.ActionType
 import com.secureguard.enterprise.security.Permission
 import com.secureguard.enterprise.security.Role
 import com.secureguard.enterprise.security.RoleManager
-import com.secureguard.enterprise.security.User
 import com.secureguard.enterprise.services.AgentService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +25,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ActionsViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
-    private val agentService: AgentService
+    private val agentService: AgentService,
+    private val roleManager: RoleManager
 ) : ViewModel() {
 
     private val assetsFlow = repository.getWhitelistedAssets()
@@ -60,10 +60,10 @@ class ActionsViewModel @Inject constructor(
         viewModelScope.launch {
             val asset = selectedAsset.value ?: return@launch
 
-            // RBAC permission check
-            val user = User(id = "local", name = "Admin", role = Role.ADMIN)
-            if (!RoleManager.hasPermission(user, Permission.EXECUTE_ACTIONS)) {
-                _commandLog.value = _commandLog.value + "⛔ Keine Berechtigung für Aktionen"
+            // RBAC gegen die AKTIVE Rolle (F-44, vorher harter ADMIN)
+            if (!roleManager.require(Permission.EXECUTE_ACTIONS)) {
+                _commandLog.value = _commandLog.value +
+                    "⛔ Rolle ${roleManager.currentRole}: Keine Berechtigung für Aktionen"
                 return@launch
             }
 

@@ -12,6 +12,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -52,6 +53,7 @@ fun SecureGuardApp() {
             if (showBottomBar) {
                 NavigationBar {
                     NavItem.bottomNavItems.forEach { item ->
+                        val label = stringResource(item.labelRes)
                         NavigationBarItem(
                             selected = currentRoute == item.route,
                             onClick = {
@@ -63,8 +65,8 @@ fun SecureGuardApp() {
                                     }
                                 }
                             },
-                            icon = { Icon(item.icon, contentDescription = item.label) },
-                            label = { Text(item.label) }
+                            icon = { Icon(item.icon, contentDescription = label) },
+                            label = { Text(label) }
                         )
                     }
                 }

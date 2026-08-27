@@ -15,6 +15,10 @@ class AlertSoundManager @Inject constructor() {
 
     private var activeTone: ToneGenerator? = null
 
+    /** Handler für das Auto-Stop-Sicherheitsnetz von Dauer-Alarms. */
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val autoStop = Runnable { stop() }
+
     fun play(soundName: String?, loop: Boolean = false) {
         stop()
         when (soundName?.lowercase()) {
@@ -48,5 +52,16 @@ class AlertSoundManager @Inject constructor() {
         } ?: return
         activeTone = generator
         runCatching { generator.startTone(tone, durationMs) }
+        // Sicherheitsnetz (F-53): ein Loop-Alarm endet spätestens nach
+        // [ALARM_AUTO_STOP_MS], auch ohne manuelles stop().
+        if (durationMs < 0) {
+            mainHandler.removeCallbacks(autoStop)
+            mainHandler.postDelayed(autoStop, ALARM_AUTO_STOP_MS)
+        }
+    }
+
+    companion object {
+        /** Maximale Laufzeit eines Dauer-Alarms. */
+        const val ALARM_AUTO_STOP_MS = 30_000L
     }
 }

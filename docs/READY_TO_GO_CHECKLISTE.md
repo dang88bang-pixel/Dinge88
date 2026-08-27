@@ -1,9 +1,15 @@
 # SecureGuard Enterprise – Ready-to-Go Checkliste
 
-Stand: 2026-08-26 · Branch `arena/01a03c79-dinge88`  
+Stand: 2026-08-27 · Branch `arena/01a0412d-dinge88` · Vollaudit + Reparatur: **docs/FEHLER_MANGEL_LISTE.md**  
 Ziel: **vollständige App mit allen Diensten angebunden und einsatzbereit**.
 
 > **Update 2026-08-26 (Vollbereitstellung):** `prepare-all.sh`, Docker-Healthchecks, Branch/PR-ready. Alle Funktionen erhalten.
+
+> **Update 2026-08-27 (Vollaudit-Reparatur):** 60 Befunde (`FEHLER_MANGEL_LISTE.md`) repariert:
+> StrongBox-Crash, Main-Thread-IO, PIN-Lockout, Backup-Validierung/WAL, MQTT-Wildcard,
+> SPI-Pin-Konflikt, Backend-Auth/CORS/Health-503, USB-Permission-Flow, Background-Location,
+> Backup-Rules, device_filter-Hex, CI-Tests (Android+Backend), AgentSettings-Persistenz,
+> NDEF-Parser, WiGle-Basic-Auth, requirements-Pinning, Node-RED-Cleanup. Siehe auch IMPLEMENTIERUNGS_INVENTUR.md.
 
 > **Update 2026-08-26 (Batch 4 / Go-Live-Pack):** DSGVO Datenauskunft/Retention/Löschen, Health-Monitor-Screen, Backend `/api/health` Stats, smoke/start-stack Scripts, CI Unit-Tests.
 

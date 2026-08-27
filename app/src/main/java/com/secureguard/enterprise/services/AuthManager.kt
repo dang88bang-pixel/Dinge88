@@ -34,11 +34,31 @@ class AuthManager @Inject constructor(
         val enabled: Boolean = false,
         val locked: Boolean = false,
         val attemptsRemaining: Int = MAX_ATTEMPTS,
-        val autoLockAfterMinutes: Int = AUTO_LOCK_MINUTES
+        val autoLockAfterMinutes: Int = AUTO_LOCK_MINUTES,
+        /** >0 = aktive Zeitsperre nach zu vielen Fehlversuchen. */
+        val lockoutSecondsRemaining: Long = 0
     )
 
     private val _state = MutableStateFlow(loadState())
     val state: StateFlow<AuthState> = _state.asStateFlow()
+
+    /** Fehlversuche persistent – überleben den App-/Prozess-Neustart. */
+    private var failedAttempts: Int
+        get() = prefs.getInt(KEY_FAILED_ATTEMPTS, 0)
+        set(value) = prefs.edit().putInt(KEY_FAILED_ATTEMPTS, value).apply()
+
+    /** Auto-Lock-Dauer in Minuten (persistent, 1–60 Min, F-49).
+     *  (Intern 'autoLockMinutesPref', damit der JVM-Setter nicht mit der
+     *  öffentlichen Funktion setAutoLockMinutes() kollidiert.) */
+    private var autoLockMinutesPref: Int
+        get() = prefs.getInt(KEY_AUTO_LOCK_MINUTES, AUTO_LOCK_MINUTES).coerceIn(1, 60)
+        private set(value) = prefs.edit().putInt(KEY_AUTO_LOCK_MINUTES, value).apply()
+
+    /** Setzt die Auto-Lock-Dauer (UI: Security-Center). */
+    fun setAutoLockMinutes(minutes: Int) {
+        autoLockMinutesPref = minutes.coerceIn(1, 60)
+        _state.value = _state.value.copy(autoLockAfterMinutes = autoLockMinutesPref)
+    }
 
     private val secureRandom = SecureRandom()
 
@@ -51,8 +71,9 @@ class AuthManager @Inject constructor(
         prefs.edit()
             .putString(KEY_HASH, hash(pin, salt))
             .putString(KEY_SALT, salt.toBase64())
-            .putLong(KEY_LOCKED_AT, System.currentTimeMillis())
+            .putLong(KEY_LOCKED_AT, 0L)
             .remove(KEY_LAST_UNLOCK)
+            .putInt(KEY_FAILED_ATTEMPTS, 0)
             .apply()
         _state.value = AuthState(
             enabled = true,
@@ -62,38 +83,77 @@ class AuthManager @Inject constructor(
         return true
     }
 
-    /** Entsperrt die App bei korrekter PIN. */
+    /**
+     * Entsperrt die App bei korrekter PIN.
+     * Nach [MAX_ATTEMPTS] Fehlversuchen greift eine exponentielle Zeitsperre
+     * ([LOCKOUT_BASE_MINUTES] × 2^(überschrittene Batches)); der Versuchszähler
+     * ist persistent und überlebt den App-Neustart.
+     */
     fun unlock(pin: String): Boolean {
         val storedHash = prefs.getString(KEY_HASH, null) ?: return false
         val salt = prefs.getString(KEY_SALT, null)?.fromBase64() ?: return false
+
+        // Aktive Zeitsperre? → PIN-Eingabe wird abgewiesen, ohne den Hash zu prüfen.
+        if (lockoutRemainingSeconds() > 0) {
+            _state.value = _state.value.copy(
+                locked = true,
+                attemptsRemaining = 0,
+                lockoutSecondsRemaining = lockoutRemainingSeconds()
+            )
+            return false
+        }
+
         val ok = MessageDigest.isEqual(
             hash(pin, salt).toByteArray(Charsets.UTF_8),
             storedHash.toByteArray(Charsets.UTF_8)
         )
         if (ok) {
+            failedAttempts = 0
             prefs.edit()
                 .remove(KEY_LOCKED_AT)
                 .putLong(KEY_LAST_UNLOCK, System.currentTimeMillis())
                 .apply()
-            _state.value = _state.value.copy(locked = false, attemptsRemaining = MAX_ATTEMPTS)
+            _state.value = _state.value.copy(
+                locked = false,
+                attemptsRemaining = MAX_ATTEMPTS,
+                autoLockAfterMinutes = autoLockMinutesPref,
+                lockoutSecondsRemaining = 0
+            )
         } else {
-            val remaining = (_state.value.attemptsRemaining - 1).coerceAtLeast(0)
-            // Bei falscher PIN bleibt die App IMMER gesperrt.
-            // remaining==0 → zusätzlich Hard-Lock (keine weiteren Versuche bis Neustart/Reset).
+            val attempts = failedAttempts + 1
+            failedAttempts = attempts
+            val remaining = (MAX_ATTEMPTS - attempts).coerceAtLeast(0)
             _state.value = _state.value.copy(
                 locked = true,
                 attemptsRemaining = remaining
             )
-            if (remaining <= 0) {
-                prefs.edit().putLong(KEY_LOCKED_AT, System.currentTimeMillis()).apply()
+            if (attempts >= MAX_ATTEMPTS) {
+                // Zeitsperre speichern: Basis × 2^(abgeschlossene Extra-Batches)
+                val extraBatches = ((attempts - MAX_ATTEMPTS) / MAX_ATTEMPTS)
+                val lockoutMs = LOCKOUT_BASE_MINUTES * 60_000L * (1L shl extraBatches.coerceAtMost(6))
+                prefs.edit()
+                    .putLong(KEY_LOCKED_AT, System.currentTimeMillis() + lockoutMs)
+                    .apply()
+                _state.value = _state.value.copy(
+                    attemptsRemaining = 0,
+                    lockoutSecondsRemaining = lockoutMs / 1000L
+                )
             }
         }
         return ok
     }
 
-    /** Sperrt die App manuell. */
+    /** Verbleibende Sekunden der aktuellen Zeitsperre (0 = keine Sperre). */
+    fun lockoutRemainingSeconds(): Long {
+        val until = prefs.getLong(KEY_LOCKED_AT, 0L)
+        if (until <= 0L) return 0L
+        val remaining = (until - System.currentTimeMillis()) / 1000L
+        return if (remaining > 0) remaining else 0L
+    }
+
+    /** Sperrt die App manuell (ohne Zeitsperre – Entsperren mit PIN jederzeit möglich). */
     fun lock() {
-        prefs.edit().putLong(KEY_LOCKED_AT, System.currentTimeMillis()).apply()
+        prefs.edit().putLong(KEY_LOCKED_AT, 0L).apply()
         _state.value = _state.value.copy(locked = true)
     }
 
@@ -105,7 +165,7 @@ class AuthManager @Inject constructor(
         if (!_state.value.enabled || _state.value.locked) return
         val lastUnlock = prefs.getLong(KEY_LAST_UNLOCK, 0L)
         if (lastUnlock > 0 &&
-            System.currentTimeMillis() - lastUnlock > AUTO_LOCK_MINUTES * 60_000L
+            System.currentTimeMillis() - lastUnlock > autoLockMinutesPref * 60_000L
         ) {
             lock()
         }
@@ -118,17 +178,23 @@ class AuthManager @Inject constructor(
             .remove(KEY_SALT)
             .remove(KEY_LOCKED_AT)
             .remove(KEY_LAST_UNLOCK)
+            .remove(KEY_FAILED_ATTEMPTS)
             .apply()
         _state.value = AuthState(enabled = false, locked = false)
     }
 
     private fun loadState(): AuthState {
         val enabled = isPinConfigured()
-        // Mit eingerichteter PIN startet die App gesperrt.
+        // Mit eingerichteter PIN startet die App gesperrt; ein aktiver Lockout
+        // (exponentielle Zeitsperre nach Fehlversuchen) bleibt über Neustarts aktiv.
+        val lockout = lockoutRemainingSeconds()
+        val usedAttempts = failedAttempts.coerceIn(0, MAX_ATTEMPTS)
         return AuthState(
             enabled = enabled,
             locked = enabled,
-            attemptsRemaining = MAX_ATTEMPTS
+            attemptsRemaining = if (lockout > 0) 0 else MAX_ATTEMPTS - usedAttempts,
+            autoLockAfterMinutes = autoLockMinutesPref,
+            lockoutSecondsRemaining = lockout
         )
     }
 
@@ -154,6 +220,9 @@ class AuthManager @Inject constructor(
     companion object {
         const val MAX_ATTEMPTS = 5
         const val AUTO_LOCK_MINUTES = 5
+
+        /** Basis-Dauer der Zeitsperre nach Erreichen von MAX_ATTEMPTS. */
+        const val LOCKOUT_BASE_MINUTES = 1L
         private const val ITERATIONS = 100_000
         private const val KEY_LENGTH_BITS = 256
 
@@ -161,5 +230,7 @@ class AuthManager @Inject constructor(
         private const val KEY_SALT = "pin_salt"
         private const val KEY_LOCKED_AT = "locked_at"
         private const val KEY_LAST_UNLOCK = "last_unlock"
+        private const val KEY_FAILED_ATTEMPTS = "failed_attempts"
+        private const val KEY_AUTO_LOCK_MINUTES = "auto_lock_minutes"
     }
 }

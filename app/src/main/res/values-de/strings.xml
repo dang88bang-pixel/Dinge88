@@ -5,4 +5,9 @@
     <string name="alerts_channel_name">Sicherheitsalarme</string>
     <string name="telemetry_channel_name">Telemetriedaten</string>
     <string name="system_channel_name">Systemmeldungen</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_assets">Assets</string>
+    <string name="nav_map">Karte</string>
+    <string name="nav_actions">Aktionen</string>
+    <string name="nav_settings">Einstellungen</string>
 </resources>

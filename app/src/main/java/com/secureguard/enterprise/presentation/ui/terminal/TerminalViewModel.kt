@@ -2,6 +2,7 @@ package com.secureguard.enterprise.presentation.ui.terminal
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import com.secureguard.enterprise.presentation.theme.TerminalAmber
 import com.secureguard.enterprise.presentation.theme.TerminalCyan
 import com.secureguard.enterprise.presentation.theme.TerminalGreen
@@ -66,7 +67,8 @@ class TerminalViewModel @Inject constructor(
             }
             "cycle" -> {
                 addEntry("  [INFO] Manueller Cycle gestartet...", TerminalCyan)
-                viewModelScope.launch {
+                // Netzwerk + DB: nicht auf Main ausführen (F-02-Rest)
+                viewModelScope.launch(Dispatchers.IO) {
                     val result = agentService.runCycle()
                     addEntry("  [OK] ${result.assetsChecked} Assets | ${result.detections} Treffer", TerminalGreen)
                     result.channelHits.forEach { (channel, count) ->
@@ -75,7 +77,7 @@ class TerminalViewModel @Inject constructor(
                 }
             }
             "flush" -> {
-                viewModelScope.launch {
+                viewModelScope.launch(Dispatchers.IO) {
                     val flushed = agentService.flushOfflineQueue()
                     addEntry("  [OK] $flushed Aktionen zugestellt.", TerminalGreen)
                 }

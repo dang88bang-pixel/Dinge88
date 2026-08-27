@@ -41,8 +41,9 @@ class SecureGuardApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        // Apply pending database restore if staged
-        backupManager.applyPendingRestoreIfPresent()
+        // Apply pending database restore if staged (Direct-Boot-sicher: kann
+        // vor User-Unlock laufen, dann ist externer Speicher evtl. nicht nutzbar).
+        runCatching { backupManager.applyPendingRestoreIfPresent() }
         Log.i(
             TAG,
             "Gerät: ${CT45PConfig.deviceSummary()} · CT45P: ${CT45PConfig.isCT45P()} · " +
@@ -51,7 +52,8 @@ class SecureGuardApplication : Application(), Configuration.Provider {
         if (com.secureguard.enterprise.BuildConfig.DEBUG) {
             seedDemoDataIfEmpty()
         }
-        scheduleAgentWorker()
+        runCatching { scheduleAgentWorker() }
+            .onFailure { Log.w(TAG, "WorkManager-Scheduling nicht möglich (z. B. Direct Boot)", it) }
     }
 
     /**

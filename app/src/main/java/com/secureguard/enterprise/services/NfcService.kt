@@ -42,12 +42,19 @@ class NfcService @Inject constructor(
             val message: NdefMessage = ndef.ndefMessage ?: return null
             ndef.close()
             val record = message.records.firstOrNull() ?: return null
-            // NDEF-Text-Record: Status-Byte + Sprache + Text
+            // RTD-Text: Byte 0 = Status (Bit 7: UTF-16, Bits 5..0: Sprachcode-Länge)
             val payload = record.payload
-            val text = if (payload.isNotEmpty() && payload[0] == 0x02.toByte()) {
-                String(payload, 3, payload.size - 3, Charsets.UTF_8)
+            if (payload.isEmpty()) return null
+            val status = payload[0].toInt() and 0xFF
+            val languageLength = status and 0x3F
+            val isUtf16 = (status and 0x80) != 0
+            val textStart = 1 + languageLength
+            val text = if (textStart >= payload.size) {
+                ""
+            } else if (isUtf16) {
+                String(payload, textStart, payload.size - textStart, Charsets.UTF_16)
             } else {
-                String(payload, Charsets.UTF_8)
+                String(payload, textStart, payload.size - textStart, Charsets.UTF_8)
             }
             text.trim().ifBlank { null }
         }.getOrNull()

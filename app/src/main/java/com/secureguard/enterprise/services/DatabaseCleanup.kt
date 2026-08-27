@@ -1,7 +1,6 @@
 package com.secureguard.enterprise.services
 
 import com.secureguard.enterprise.data.local.SecureGuardDatabase
-import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,7 +40,9 @@ class DatabaseCleanup @Inject constructor(
 
     /** Anzahl der aktuell gespeicherten Detektionen (für Anzeige/Tests). */
     suspend fun detectionCount(): Int =
-        database.detectionDao().observeAll().first().size
+        // F-61i: COUNT(*) statt observeAll().first() – sonst wird die ganze
+        // detections-Tabelle materialisiert, nur um sie zu zählen.
+        database.detectionDao().count()
 }
 
 data class CleanupResult(

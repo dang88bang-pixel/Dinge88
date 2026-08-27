@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
+    <!-- Datenbank inkl. WAL/SHM (verschlüsselt, aber nicht in Cloud-Backups) -->
     <exclude domain="database" path="secureguard.db" />
+    <exclude domain="database" path="secureguard.db-wal" />
+    <exclude domain="database" path="secureguard.db-shm" />
+    <exclude domain="database" path="secureguard.db-journal" />
+    <!-- Prefs: Endpunkte enthalten MQTT-Passwort, db_key SQLCipher-Keymaterial,
+         auth PIN-Hash/Salt → niemals in Cloud-Backup/Device-Transfer. -->
     <exclude domain="sharedpref" path="secureguard_settings.xml" />
+    <exclude domain="sharedpref" path="secureguard_endpoints.xml" />
+    <exclude domain="sharedpref" path="secureguard_db_key.xml" />
+    <exclude domain="sharedpref" path="secureguard_auth.xml" />
+    <exclude domain="sharedpref" path="secureguard_roles.xml" />
 </full-backup-content>

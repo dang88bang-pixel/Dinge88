@@ -13,9 +13,15 @@ sdk.dir=/home/USER/.secureguard/android-sdk
 # sdk.dir=C:/Users/USER/.secureguard/android-sdk
 
 # ---- API-Keys (niemals committen) ----
-WIGLE_API_KEY=your_wigle_key_here
+# WiGle verlangt HTTP-Basic: Format <API-Token>:<API-Name>
+# (z. B. "AbCdEf123456:MeinAccountName"). Ein Wert ohne ":" wird als Bearer gesendet.
+WIGLE_API_KEY=your_wigle_token:your_wigle_name
 OPEN_CHARGE_MAP_KEY=your_ocm_key_here
-NETATMO_TOKEN=your_netatmo_token_here
+NETATMO_TOKEN=
+# Netatmo OAuth2-Refresh (empfohlen – Access-Tokens laufen nach ~3h ab):
+NETATMO_CLIENT_ID=
+NETATMO_CLIENT_SECRET=
+NETATMO_REFRESH_TOKEN=
 GOOGLE_API_KEY=your_google_key_here
 
 # ---- Backend / Broker (Build-Defaults; zur Laufzeit in Settings überschreibbar) ----
@@ -29,6 +35,9 @@ MCP_SERVER_URL=http://10.0.2.2:8000
 BACKEND_BASE_URL=http://10.0.2.2:8000
 
 # ---- Optionale Gateways / Proxies ----
+# DHL Location-API (braucht DHL-Vertrag): URL + optionaler Bearer-Token
+DHL_API_URL=
+DHL_API_TOKEN=
 LORA_GATEWAY_URL=http://lora-gateway.example.com:8080
 YOLO_SERVER_URL=http://yolo-inference.example.com:5000
 OPEN_DATA_API_URL=https://demo.ckan.org/api/3
@@ -39,3 +48,7 @@ FIND_MY_PROXY_URL=https://find-my-proxy.example.com
 # KEYSTORE_PASSWORD=
 # KEY_ALIAS=secureguard
 # KEY_PASSWORD=
+
+# ---- SecureGuard-Backend: X-API-Key für schreibende Endpunkte (POST) ----
+# Muss zum SECUREGUARD_API_KEY im Backend-.env passen; leer = ohne API-Schutz.
+# SECUREGUARD_API_KEY=bitte-selbst-setzen

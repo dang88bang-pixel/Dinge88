@@ -43,17 +43,29 @@ class OfflineQueue @Inject constructor(
         val dao = database.pendingActionDao()
         var delivered = 0
         for (action in dao.getAll()) {
+            var execError: String? = null
             val ok = try {
                 executor(action)
             } catch (e: Exception) {
-                dao.markAttempt(action.id, e.message)
+                execError = e.message
                 false
             }
             if (ok) {
                 dao.deleteById(action.id)
                 delivered++
-            } else if (action.attempts >= MAX_ATTEMPTS) {
-                dao.markAttempt(action.id, "Max. Versuche erreicht")
+            } else {
+                // Auch ein `false` ohne Exception ist ein Versuch (F-61e):
+                // sonst wird attempts nie erhöht und die Queue läuft endlos.
+                dao.markAttempt(action.id, execError ?: "Executor lieferte false")
+                // Dead-Letter: nach MAX_ATTEMPTS aus der Queue entfernen
+                // (letzte Fehlermeldung bleibt im Log/Beobachter erhalten).
+                if (action.attempts + 1 >= MAX_ATTEMPTS) {
+                    android.util.Log.w(
+                        "OfflineQueue",
+                        "Dead-Letter nach ${action.attempts + 1} Versuchen: ${action.actionType} (${execError ?: "false"})"
+                    )
+                    dao.deleteById(action.id)
+                }
             }
         }
         return delivered

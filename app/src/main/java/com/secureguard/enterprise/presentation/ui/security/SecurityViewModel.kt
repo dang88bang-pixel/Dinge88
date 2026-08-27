@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.AuditLog
 import com.secureguard.enterprise.security.DatabaseKeyManager
+import com.secureguard.enterprise.security.Permission
+import com.secureguard.enterprise.security.Role
 import com.secureguard.enterprise.services.AuthManager
 import com.secureguard.enterprise.services.AuditLogService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +22,8 @@ class SecurityViewModel @Inject constructor(
     private val encryptionService: com.secureguard.enterprise.services.EncryptionService,
     private val satelliteService: com.secureguard.enterprise.services.SatelliteService,
     private val nfcService: com.secureguard.enterprise.services.NfcService,
-    private val databaseKeyManager: DatabaseKeyManager
+    private val databaseKeyManager: DatabaseKeyManager,
+    private val roleManager: com.secureguard.enterprise.security.RoleManager
 ) : ViewModel() {
 
     val dbKeyFingerprint: String = runCatching { databaseKeyManager.passphraseFingerprint() }.getOrDefault("–")
@@ -32,6 +35,27 @@ class SecurityViewModel @Inject constructor(
     val pinConfigured: StateFlow<Boolean> = _pinConfigured.asStateFlow()
 
     val authState = authManager.state
+
+    /** Aktive RBAC-Rolle (F-44) + Wechselrecht (MANAGE_USERS). */
+    val role: StateFlow<Role> = roleManager.role
+    val canSwitchRoles: Boolean = roleManager.has(Permission.MANAGE_USERS)
+
+    /** Rollenwechsel (Security-Center); verweigert ohne MANAGE_USERS. */
+    fun setRole(newRole: Role) {
+        if (!roleManager.has(Permission.MANAGE_USERS)) {
+            viewModelScope.launch {
+                auditLogService.log(
+                    action = "ROLE_SWITCH_DENIED",
+                    details = "Rolle ${roleManager.currentRole} darf nicht wechseln"
+                )
+            }
+            return
+        }
+        roleManager.setRole(newRole)
+        viewModelScope.launch {
+            auditLogService.log(action = "ROLE_SWITCH", details = "Neue Rolle: $newRole")
+        }
+    }
 
     fun loadAuditLog() {
         viewModelScope.launch {
@@ -47,6 +71,14 @@ class SecurityViewModel @Inject constructor(
                 auditLogService.log("PIN_CHANGE", "PIN geändert über Security-Center")
                 loadAuditLog()
             }
+        }
+    }
+
+    /** Auto-Lock-Dauer setzen (F-49): 5/10/30 Minuten. Sichtbar über [authState]. */
+    fun setAutoLockMinutes(minutes: Int) {
+        authManager.setAutoLockMinutes(minutes)
+        viewModelScope.launch {
+            auditLogService.log(action = "AUTO_LOCK_SET", details = "Auto-Lock: $minutes Min")
         }
     }
 
