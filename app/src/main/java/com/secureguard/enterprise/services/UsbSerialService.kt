@@ -1,6 +1,7 @@
 package com.secureguard.enterprise.services
 
 import android.content.Context
+import android.content.Intent
 import android.hardware.usb.UsbManager
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
