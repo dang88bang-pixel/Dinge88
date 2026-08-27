@@ -15,6 +15,10 @@ class AlertSoundManager @Inject constructor() {
 
     private var activeTone: ToneGenerator? = null
 
+    /** Handler für das Auto-Stop-Sicherheitsnetz von Dauer-Alarms. */
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val autoStop = Runnable { stop() }
+
     fun play(soundName: String?, loop: Boolean = false) {
         stop()
         when (soundName?.lowercase()) {
