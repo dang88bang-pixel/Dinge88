@@ -62,7 +62,7 @@ class OfflineQueue @Inject constructor(
                 if (action.attempts + 1 >= MAX_ATTEMPTS) {
                     android.util.Log.w(
                         "OfflineQueue",
-                        "Dead-Letter nach ${action.attempts + 1} Versuchen: ${action.type} (${execError ?: "false"})"
+                        "Dead-Letter nach ${action.attempts + 1} Versuchen: ${action.actionType} (${execError ?: "false"})"
                     )
                     dao.deleteById(action.id)
                 }
