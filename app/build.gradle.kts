@@ -384,6 +384,7 @@ tasks.configureEach {
 // ==================== CI-Diagnose (minimal) ====================
 val ciDiagnose = tasks.register("ciDiagnose") {
     doLast {
+        println("##[error]DIAG ciDiagnose LIEF (Tasks im Graph: " + gradle.taskGraph.allTasks.size + ")")
         gradle.taskGraph.allTasks.forEach { t ->
             val f = t.state.failure
             if (f != null) {
