@@ -1,3 +1,6 @@
+import java.io.File
+import java.nio.file.Files
+import java.time.Instant
 import java.util.Properties
 
 plugins {
@@ -9,29 +12,12 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// Keystore: CI decodes to app/secureguard-keystore.jks; local may use root.
-// Env KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD or local.properties.
-val keystoreFile = sequenceOf(
-    rootProject.file("app/secureguard-keystore.jks"),
-    rootProject.file("secureguard-keystore.jks"),
-    rootProject.file("release-keystore.jks")
-).firstOrNull { it.exists() } ?: rootProject.file("app/secureguard-keystore.jks")
-
-fun propOrEnv(name: String, env: String = name): String =
-    System.getenv(env)
-        ?: (project.findProperty(name) as? String)
-        ?: run {
-            val lp = rootProject.file("local.properties")
-            if (lp.exists()) {
-                val p = java.util.Properties().apply { lp.inputStream().use { load(it) } }
-                p.getProperty(name)
-            } else null
-        }
-        ?: ""
-
-val keystorePassword = propOrEnv("KEYSTORE_PASSWORD")
-val keyAlias = propOrEnv("KEY_ALIAS").ifBlank { "secureguard" }
-val keyPassword = propOrEnv("KEY_PASSWORD").ifBlank { keystorePassword }
+// Keystore from environment (CI) or local.properties; falls back to the debug
+// keystore so `assembleRelease` always produces an installable signed APK.
+val keystoreFile = rootProject.file("secureguard-keystore.jks")
+val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+val keyAlias = System.getenv("KEY_ALIAS") ?: "secureguard"
+val keyPassword = System.getenv("KEY_PASSWORD") ?: keystorePassword
 
 /**
  * Reads an API key from gradle.properties / local.properties / -P args
@@ -65,21 +51,15 @@ android {
             useSupportLibrary = true
         }
 
-        // ============ EXTERNE API-KEYS & ENDPUNKTE (BuildConfig) ============
-        // Werte aus gradle.properties / local.properties (siehe local.properties.example).
-        // Leere Werte sind erlaubt – die zugehörigen Aufrufe liefern dann null/leer
-        // bzw. nutzen Runtime-Overrides aus den App-Einstellungen.
+        // ============ EXTERNE API-KEYS (BuildConfig) ============
+        // Werte kommen aus gradle.properties / local.properties (siehe local.properties.example).
+        // Leere Werte sind erlaubt – die zugehörigen API-Aufrufe liefern dann null/leer.
         buildConfigField("String", "WIGLE_API_KEY", "\"${apiKey("WIGLE_API_KEY")}\"")
         buildConfigField("String", "OPEN_CHARGE_MAP_KEY", "\"${apiKey("OPEN_CHARGE_MAP_KEY")}\"")
         buildConfigField("String", "NETATMO_TOKEN", "\"${apiKey("NETATMO_TOKEN")}\"")
-        // Netatmo-OAuth2 (F-19): App-Registrierung auf dev.netatmo.com; leer = Refresh deaktiviert
-        buildConfigField("String", "NETATMO_CLIENT_ID", "\"${apiKey("NETATMO_CLIENT_ID")}\"")
-        buildConfigField("String", "NETATMO_CLIENT_SECRET", "\"${apiKey("NETATMO_CLIENT_SECRET")}\"")
-        buildConfigField("String", "NETATMO_REFRESH_TOKEN", "\"${apiKey("NETATMO_REFRESH_TOKEN")}\"")
         buildConfigField("String", "GOOGLE_API_KEY", "\"${apiKey("GOOGLE_API_KEY")}\"")
+        buildConfigField("String", "HELIUM_API_KEY", "\"${apiKey("HELIUM_API_KEY")}\"")
         buildConfigField("String", "MQTT_BROKER_URL", "\"${apiKey("MQTT_BROKER_URL")}\"")
-        buildConfigField("String", "MQTT_USERNAME", "\"${apiKey("MQTT_USERNAME")}\"")
-        buildConfigField("String", "MQTT_PASSWORD", "\"${apiKey("MQTT_PASSWORD")}\"")
         buildConfigField("String", "WEBSOCKET_URL", "\"${apiKey("WEBSOCKET_URL")}\"")
         buildConfigField("String", "MCP_SERVER_URL", "\"${apiKey("MCP_SERVER_URL")}\"")
         buildConfigField("String", "BACKEND_BASE_URL", "\"${apiKey("BACKEND_BASE_URL")}\"")
@@ -87,17 +67,13 @@ android {
         buildConfigField("String", "YOLO_SERVER_URL", "\"${apiKey("YOLO_SERVER_URL")}\"")
         buildConfigField("String", "OPEN_DATA_API_URL", "\"${apiKey("OPEN_DATA_API_URL")}\"")
         buildConfigField("String", "FIND_MY_PROXY_URL", "\"${apiKey("FIND_MY_PROXY_URL")}\"")
+        // Runtime austauschbar (EndpointConfig); Default https://api.dhl.de/
         buildConfigField("String", "DHL_API_URL", "\"${apiKey("DHL_API_URL").ifBlank { "https://api.dhl.de/" }}\"")
-        // Schreibende SecureGuard-Backend-Endpunkte (X-API-Key); leer = Pilot ohne API-Schutz
-        buildConfigField("String", "SECUREGUARD_API_KEY", "\"${apiKey("SECUREGUARD_API_KEY")}\"")
         buildConfigField("String", "DHL_API_TOKEN", "\"${apiKey("DHL_API_TOKEN")}\"")
-    }
-
-    if (keystoreFile.exists() && keystorePassword.isBlank()) {
-        logger.warn(
-            "SECUREGUARD: Keystore '${keystoreFile}' existiert, aber KEYSTORE_PASSWORD ist leer – " +
-                "packageRelease würde mit kryptischem Fehler scheitern. Setze KEYSTORE_PASSWORD/KEY_PASSWORD."
-        )
+        // Schreibende SecureGuard-Backend-Endpunkte (X-API-Key, F-71)
+        buildConfigField("String", "SECUREGUARD_API_KEY", "\"${apiKey("SECUREGUARD_API_KEY")}\"")
+        buildConfigField("String", "MQTT_USERNAME", "\"${apiKey("MQTT_USERNAME")}\"")
+        buildConfigField("String", "MQTT_PASSWORD", "\"${apiKey("MQTT_PASSWORD")}\"")
     }
 
     val releaseSigning = signingConfigs.create("release") {
@@ -152,13 +128,6 @@ android {
         jvmTarget = "17"
     }
 
-    // Room: Schemas nach app/schemas exportieren (Voraussetzung für Migration-Tests)
-    kapt {
-        arguments {
-            arg("room.schemaLocation", "$projectDir/schemas")
-        }
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -170,11 +139,6 @@ android {
             excludes += "/META-INF/INDEX.LIST"
             excludes += "/META-INF/io.netty.versions.properties"
         }
-    }
-
-    testOptions {
-        unitTests.isIncludeAndroidResources = true
-        unitTests.isReturnDefaultValues = true
     }
 }
 
@@ -208,12 +172,10 @@ dependencies {
     implementation(libs.hilt.work)
     kapt(libs.hilt.work.compiler)
 
-    // Room + SQLCipher (at-rest encryption)
+    // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
-    implementation(libs.sqlcipher.android)
-    implementation(libs.androidx.sqlite)
 
     // WorkManager (Hintergrund-Agent)
     implementation(libs.androidx.work.runtime.ktx)
@@ -241,18 +203,20 @@ dependencies {
     kapt(libs.moshi.kotlin.codegen)
     implementation(libs.gson)
 
-    // MQTT (Paho – clientseitiger MqttAsyncClient; der veraltete
-    // org.eclipse.paho.android.service wird bewusst NICHT genutzt, siehe
-    // IMPLEMENTIERUNGS_INVENTUR.md "Abweichungen")
+    // MQTT (Paho MqttAsyncClient, ohne veralteten android.service)
     implementation(libs.paho.mqtt.client)
 
     // Location (echte GPS-Position)
     implementation(libs.play.services.location)
 
+    // BLE – Nordic ble-ktx (Scan über Plattform-API in BleService)
+
+    // Permissions (Accompanist – optional, Plattform-Permissions util vorhanden)
+
     // Coil (Bildladen)
     implementation(libs.coil.compose)
 
-    // RxJava (Rx-Adapter für Retrofit; rxandroid wird nicht genutzt und entfernt)
+    // RxJava (asynchrone Operationen / Rx-Adapter für Retrofit)
     implementation(libs.rxjava)
 
     // USB/Serial (kabelgebundene Anbindung)
@@ -270,23 +234,145 @@ dependencies {
     // Desugaring
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    // Unit tests (JVM + Robolectric)
+    // Unit tests
     testImplementation(libs.junit)
-    testImplementation(libs.robolectric)
-    testImplementation(libs.mockk)
-    testImplementation(libs.truth)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.room.testing)
-    testImplementation(libs.androidx.test.core)
-    testImplementation(libs.androidx.test.core.ktx)
-    testImplementation(libs.androidx.test.ext.junit)
 
-    // Instrumented / Compose UI tests (Gerät oder Emulator)
+    // Instrumented tests
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
-    androidTestImplementation(libs.androidx.test.runner)
-    androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// GitHub Release erwartet genau diese Datei: release.apk
+android.applicationVariants.configureEach {
+    if (buildType.name == "release") {
+        outputs.configureEach {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+                .outputFileName = "release.apk"
+        }
+    }
+}
+
+// ==================== APK-Delivery via Git-Branch ====================
+// Nur auf GitHub Actions aktiv: Nach jedem assemble*-Lauf (auch bei Fehlern,
+// dank finalizedBy) werden APK + Prüfsummen + Build-Info als Orphan-Branch
+// `apk-delivery-<release|debug>` ins Repo gepusht (force). Der Branch ist der
+// zuverlässige Download-Kanal (git fetch origin apk-delivery-release).
+val isCi = System.getenv("GITHUB_ACTIONS") == "true"
+val ghToken = System.getenv("GITHUB_TOKEN")
+val ghRepo = System.getenv("GITHUB_REPOSITORY")
+val ghRunId = System.getenv("GITHUB_RUN_ID") ?: ""
+val ghSha = System.getenv("GITHUB_SHA") ?: ""
+
+tasks.register("publishApkDelivery") {
+    group = "build"
+    description = "Publiziert die gebaute APK + Prüfsummen als apk-delivery-* Git-Branch (nur CI)."
+    doLast {
+        if (!isCi || ghToken.isNullOrBlank() || ghRepo.isNullOrBlank()) {
+            logger.lifecycle("publishApkDelivery: nicht auf GitHub Actions – übersprungen.")
+            return@doLast
+        }
+        fun sh(cmd: List<String>, dir: File? = null): Pair<Int, String> {
+            val p = ProcessBuilder(cmd).apply {
+                directory(dir ?: rootProject.projectDir)
+                redirectErrorStream(true)
+                environment()["GIT_AUTHOR_NAME"] = "github-actions[bot]"
+                environment()["GIT_AUTHOR_EMAIL"] = "41898282+github-actions[bot]@users.noreply.github.com"
+                environment()["GIT_COMMITTER_NAME"] = "github-actions[bot]"
+                environment()["GIT_COMMITTER_EMAIL"] = "41898282+github-actions[bot]@users.noreply.github.com"
+            }.start()
+            val out = p.inputStream.bufferedReader().readText()
+            val code = p.waitFor()
+            return code to out.trim()
+        }
+        try {
+            val wantsRelease = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+            val buildType = if (wantsRelease) "release" else "debug"
+            val apkDir = file("build/outputs/apk/$buildType")
+            val apks = apkDir.listFiles { f: File -> f.isFile && f.extension == "apk" }?.sortedBy { it.name } ?: emptyList()
+            logger.lifecycle("publishApkDelivery: buildType=$buildType, gefundene APKs=${apks.map { it.name }}")
+
+            val workDir = Files.createTempDirectory("apkdelivery").toFile()
+            val dist = File(workDir, "apk-dist").apply { mkdirs() }
+
+            // 1) APKs kopieren, große splitten (GitHub blockt Blobs > 100 MB)
+            apks.forEach { apk ->
+                val target = File(dist, apk.name)
+                apk.copyTo(target, overwrite = true)
+                if (target.length() > 90_000_000) {
+                    val (c, o) = sh(listOf("split", "-b", "90M", "-d", target.absolutePath, target.absolutePath + ".part-"))
+                    if (c != 0) logger.warn("split fehlgeschlagen: $o") else target.delete()
+                }
+            }
+
+            // 2) Prüfsummen
+            val sums = StringBuilder()
+            dist.listFiles { f: File -> f.isFile }?.sortedBy { it.name }?.forEach { f ->
+                val (c, o) = sh(listOf("sha256sum", f.name), dir = dist)
+                if (c == 0) sums.appendLine(o)
+            }
+            File(dist, "SHA256SUMS.txt").writeText(sums.toString())
+
+            // 3) Build-Info + Diagnose
+            val diag = StringBuilder()
+            gradle.taskGraph.allTasks.forEach { t ->
+                val failed = try { t.state.failure } catch (_: Throwable) { null }
+                if (failed != null) {
+                    diag.appendLine("FAILED TASK: ${t.path}")
+                    var cause: Throwable? = failed
+                    var depth = 0
+                    while (cause != null && depth < 6) {
+                        diag.appendLine("  ${cause.javaClass.simpleName}: ${cause.message?.take(2000)}")
+                        cause = cause.cause
+                        depth++
+                    }
+                }
+            }
+            val info = buildString {
+                appendLine("buildType      : $buildType")
+                appendLine("versionName    : ${android.defaultConfig.versionName}")
+                appendLine("versionCode    : ${android.defaultConfig.versionCode}")
+                appendLine("minSdk         : ${android.defaultConfig.minSdk}")
+                appendLine("targetSdk      : ${android.defaultConfig.targetSdk}")
+                appendLine("compileSdk     : ${android.compileSdk}")
+                appendLine("ciRunId        : $ghRunId")
+                appendLine("commit         : $ghSha")
+                appendLine("timestamp (UTC): ${Instant.now()}")
+                appendLine()
+                if (diag.isNotEmpty()) {
+                    appendLine("=== DIAGNOSE (fehlgeschlagene Tasks) ===")
+                    appendLine(diag)
+                } else {
+                    appendLine("BUILD ERFOLGREICH")
+                }
+            }
+            File(dist, "BUILD-INFO.txt").writeText(info)
+
+            // 4) Orphan-Branch committen + pushen
+            val branch = "apk-delivery-$buildType"
+            val remote = "https://x-access-token:$ghToken@github.com/$ghRepo.git"
+            var (c, o) = sh(listOf("git", "init", "-q", "-b", branch, workDir.absolutePath))
+            if (c != 0) throw GradleException("git init: $o")
+            sh(listOf("git", "-C", workDir.absolutePath, "add", "-f", "apk-dist")).let { (cc, oo) ->
+                if (cc != 0) throw GradleException("git add: $oo")
+            }
+            val commitMsg = "APK-Delivery: buildType=$buildType run=$ghRunId sha=${ghSha.take(7)}"
+            sh(listOf("git", "-C", workDir.absolutePath, "commit", "-q", "-m", commitMsg)).let { (cc, oo) ->
+                if (cc != 0) throw GradleException("git commit: $oo")
+            }
+            val (pc, po) = sh(listOf("git", "-C", workDir.absolutePath, "push", "-q", "--force", remote, "HEAD:refs/heads/$branch"))
+            if (pc != 0) throw GradleException("git push (${po.take(500)})")
+            logger.lifecycle("publishApkDelivery: OK -> Branch '$branch' (run=$ghRunId). Dateien: ${dist.listFiles()?.joinToString { it.name }}")
+        } catch (e: Exception) {
+            logger.warn("publishApkDelivery FEHLGESCHLAGEN (Build selbst bleibt unberührt): ${e.message}")
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name == "assembleDebug" || name == "assembleRelease") {
+        finalizedBy("publishApkDelivery")
+    }
 }
