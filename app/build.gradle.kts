@@ -381,63 +381,27 @@ tasks.configureEach {
     }
 }
 
-// ==================== CI-Diagnose (sichere Task-Variante) ====================
-// Läuft nach assembleDebug/assembleRelease (auch bei Fehler) und pumpt die
-// Fehlerketten als ##[error]-Annotations + Branch apk-delivery-logs.
-val ciDiag = tasks.register("ciDiagnose") {
-    group = "build"
+// ==================== CI-Diagnose (minimal) ====================
+val ciDiagnose = tasks.register("ciDiagnose") {
     doLast {
-        val failures = try {
-            gradle.taskGraph.allTasks.mapNotNull { t ->
-                val f = try { t.state.failure } catch (_: Throwable) { null }
-                if (f != null) Triple(t.path, f, t) else null
+        gradle.taskGraph.allTasks.forEach { t ->
+            val f = t.state.failure
+            if (f != null) {
+                println("##[error]DIAG ROOT " + t.path + " :: " + f.javaClass.name + ": " + (f.message ?: "-"))
+                var c: Throwable? = f.cause
+                var n = 0
+                while (c != null && n < 12) {
+                    val cc = c
+                    println("##[error]DIAG CAUSE " + t.path + " :: " + cc.javaClass.name + ": " + (cc.message ?: "-").take(1800).replace('\n', ' '))
+                    c = cc.cause
+                    n++
+                }
             }
-        } catch (e: Throwable) {
-            println("##[error]DIAG taskGraph: ${e.message}")
-            emptyList<Triple<String, Throwable, org.gradle.api.Task>>()
-        }
-        val sb = StringBuilder("=== SecureGuard CI-Diagnose ${java.time.Instant.now()} ===\n")
-        sb.appendLine("Gradle: ${gradle.gradleVersion} | Run: ${System.getenv("GITHUB_RUN_ID")} | Sha: ${System.getenv("GITHUB_SHA")}")
-        if (failures.isEmpty()) {
-            println("##[error]DIAG: keine Task-Fehler sichtbar")
-        }
-        for ((path, f, _) in failures) {
-            var cause: Throwable? = f
-            var d = 0
-            while (cause != null && d < 12) {
-                val cc: Throwable = cause
-                println("##[error]DIAG " + path + " :: " + cc.javaClass.name + ": " + (cc.message ?: "(keine Meldung)").take(1500).replace("\n", " "))
-                sb.appendLine("FAILED " + path + " [" + cc.javaClass.name + "] " + (cc.message ?: "(keine Meldung)"))
-                cause = cc.cause; d++
-            }
-        }
-        try {
-            val work = java.nio.file.Files.createTempDirectory("diag").toFile()
-            java.io.File(work, "DIAGNOSE.txt").writeText(sb.toString())
-            fun sh(vararg cmd: String): String {
-                val p = ProcessBuilder(*cmd).apply {
-                    directory(work)
-                    redirectErrorStream(true)
-                    environment()["GIT_AUTHOR_NAME"] = "github-actions[bot]"
-                    environment()["GIT_AUTHOR_EMAIL"] = "41898282+github-actions[bot]@users.noreply.github.com"
-                    environment()["GIT_COMMITTER_NAME"] = "github-actions[bot]"
-                    environment()["GIT_COMMITTER_EMAIL"] = "41898282+github-actions[bot]@users.noreply.github.com"
-                }.start()
-                val out = p.inputStream.bufferedReader().readText(); p.waitFor()
-                return out.trim()
-            }
-            sh("git", "init", "-q", "-b", "apk-delivery-logs")
-            sh("git", "add", "-f", "DIAGNOSE.txt")
-            sh("git", "commit", "-q", "-m", "CI-Diagnose run=${System.getenv("GITHUB_RUN_ID")}")
-            val pushOut = sh("git", "push", "-q", "--force",
-                "https://x-access-token:${System.getenv("GITHUB_TOKEN")}@github.com/${System.getenv("GITHUB_REPOSITORY")}.git",
-                "HEAD:refs/heads/apk-delivery-logs")
-            println("DIAGNOSE-SONDE pushOut=${pushOut.take(300)}")
-        } catch (e: Throwable) {
-            println("DIAGNOSE-SONDE push ignoriert: ${e.message}")
         }
     }
 }
-tasks.matching { it.name == "assembleDebug" || it.name == "assembleRelease" }.configureEach {
-    finalizedBy(ciDiag)
+afterEvaluate {
+    tasks.matching { it.name == "assembleDebug" || it.name == "assembleRelease" }.configureEach {
+        finalizedBy(ciDiagnose)
+    }
 }
