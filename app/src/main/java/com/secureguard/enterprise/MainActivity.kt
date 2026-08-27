@@ -164,12 +164,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        handleNfcIntent(intent)
-    }
-
     private fun handleNfcIntent(intent: Intent) {
         if (intent.action == android.nfc.NfcAdapter.ACTION_NDEF_DISCOVERED ||
             intent.action == android.nfc.NfcAdapter.ACTION_TECH_DISCOVERED ||
