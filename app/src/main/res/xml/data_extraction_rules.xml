@@ -9,6 +9,7 @@
         <exclude domain="sharedpref" path="secureguard_endpoints.xml" />
         <exclude domain="sharedpref" path="secureguard_db_key.xml" />
         <exclude domain="sharedpref" path="secureguard_auth.xml" />
+    <exclude domain="sharedpref" path="secureguard_roles.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="database" path="secureguard.db" />
@@ -19,5 +20,6 @@
         <exclude domain="sharedpref" path="secureguard_endpoints.xml" />
         <exclude domain="sharedpref" path="secureguard_db_key.xml" />
         <exclude domain="sharedpref" path="secureguard_auth.xml" />
+    <exclude domain="sharedpref" path="secureguard_roles.xml" />
     </device-transfer>
 </data-extraction-rules>

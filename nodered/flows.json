@@ -197,17 +197,17 @@
   "id": "sg_inject_telemetry",
   "type": "inject",
   "z": "sg_tab_main",
-  "name": "TELEMETRY request",
+  "name": "TELEMETRY request (Default-Gateway)",
   "props": [
    {
     "p": "payload"
    },
    {
     "p": "topic",
-    "vt": "str"
+    "vt": "env"
    }
   ],
-  "topic": "secureguard/ESP32_SecureGuard/command",
+  "topic": "SG_DEFAULT_DEVICE_ID",
   "payload": "TELEMETRY",
   "payloadType": "str",
   "x": 170,

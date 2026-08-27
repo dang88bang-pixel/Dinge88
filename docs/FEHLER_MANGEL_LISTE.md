@@ -384,6 +384,16 @@ pytest 7/7.
 Default-Device-ID `ESP32_SecureGuard` – wirksam nur für Gateways ohne CONFIG-`device_id`
 (produktive Gateways nutzen ihre MAC als Username/ID).
 
-**Gesamtstand:** 75 Befundpositionen bearbeitet – **73 behoben/wire-ready**, 2 Phase-2
-(F-44 RBAC-Enforcement, F-45 i18n-Deep-Screens), F-56 System-Broadcast ohne
-Handlungsbedarf.
+| F-76 | **Node-RED-Telemetrie-Inject auf Default-Device-ID fix** (`ESP32_SecureGuard`) – produktive Gateways mit CONFIG-`device_id` bekamen den Testbefehl nie | ✅ behoben | Topic über Env-Var `SG_DEFAULT_DEVICE_ID` (compose/.env, Default unverändert) |
+
+**Nachtrag F-44 (2026-08-27, zweite Runde):** `RoleManager` ist jetzt injizierbarer
+Singleton mit **persistenter aktiver Rolle** (Prefs, Default ADMIN). Enforcement an
+allen Mutations-Sites: Aktionen senden (ActionsViewModel, AssetDetailViewModel,
+`EXECUTE_ACTIONS`), Asset anlegen (AddAssetViewModel, `EDIT_ASSETS`), Endpunkte
+speichern (SettingsViewModel, `CONFIGURE_AGENT`), Rollenwechsel (SecurityViewModel,
+`MANAGE_USERS`, mit Audit-Log `ROLE_SWITCH`/`ROLE_SWITCH_DENIED`). Rollen-Umschalter
+im Security-Center (gesperrt ohne MANAGE_USERS). `secureguard_roles.xml` ist aus
+Cloud-Backup/Device-Transfer ausgeschlossen.
+
+**Gesamtstand:** 76 Befundpositionen bearbeitet – **75 behoben/wire-ready**, 1 Phase-2
+(F-45 i18n-Deep-Screens), F-56 System-Broadcast ohne Handlungsbedarf.

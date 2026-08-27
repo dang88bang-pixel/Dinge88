@@ -81,6 +81,8 @@ services:
       - TZ=Europe/Berlin
       # Flow-Credentials-Verschlüsselung (settings.js liest sie) – in .env setzen!
       - NODE_RED_CREDENTIAL_SECRET=${NODE_RED_CREDENTIAL_SECRET:-secureguard-change-me}
+      # Default-Gateway für sg_inject_telemetry (CONFIG device_id des ESP32)
+      - SG_DEFAULT_DEVICE_ID=${SG_DEFAULT_DEVICE_ID:-ESP32_SecureGuard}
     volumes:
       - ./nodered:/data
     depends_on:

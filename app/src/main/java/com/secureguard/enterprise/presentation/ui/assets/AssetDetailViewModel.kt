@@ -15,7 +15,6 @@ import com.secureguard.enterprise.data.model.Telemetry
 import com.secureguard.enterprise.security.Permission
 import com.secureguard.enterprise.security.Role
 import com.secureguard.enterprise.security.RoleManager
-import com.secureguard.enterprise.security.User
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.NotificationService
 import com.secureguard.enterprise.services.CrowdService
@@ -47,7 +46,8 @@ class AssetDetailViewModel @Inject constructor(
     private val urbanService: UrbanService,
     private val crowdService: CrowdService,
     private val satelliteService: SatelliteService,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val roleManager: RoleManager
 ) : ViewModel() {
 
     private val _assetState = MutableStateFlow<Asset?>(null)
@@ -89,10 +89,9 @@ class AssetDetailViewModel @Inject constructor(
             _actionResult.value = ActionResult.Processing
             val asset = _assetState.value ?: return@launch
 
-            // RBAC permission check
-            val user = User(id = "local", name = "Admin", role = Role.ADMIN)
-            if (!RoleManager.hasPermission(user, Permission.EXECUTE_ACTIONS)) {
-                _actionResult.value = ActionResult(false, "Keine Berechtigung")
+            // RBAC gegen die AKTIVE Rolle (F-44, vorher harter ADMIN)
+            if (!roleManager.require(Permission.EXECUTE_ACTIONS)) {
+                _actionResult.value = ActionResult(false, "Keine Berechtigung (Rolle ${roleManager.currentRole})")
                 return@launch
             }
 

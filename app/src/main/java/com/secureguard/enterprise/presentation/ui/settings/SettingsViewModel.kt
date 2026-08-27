@@ -10,6 +10,8 @@ import com.secureguard.enterprise.services.AgentSettings
 import com.secureguard.enterprise.services.BackendSyncService
 import com.secureguard.enterprise.services.MqttService
 import com.secureguard.enterprise.services.WebSocketService
+import com.secureguard.enterprise.security.Permission
+import com.secureguard.enterprise.security.RoleManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,7 +56,8 @@ class SettingsViewModel @Inject constructor(
     private val mqttService: MqttService,
     private val webSocketService: WebSocketService,
     private val backendSyncService: BackendSyncService,
-    private val privacyService: com.secureguard.enterprise.services.PrivacyService
+    private val privacyService: com.secureguard.enterprise.services.PrivacyService,
+    private val roleManager: RoleManager
 ) : ViewModel() {
 
     private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
@@ -140,6 +143,11 @@ class SettingsViewModel @Inject constructor(
 
     /** Speichert Endpunkte und reconnectet MQTT/WebSocket. */
     fun saveEndpoints() {
+        // RBAC (F-44): Konfiguration erfordert CONFIGURE_AGENT
+        if (!roleManager.require(Permission.CONFIGURE_AGENT)) {
+            _uiState.update { it.copy(statusMessage = "⛔ Keine Berechtigung (Rolle ${roleManager.currentRole})") }
+            return
+        }
         val s = _uiState.value
         endpointConfig.update(
             mqttUrl = s.mqttBrokerUrl,

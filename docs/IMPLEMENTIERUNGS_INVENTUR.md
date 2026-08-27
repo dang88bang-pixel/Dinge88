@@ -65,6 +65,8 @@ BleService).
 | Mosquitto-ACL (F-72) | `secureguard/broadcast/#` für Gateways lesbar; eigener `nodered`-User mit Publish-Recht auf broadcast/command |
 | Backend-MQTT-Auth (F-73) | `MQTT_USERNAME/MQTT_PASSWORD`-Env + `username_pw_set` (compose/.env durchgereicht) |
 | FGS-Location (F-75) | Agent-Dienst `dataSync|location` + `FOREGROUND_SERVICE_LOCATION` → GPS-Kanal funktioniert im Hintergrund auf Android 14 |
+| RBAC-Enforcement (F-44) | `RoleManager` mit persistenter aktiver Rolle; Prüfpunkte: Aktionen (EXECUTE_ACTIONS), Asset-Anlage (EDIT_ASSETS), Endpunkte (CONFIGURE_AGENT), Rollenwechsel (MANAGE_USERS) + Audit |
+| Node-RED-Gateway-Inject (F-76) | TELEMETRY-Testbefehl geht an `SG_DEFAULT_DEVICE_ID` (Env, Default `ESP32_SecureGuard`) |
 | Backend | optionale `X-API-Key`-Auth (Env `SECUREGUARD_API_KEY`), CORS korrigiert (`CORS_ORIGINS`), `/api/health` → 503 bei degraded, DB-Endpunkte im Threadpool (`def`), portables Command-UPDATE, lifespan-Startup, paho `<2.0` gepinnt |
 
 ## 3. Bekannte, bewusst offene Punkte (Stand dieses Branches)
@@ -74,7 +76,7 @@ BleService).
 | DHL-Packstation-API | ✅ wire-ready: URL + Bearer-Token zur Laufzeit konfigurierbar; ** tatsächliche DHL-Credentials/Vertrag muss der Anwender liefern** – ohne diese liefert der Kanal leer. |
 | Netatmo | ✅ OAuth2-Refresh implementiert; **Anwender-Registrierung (App/Secret/Refresh-Token)** nötig, Legacy-Token als Fallback. |
 | Helium IoT API | ✅ korrekt konfiguriert (kein Auth nötig); inhaltliches Risiko post-Solana bleibt beobachtet, Fehlerfall = leerer Kanal. |
-| RBAC | `RoleManager` vorhanden, App läuft implizit im ADMIN-Kontext; Enforcement an Aktionen/Serveranbindung geplant (Phase 2). |
+| RBAC | ✅ **Enforcement aktiv (F-44):** aktive Rolle persistent (Default ADMIN), Prüfung an Asset-Anlage, Aktionen, Endpunkt-Konfiguration und Rollenwechsel; Rollen-UI im Security-Center. Multi-User/Server-Anbindung bleibt Phase 2. |
 | i18n | Bottom-Nav + Kanalnamen i18n-fähig; Deep-Screen-Texte größtenteils noch hartkodiert Deutsch (Phase 2). |
 | Gson+Moshi | Retrofit-Schicht konsolidiert (Moshi-only); Gson verbleibt bewusst für App-interne Services. |
 | Node-RED Credential-Secret | Pilot-Default „secureguard-change-me"; **Anwender setzt `NODE_RED_CREDENTIAL_SECRET` in `.env`**. |

@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
+import com.secureguard.enterprise.security.Permission
+import com.secureguard.enterprise.security.RoleManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +29,8 @@ data class AddAssetUiState(
 
 @HiltViewModel
 class AddAssetViewModel @Inject constructor(
-    private val repository: SecureGuardRepository
+    private val repository: SecureGuardRepository,
+    private val roleManager: RoleManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddAssetUiState())
@@ -40,6 +43,11 @@ class AddAssetViewModel @Inject constructor(
     fun onExternalChange(value: Boolean) = _uiState.update { it.copy(externalAllowed = value) }
 
     fun save() {
+        // RBAC (F-44): Assets anlegen/bearbeiten erfordert EDIT_ASSETS
+        if (!roleManager.require(Permission.EDIT_ASSETS)) {
+            _uiState.update { it.copy(error = "Keine Berechtigung (Rolle ${roleManager.currentRole})") }
+            return
+        }
         val state = _uiState.value
         if (state.name.isBlank() || state.mac.isBlank()) {
             _uiState.update { it.copy(error = "Name und MAC-Adresse sind erforderlich") }

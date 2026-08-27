@@ -11,4 +11,5 @@
     <exclude domain="sharedpref" path="secureguard_endpoints.xml" />
     <exclude domain="sharedpref" path="secureguard_db_key.xml" />
     <exclude domain="sharedpref" path="secureguard_auth.xml" />
+    <exclude domain="sharedpref" path="secureguard_roles.xml" />
 </full-backup-content>
