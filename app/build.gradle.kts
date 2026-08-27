@@ -358,21 +358,8 @@ tasks.register("publishApkDelivery") {
             }
             File(dist, "BUILD-INFO.txt").writeText(info)
 
-            // 4) Orphan-Branch committen + pushen
-            // Auth: bevorzugt GITHUB_TOKEN; sonst den von actions/checkout
-            // persistierten extraheader dekodieren (x-access-token:<TOKEN>).
-            var remote = if (ghToken.isNullOrBlank()) "https://github.com/$ghRepo.git"
-                         else "https://x-access-token:$ghToken@github.com/$ghRepo.git"
-            val (hc, ho) = sh(listOf("git", "-C", rootProject.projectDir.absolutePath,
-                                      "config", "--get", "http.https://github.com/.extraheader"))
-            println("##[error]PUBLISH-DIAG extraheader exit=" + hc + " len=" + ho.length + " auth=" + ho.startsWith("AUTHORIZATION: basic "))
-            if (hc == 0 && ho.startsWith("AUTHORIZATION: basic ") && ghToken.isNullOrBlank()) {
-                runCatching {
-                    val decoded = String(java.util.Base64.getDecoder().decode(ho.removePrefix("AUTHORIZATION: basic ").trim()))
-                    val tok = decoded.substringAfter(':')
-                    if (tok.isNotBlank()) remote = "https://x-access-token:" + tok + "@github.com/" + ghRepo + ".git"
-                }
-            }
+            // 4) Orphan-Branch committen, in den Checkout holen und von dort
+            // pushen (Auth: persistierte Checkout-Credentials via origin).
             val branch = "apk-delivery-$buildType"
             var (c, o) = sh(listOf("git", "init", "-q", "-b", branch, workDir.absolutePath))
             if (c != 0) throw GradleException("git init: $o")
@@ -383,7 +370,12 @@ tasks.register("publishApkDelivery") {
             sh(listOf("git", "-C", workDir.absolutePath, "commit", "-q", "-m", commitMsg)).let { (cc, oo) ->
                 if (cc != 0) throw GradleException("git commit: $oo")
             }
-            val (pc, po) = sh(listOf("git", "-C", workDir.absolutePath, "push", "-q", "--force", remote, "HEAD:refs/heads/$branch"))
+            val rootAbs = rootProject.projectDir.absolutePath
+            val refSpec = "+refs/heads/" + branch + ":refs/heads/" + branch
+            sh(listOf("git", "-C", rootAbs, "fetch", "--force", workDir.absolutePath, refSpec)).let { (fc, fo) ->
+                if (fc != 0) throw GradleException("git fetch temp->checkout: " + fo.take(300))
+            }
+            val (pc, po) = sh(listOf("git", "-C", rootAbs, "push", "--force", "origin", refSpec.replace("+refs/heads/", "refs/heads/")))
             if (pc != 0) throw GradleException("git push (${po.take(500)})")
             logger.lifecycle("publishApkDelivery: OK -> Branch '$branch' (run=$ghRunId). Dateien: ${dist.listFiles()?.joinToString { it.name }}")
         } catch (e: Exception) {
