@@ -23,7 +23,10 @@ object SqlCipherHelper {
     @Synchronized
     fun loadNative(context: Context) {
         if (loaded) return
-        SQLiteDatabase.loadLibs(context)
+        // sqlcipher-android 4.x: natives Laden via System.loadLibrary
+        // (das alte SQLiteDatabase.loadLibs(context) stammt aus der
+        // eingestellten Lib android-database-sqlcipher).
+        System.loadLibrary("sqlcipher")
         loaded = true
         Log.i(TAG, "SQLCipher native libs geladen")
     }
@@ -70,10 +73,11 @@ object SqlCipherHelper {
             dbPath.copyTo(plainBackup, overwrite = true)
 
             // Plain öffnen (leerer Key = unverschlüsselt). API sqlcipher-android 4.x:
-            // openDatabase(path, password, cursorFactory, flags, databaseHook, errorHandler)
+            // openDatabase(path, password: ByteArray?, factory, flags, hook, errorHandler)
+            // – leerer Key öffnet eine Plaintext-Datenbank.
             val plain = SQLiteDatabase.openDatabase(
                 dbPath.absolutePath,
-                "",
+                ByteArray(0),
                 null,
                 SQLiteDatabase.OPEN_READWRITE,
                 null,
