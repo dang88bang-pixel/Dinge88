@@ -360,14 +360,18 @@ tasks.register("publishApkDelivery") {
 
             // 4) Orphan-Branch committen + pushen
             // Auth: bevorzugt GITHUB_TOKEN; sonst den von actions/checkout
-            // persistierten extraheader aus dem Checkout uebernehmen.
-            val remote = if (ghToken.isNullOrBlank()) "https://github.com/$ghRepo.git"
+            // persistierten extraheader dekodieren (x-access-token:<TOKEN>).
+            var remote = if (ghToken.isNullOrBlank()) "https://github.com/$ghRepo.git"
                          else "https://x-access-token:$ghToken@github.com/$ghRepo.git"
             val (hc, ho) = sh(listOf("git", "-C", rootProject.projectDir.absolutePath,
                                       "config", "--get", "http.https://github.com/.extraheader"))
-            if (hc == 0 && ho.isNotBlank() && ghToken.isNullOrBlank()) {
-                sh(listOf("git", "-C", workDir.absolutePath,
-                          "config", "http.https://github.com/.extraheader", ho))
+            println("##[error]PUBLISH-DIAG extraheader exit=" + hc + " len=" + ho.length + " auth=" + ho.startsWith("AUTHORIZATION: basic "))
+            if (hc == 0 && ho.startsWith("AUTHORIZATION: basic ") && ghToken.isNullOrBlank()) {
+                runCatching {
+                    val decoded = String(java.util.Base64.getDecoder().decode(ho.removePrefix("AUTHORIZATION: basic ").trim()))
+                    val tok = decoded.substringAfter(':')
+                    if (tok.isNotBlank()) remote = "https://x-access-token:" + tok + "@github.com/" + ghRepo + ".git"
+                }
             }
             val branch = "apk-delivery-$buildType"
             var (c, o) = sh(listOf("git", "init", "-q", "-b", branch, workDir.absolutePath))
