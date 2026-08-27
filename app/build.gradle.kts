@@ -408,13 +408,13 @@ afterEvaluate {
             logging.addStandardErrorListener(object : org.gradle.api.logging.StandardOutputListener {
                 override fun onOutput(message: CharSequence) {
                     val m = message.toString()
-                    if (m.isNotBlank()) println("##[error]KOTLIN-ERR " + m.take(1600).replace('\n', ' '))
+                    if (m.contains("e: file:") || m.contains("error:")) println("##[error]KOTLIN-ERR " + m.take(1600).replace('\n', ' '))
                 }
             })
             logging.addStandardOutputListener(object : org.gradle.api.logging.StandardOutputListener {
                 override fun onOutput(message: CharSequence) {
                     val m = message.toString()
-                    if (m.contains("e: ") || m.contains("error:")) {
+                    if (Regex("(^|[^a-zA-Z])e: ").containsMatchIn(m) || m.contains("error:")) {
                         println("##[error]KOTLIN-OUT " + m.take(1600).replace('\n', ' '))
                     }
                 }
