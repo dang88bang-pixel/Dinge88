@@ -1,0 +1,18 @@
+{
+  "name": "secureguard-ops3d",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SecureGuard Enterprise – 3D Operations Center (Three.js)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}

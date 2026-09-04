@@ -55,3 +55,10 @@ backend/secureguard.db
 # Keystore base64 export
 *.b64
 app/secureguard-keystore.*
+
+# 3D Operations Center (console3d)
+# Das gebaute Bundle wird bewusst unter app/src/main/assets/console3d/
+# versioniert (Offline-Betrieb der App). Quell-Build-Artefakte nicht.
+console3d/node_modules/
+console3d/dist/
+console3d/.vite/

@@ -1,0 +1,5 @@
+name: systematic-debugging
+description: Findet die Ursache eines Fehlers, statt Symptome zu überschreiben. Anwenden, sobald die Ursache nicht offensichtlich ist.
+version: 1
+invocation:
+  trigger: implicit

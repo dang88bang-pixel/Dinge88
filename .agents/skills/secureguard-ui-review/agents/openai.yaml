@@ -1,0 +1,5 @@
+name: secureguard-ui-review
+description: Prüfliste für jede sichtbare Änderung an der Android-App oder der 3D-Konsole. Deckt Zustände, Hierarchie, Aktionen, Barrierefreiheit und Sprache ab.
+version: 1
+invocation:
+  trigger: implicit

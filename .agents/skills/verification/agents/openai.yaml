@@ -1,0 +1,5 @@
+name: verification
+description: Erzwingt Nachweise, bevor Arbeit als fertig gemeldet wird. Vor jeder Fertigmeldung, jedem Commit und jedem Release anwenden.
+version: 1
+invocation:
+  trigger: implicit

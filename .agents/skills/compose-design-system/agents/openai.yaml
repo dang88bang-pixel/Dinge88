@@ -1,0 +1,5 @@
+name: compose-design-system
+description: Baut oder ändert Jetpack-Compose-Oberflächen in SecureGuard mit den Sg-Bausteinen. Enthält die projektspezifischen Compose-Fallstricke.
+version: 1
+invocation:
+  trigger: explicit

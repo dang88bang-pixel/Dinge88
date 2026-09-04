@@ -1,0 +1,5 @@
+name: three-scene-review
+description: Prüft Änderungen an der Three.js-Szene des 3D Operations Center auf Korrektheit, Leistung und Speicherverhalten.
+version: 1
+invocation:
+  trigger: explicit

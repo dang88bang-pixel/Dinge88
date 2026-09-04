@@ -85,6 +85,23 @@ class DashboardViewModel @Inject constructor(
         .map { it.running }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    /** Vollständiger Agent-Status für Laufzeit, Zyklus und Intervall. */
+    val agentStatus: StateFlow<com.secureguard.enterprise.services.AgentStatus> =
+        agentService.agentStatus.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            com.secureguard.enterprise.services.AgentStatus()
+        )
+
+    /** Offene Alarme quittieren – direkt aus der Übersicht heraus. */
+    fun acknowledgeAlert(id: Long) {
+        viewModelScope.launch { runCatching { repository.acknowledgeAlert(id) } }
+    }
+
+    fun acknowledgeAllAlerts() {
+        viewModelScope.launch { runCatching { repository.acknowledgeAllAlerts() } }
+    }
+
     init {
         startAgent()
         viewModelScope.launch {

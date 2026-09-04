@@ -37,6 +37,7 @@ import com.secureguard.enterprise.presentation.ui.sensorfusion.SensorFusionScree
 import com.secureguard.enterprise.presentation.ui.security.SecurityScreen
 import com.secureguard.enterprise.presentation.ui.esp32.Esp32ConfigScreen
 import com.secureguard.enterprise.presentation.ui.health.HealthScreen
+import com.secureguard.enterprise.presentation.ui.ops.OpsCenter3DScreen
 
 private const val ANIM_MS = 250
 
@@ -129,6 +130,9 @@ fun SecureGuardApp() {
             }
             composable(Routes.HEALTH) {
                 HealthScreen(navController = navController)
+            }
+            composable(Routes.OPS_3D) {
+                OpsCenter3DScreen(navController = navController)
             }
             composable(
                 route = Routes.ASSET_DETAIL,
