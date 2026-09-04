@@ -376,7 +376,8 @@ Priorität hoch → niedrig:
 9. ✅/⚙️ UI-Tests (Agent-Cycle-Logik, Login/PIN, Asset-CRUD) – lokal `./gradlew testDebugUnitTest` / `connectedDebugAndroidTest`  
 10. ✅ Monitoring (Health-Screen + Backend `/api/health` + `scripts/smoke-check.sh`)  
 11. ✅/⚙️ DSGVO: Consent, Datenauskunft, Retention 90d, Löschen Art.17 (AVV organisatorisch)  
-12. ✅ compileSdk 35
+12. ✅ compileSdk 35  
+13. ✅ Einstellungen: Anbindungen & Abhängigkeiten zentral (Backend/WebSocket/MQTT/MCP/Slack/LoRa/YOLO/CKAN/Find-My/DHL/API-Keys + Server-Inventur via `GET /api/system/dependencies`; Slack-Schalter + Channel)
 
 ---
 

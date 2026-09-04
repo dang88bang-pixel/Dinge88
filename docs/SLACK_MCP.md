@@ -37,7 +37,7 @@ Inhalt:
 ```bash
 cp .env.example .env            # Slack-Abschnitt ausfüllen (Tokens, Channel)
 ./scripts/start-stack.sh        # baut + startet mqtt, backend, nodered, slack-mcp
-./scripts/smoke-check.sh        # prüft u. a. /api/slack/health
+./scripts/smoke-check.sh        # prüft /api/slack/health + /api/system/dependencies
 ```
 
 Ohne Slack-Token startet der Server im **Demo-Modus**

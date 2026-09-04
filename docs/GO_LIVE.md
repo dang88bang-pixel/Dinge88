@@ -22,6 +22,7 @@
 | **I · Monitoring** | Health-Screen + `/api/health` + smoke-check | ✅ |
 | **J · Offline** | `scripts/offline/*` | ✅ |
 | **K · Slack (MCP)** | `slack-mcp/` + `/api/slack/*` + App-Screen + Node-RED-Flow | ✅ |
+| **L · Einstellungen** | alle Anbindungen/Abhängigkeiten zentral + `/api/system/dependencies` | ✅ |
 
 ---
 
