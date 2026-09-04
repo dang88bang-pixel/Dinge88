@@ -25,6 +25,7 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 - [Datenbank (Room v2)](#-datenbank-room-v2)
 - [Sicherheit & Berechtigungen](#-sicherheit--berechtigungen)
 - [Backend (FastAPI)](#-backend-fastapi)
+- [Slack (MCP)](#-slack-mcp)
 - [Firmware (ESP32)](#-firmware-esp32)
 - [Docker-Stack](#-docker-stack)
 - [Abhängigkeiten (63 Libraries)](#-abhängigkeiten-63-libraries)
@@ -484,7 +485,7 @@ getWhitelistedAssets, getAllAssets, getAssetByMac, getAssetById, resolveAsset, u
 
 ## 🖥️ Backend (FastAPI)
 
-### Endpoints (13)
+### Endpoints (18)
 
 | Methode | Pfad | Funktion |
 |---------|------|----------|
@@ -500,6 +501,11 @@ getWhitelistedAssets, getAllAssets, getAssetByMac, getAssetById, resolveAsset, u
 | GET | `/api/stats` | Statistiken |
 | POST | `/api/crowd/report` | Crowd-Sichtung melden |
 | GET | `/api/crowd/search` | Crowd-Sichtungen abfragen |
+| GET | `/api/slack/health` | Slack-MCP-Status (Erreichbarkeit, Tools) |
+| GET | `/api/slack/tools` | Registrierte MCP-Tools |
+| GET | `/api/slack/channels` | Slack-Channel-Verzeichnis |
+| POST | `/api/slack/call` | MCP-Tool-Aufruf (X-API-Key) |
+| POST | `/api/slack/notify` | Meldung an Slack senden (X-API-Key) |
 | WS | `/ws` | Echtzeit-Updates (Command + MQTT-Bridge) |
 
 ### MQTT → WebSocket Bridge
@@ -509,6 +515,38 @@ Das Backend abonniert `secureguard/+/telemetry`, `+/alert`, `+/status` und forwa
 ### Datenbank (SQLite)
 
 5 Tabellen: `assets`, `detections`, `alerts`, `commands`, `crowd_sightings` (+ Index auf `crowd_sightings.mac`)
+
+---
+
+## 📨 Slack (MCP)
+
+Alarme und Statusmeldungen laufen über den **Slack-MCP-Server**
+([provectus/slack-mcp-server](https://github.com/provectus/slack-mcp-server))
+als vierten Dienst im Docker-Stack. Das Backend ist MCP-Client
+(`backend/slack_mcp.py`) und stellt App/Node-RED einfache REST-Endpunkte zur
+Verfügung – Slack-Tokens bleiben im Backend.
+
+| Baustein | Ort |
+|----------|-----|
+| MCP-Server (Go, Release `pv-v1.0.1`) | `slack-mcp/Dockerfile`, Port `127.0.0.1:13080` |
+| MCP-Client + REST-Bridge | `backend/slack_mcp.py` → `/api/slack/*` |
+| Alarm-Weiterleitung | `POST /api/alerts`, MQTT `secureguard/+/alert` |
+| App-Screen „💬 Slack (MCP)" | `presentation/ui/slack/`, Auto-Forwarder `SlackAlertForwarder` |
+| Node-RED-Flow | `slack notify` + Inject „Slack Testmeldung" |
+| Doku & Tokens | [`docs/SLACK_MCP.md`](docs/SLACK_MCP.md) |
+
+```bash
+cp .env.example .env          # SLACK_MCP_XOXB_TOKEN, SLACK_NOTIFY_CHANNEL …
+./scripts/start-stack.sh      # startet auch slack-mcp
+curl -s localhost:8000/api/slack/health
+curl -X POST localhost:8000/api/slack/notify -H 'Content-Type: application/json' \
+     -d '{"message":"SecureGuard online","channel":"#secureguard-alerts"}'
+```
+
+Ohne Token läuft der Server im Demo-Modus (`SLACK_MCP_XOXP_TOKEN=demo`) – die
+Verkabelung ist prüfbar, echte Slack-Aufrufe scheitern. Automatisch gemeldet
+wird ab `SLACK_NOTIFY_MIN_SEVERITY` (Default `WARNING`); Posting ist serverseitig
+nur mit `SLACK_MCP_ADD_MESSAGE_TOOL` freigegeben.
 
 ---
 
@@ -595,9 +633,11 @@ services:
     ports: 1883 (MQTT), 9001 (WebSocket)
   backend:     # FastAPI + Uvicorn
     ports: 8000
-    depends_on: mqtt
+    depends_on: mqtt, slack-mcp
   nodered:     # Node-RED Dashboard
     ports: 1880
+  slack-mcp:   # Slack-MCP-Server (provectus), Streamable HTTP
+    ports: 127.0.0.1:13080
 ```
 
 **Start:** `docker compose up --build`

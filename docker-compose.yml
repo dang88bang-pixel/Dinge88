@@ -2,11 +2,14 @@
 #   ./scripts/start-stack.sh
 #   docker compose up --build -d
 #
-# Enthält: MQTT-Broker (Mosquitto), FastAPI-Backend, Node-RED-Flows.
+# Enthält: MQTT-Broker (Mosquitto), FastAPI-Backend, Node-RED-Flows und den
+# Slack-MCP-Server (provectus/slack-mcp-server) für Slack-Benachrichtigungen.
 # Passwörter/MQTT-Auth: Anwender setzt selbst (siehe mosquitto/config/*.example).
 # Optionale Umgebungsvariablen (werden aus .env gelesen, siehe .env.example):
 #   SECUREGUARD_API_KEY – schützt alle schreibenden Backend-Endpunkte (X-API-Key)
 #   CORS_ORIGINS        – kommaseparierte erlaubte Origins (Default: *)
+#   SLACK_MCP_*         – Slack-Integration (Tokens, API-Key, Ziel-Channel),
+#                         Details: docs/SLACK_MCP.md
 
 services:
   mqtt:
@@ -52,10 +55,22 @@ services:
       # Optional (aus .env): schreibende Endpunkte per X-API-Key schützen
       - SECUREGUARD_API_KEY=${SECUREGUARD_API_KEY:-}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      # Slack über MCP (Service `slack-mcp`); leer = Integration inaktiv.
+      - SLACK_MCP_URL=${SLACK_MCP_URL:-http://slack-mcp:13080/mcp}
+      - SLACK_MCP_TRANSPORT=${SLACK_MCP_TRANSPORT:-http}
+      - SLACK_MCP_API_KEY=${SLACK_MCP_API_KEY:-}
+      - SLACK_MCP_TIMEOUT=${SLACK_MCP_TIMEOUT:-15}
+      - SLACK_NOTIFY_ENABLED=${SLACK_NOTIFY_ENABLED:-true}
+      - SLACK_NOTIFY_CHANNEL=${SLACK_NOTIFY_CHANNEL:-#secureguard-alerts}
+      - SLACK_NOTIFY_MIN_SEVERITY=${SLACK_NOTIFY_MIN_SEVERITY:-WARNING}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
     volumes:
       - ./data:/data
     depends_on:
       - mqtt
+      # Slack ist optional: `service_started` statt `service_healthy`, damit ein
+      # nicht konfigurierter/defekter Slack-MCP-Server das Backend nicht blockiert.
+      - slack-mcp
     networks:
       - secureguard-network
     logging:
@@ -83,6 +98,9 @@ services:
       - NODE_RED_CREDENTIAL_SECRET=${NODE_RED_CREDENTIAL_SECRET:-secureguard-change-me}
       # Default-Gateway für sg_inject_telemetry (CONFIG device_id des ESP32)
       - SG_DEFAULT_DEVICE_ID=${SG_DEFAULT_DEVICE_ID:-ESP32_SecureGuard}
+      # Flow "slack notify": X-API-Key + optionaler Ziel-Channel ({{$env.…}})
+      - SG_API_KEY=${SECUREGUARD_API_KEY:-}
+      - SG_SLACK_CHANNEL=${SLACK_NOTIFY_CHANNEL:-}
     volumes:
       - ./nodered:/data
     depends_on:
@@ -101,6 +119,70 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+
+  # Slack-MCP-Server (provectus/slack-mcp-server) – MCP-Server für Slack.
+  # Das Backend ist MCP-Client und stellt der App /api/slack/* zur Verfügung.
+  slack-mcp:
+    build:
+      context: ./slack-mcp
+      args:
+        SLACK_MCP_VERSION: ${SLACK_MCP_VERSION:-pv-v1.0.1}
+    container_name: secureguard-slack-mcp
+    restart: unless-stopped
+    # Nur loopback: Der Server hat ohne SLACK_MCP_API_KEY keinerlei Auth.
+    # Für Zugriff von anderen Rechnern: Port-Bindung anpassen UND API-Key setzen.
+    ports:
+      - "127.0.0.1:13080:13080"
+    environment:
+      SLACK_MCP_HOST: "0.0.0.0"
+      SLACK_MCP_PORT: "13080"
+      SLACK_MCP_TRANSPORT: ${SLACK_MCP_TRANSPORT:-http}
+      # Genau ein Token-Paar muss gesetzt sein (siehe docs/SLACK_MCP.md):
+      #   xoxb-… (Bot)  ODER  xoxp-… (User)  ODER  xoxc-… + xoxd-… (Session)
+      # Default "demo" = Smoke-Betrieb ohne Slack-Zugang (Cache-Refresh wird
+      # übersprungen, Tool-Aufrufe scheitern erwartbar).
+      SLACK_MCP_XOXB_TOKEN: ${SLACK_MCP_XOXB_TOKEN:-}
+      SLACK_MCP_XOXP_TOKEN: ${SLACK_MCP_XOXP_TOKEN:-demo}
+      SLACK_MCP_XOXC_TOKEN: ${SLACK_MCP_XOXC_TOKEN:-}
+      SLACK_MCP_XOXD_TOKEN: ${SLACK_MCP_XOXD_TOKEN:-}
+      # Bearer-Token für SSE/HTTP-Transport (empfohlen, wenn Port geöffnet wird).
+      SLACK_MCP_API_KEY: ${SLACK_MCP_API_KEY:-}
+      # Posting ist serverseitig abgeschaltet, bis dies gesetzt ist:
+      #   true | <kommaseparierte Channel-IDs> | !<Channel-ID> (alle außer …)
+      SLACK_MCP_ADD_MESSAGE_TOOL: ${SLACK_MCP_ADD_MESSAGE_TOOL:-true}
+      SLACK_MCP_ENABLED_TOOLS: ${SLACK_MCP_ENABLED_TOOLS:-}
+      SLACK_MCP_LOG_LEVEL: ${SLACK_MCP_LOG_LEVEL:-info}
+      SLACK_MCP_CACHE_TTL: ${SLACK_MCP_CACHE_TTL:-24h}
+    # Transport ist ein CLI-Flag (kein Env) – daher command, nicht environment.
+    command: ["--transport", "${SLACK_MCP_TRANSPORT:-http}"]
+    volumes:
+      # User-/Channel-Cache bleibt über Neustarts erhalten (#channel/@user).
+      - ./slack-mcp/cache:/app/mcp-server
+    networks:
+      - secureguard-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      # http: echter MCP-Handshake; sse: erstes `endpoint`-Event abwarten.
+      test:
+        - "CMD-SHELL"
+        - >-
+          if [ "$${SLACK_MCP_TRANSPORT:-http}" = "sse" ]; then
+          curl -sN --max-time 4 "http://127.0.0.1:$${SLACK_MCP_PORT}/sse" | grep -q "event:";
+          else
+          curl -fsS --max-time 5 -o /dev/null -X POST
+          -H 'Content-Type: application/json'
+          -H 'Accept: application/json, text/event-stream'
+          -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"secureguard-healthcheck","version":"1.0"}}}'
+          "http://127.0.0.1:$${SLACK_MCP_PORT}/mcp";
+          fi
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 20s
 
 networks:
   secureguard-network:

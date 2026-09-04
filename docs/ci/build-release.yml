@@ -164,6 +164,63 @@ jobs:
           path: app/build/reports/tests/
           if-no-files-found: ignore
 
+  # Slack-MCP-Image bauen und den MCP-Handshake gegen den echten Server prüfen
+  # (Demo-Modus, ohne Slack-Tokens). Verifiziert Dockerfile + compose + Transport.
+  slack-mcp-image:
+    name: Slack-MCP image + MCP handshake
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compose config validieren
+        run: docker compose config --quiet
+
+      - name: Image bauen (slack-mcp)
+        run: docker compose build slack-mcp
+
+      - name: Server starten (Demo-Modus)
+        run: docker compose up -d slack-mcp
+
+      - name: MCP-Handshake (initialize)
+        run: |
+          req='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}'
+          for i in $(seq 1 30); do
+            if curl -fsS -o /tmp/init.json -X POST \
+                 -H 'Content-Type: application/json' \
+                 -H 'Accept: application/json, text/event-stream' \
+                 -d "$req" http://127.0.0.1:13080/mcp; then
+              echo "initialize beantwortet:"; cat /tmp/init.json; exit 0
+            fi
+            sleep 2
+          done
+          echo "MCP-Handshake fehlgeschlagen – Logs:"
+          docker compose logs --tail=60 slack-mcp
+          exit 1
+
+      - name: tools/list prüfen
+        run: |
+          curl -fsS -o /tmp/tools.json -X POST \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+            http://127.0.0.1:13080/mcp
+          grep -q channels_list /tmp/tools.json && echo "channels_list registriert"
+
+      - name: Backend gegen slack-mcp (End-to-End)
+        run: |
+          docker compose up -d --build backend
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8000/api/health >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8000/api/slack/health | tee /tmp/slack-health.json
+          grep -q '"reachable": *true' /tmp/slack-health.json || grep -q '"reachable":true' /tmp/slack-health.json
+
+      - name: Container stoppen
+        if: always()
+        run: docker compose down -v
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:

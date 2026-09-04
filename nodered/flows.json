@@ -71,7 +71,8 @@
   "y": 280,
   "wires": [
    [
-    "sg_debug_alert"
+    "sg_debug_alert",
+    "sg_slack_fmt"
    ]
   ]
  },
@@ -291,5 +292,102 @@
   "x": 570,
   "y": 540,
   "wires": []
+ },
+ {
+  "id": "sg_slack_fmt",
+  "type": "function",
+  "z": "sg_tab_main",
+  "name": "format slack alert",
+  "func": "// MQTT-Alert → Payload für POST /api/slack/notify\nconst p = msg.payload || {};\nconst parts = (msg.topic || '').split('/').filter(Boolean);\nconst asset = String(p.asset_id || parts[1] || 'unknown').toUpperCase();\nconst body = {\n    message: String(p.message || p.type || 'Alert vom Gateway'),\n    asset_id: asset,\n    alert_type: String(p.type || 'SECURITY'),\n    severity: String(p.severity || 'WARNING')\n};\n// Optionaler Ziel-Channel – leer lässt den Backend-Default gelten.\nconst channel = env.get('SG_SLACK_CHANNEL');\nif (channel) { body.channel = channel; }\nmsg.payload = body;\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "x": 390,
+  "y": 340,
+  "wires": [
+   [
+    "sg_http_slack"
+   ]
+  ]
+ },
+ {
+  "id": "sg_http_slack",
+  "type": "http request",
+  "z": "sg_tab_main",
+  "name": "slack notify",
+  "method": "POST",
+  "ret": "obj",
+  "paytoqs": "ignore",
+  "url": "http://backend:8000/api/slack/notify",
+  "tls": "",
+  "persist": false,
+  "proxy": "",
+  "insecureHTTPParser": false,
+  "authType": "",
+  "senderr": true,
+  "headers": [
+   {
+    "keyType": "other",
+    "keyValue": "Content-Type",
+    "value": "application/json"
+   },
+   {
+    "keyType": "other",
+    "keyValue": "X-API-Key",
+    "value": "{{$env.SG_API_KEY}}"
+   }
+  ],
+  "x": 610,
+  "y": 340,
+  "wires": [
+   [
+    "sg_debug_slack"
+   ]
+  ]
+ },
+ {
+  "id": "sg_debug_slack",
+  "type": "debug",
+  "z": "sg_tab_main",
+  "name": "slack",
+  "active": true,
+  "tosidebar": true,
+  "console": false,
+  "tostatus": true,
+  "complete": "payload",
+  "targetType": "msg",
+  "statusVal": "payload.ok",
+  "statusType": "auto",
+  "x": 790,
+  "y": 340,
+  "wires": []
+ },
+ {
+  "id": "sg_inject_slack_test",
+  "type": "inject",
+  "z": "sg_tab_main",
+  "name": "Slack Testmeldung",
+  "props": [
+   {
+    "p": "payload"
+   }
+  ],
+  "repeat": "",
+  "crontab": "",
+  "once": false,
+  "onceDelay": "",
+  "topic": "",
+  "payload": "{\"message\":\"Node-RED → Slack: Testmeldung aus dem SecureGuard-Stack\",\"severity\":\"INFO\"}",
+  "payloadType": "json",
+  "x": 180,
+  "y": 400,
+  "wires": [
+   [
+    "sg_http_slack"
+   ]
+  ]
  }
 ]

@@ -55,3 +55,17 @@ backend/secureguard.db
 # Keystore base64 export
 *.b64
 app/secureguard-keystore.*
+
+# Umgebungsdateien (Secrets: Slack-Tokens, API-Keys)
+.env
+.env.local
+
+# Slack-MCP: heruntergeladene Binaries + lokaler User-/Channel-Cache
+slack-mcp/bin/*
+!slack-mcp/bin/README.md
+!slack-mcp/bin/.gitkeep
+slack-mcp/cache/*
+!slack-mcp/cache/.gitkeep
+
+# Lokale Python-Umgebung für Backend-Tests
+.venv/

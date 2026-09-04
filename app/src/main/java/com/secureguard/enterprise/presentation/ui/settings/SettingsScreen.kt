@@ -285,6 +285,16 @@ fun SettingsScreen(
                         )
                         HorizontalDivider()
                         Text(
+                            "Slack (MCP: Alerts & Meldungen)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .testTag("settings_slack_button")
+                                .clickable { navController.navigate(Routes.SLACK) }
+                        )
+                        HorizontalDivider()
+                        Text(
                             "Temporäre E-Mail (OTP für Registrierungen)",
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier

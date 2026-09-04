@@ -27,6 +27,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+import slack_mcp
+from slack_mcp import SlackMCPError, format_alert_message, parse_channels_csv
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -66,6 +69,13 @@ async def lifespan(_app: FastAPI):
     start_mqtt_subscriber()
     logger.info("SecureGuard Backend gestartet")
     yield
+    # Slack-MCP-Client sauber schließen (offene HTTP-/SSE-Verbindungen).
+    notifier = slack_mcp.peek_notifier()
+    if notifier is not None:
+        try:
+            await notifier.aclose()
+        except Exception as exc:  # pragma: no cover - Best effort beim Shutdown
+            logger.debug("Slack-MCP-Client nicht sauber geschlossen: %s", exc)
 
 
 app = FastAPI(title="SecureGuard API", version="1.0.1", lifespan=lifespan)
@@ -262,6 +272,10 @@ def start_mqtt_subscriber():
             except json.JSONDecodeError:
                 data = payload
             ws_msg = json.dumps({"type": "alert", "topic": topic, "data": data})
+            # Alert zusätzlich an Slack melden (Gateway/ESP32 → Backend → Slack).
+            loop = main_event_loop
+            if loop is not None and loop.is_running():
+                asyncio.run_coroutine_threadsafe(_notify_mqtt_alert(topic, data), loop)
         elif "/status" in topic:
             ws_msg = json.dumps({"type": "system_status", "topic": topic, "data": payload})
         else:
@@ -278,6 +292,24 @@ def start_mqtt_subscriber():
     client.subscribe("secureguard/broadcast")
     client.on_message = on_message
     logger.info("MQTT-Subscriber gestartet – Topics abonniert")
+
+
+async def _notify_mqtt_alert(topic: str, data) -> dict:
+    """MQTT-Alert (`secureguard/<MAC>/alert`) → Slack-Benachrichtigung."""
+    parts = [p for p in topic.split("/") if p]
+    asset = parts[1].upper() if len(parts) > 1 else topic
+    if isinstance(data, dict):
+        return await notify_slack_alert(
+            asset_id=str(data.get("asset_id") or asset),
+            alert_type=str(data.get("type", "SECURITY")),
+            severity=str(data.get("severity", "WARNING")),
+            message=str(data.get("message", "")),
+            source=f"mqtt:{topic}",
+            timestamp=str(data.get("timestamp", "")) or None,
+        )
+    return await notify_slack_alert(
+        asset, "SECURITY", "WARNING", str(data), f"mqtt:{topic}"
+    )
 
 
 async def broadcast_websocket(message: str):
@@ -331,6 +363,9 @@ def health():
         "detections": detections,
         "alerts": alerts,
         "service": "secureguard-backend",
+        # Konfiguration (nicht Erreichbarkeit!) der Slack-MCP-Integration –
+        # siehe GET /api/slack/health für den Live-Check.
+        "slack": _slack_summary(),
     }
 
 
@@ -388,7 +423,7 @@ def list_detections(limit: int = 100):
 
 
 @app.post("/api/alerts", dependencies=[Depends(require_api_key)])
-def add_alert(alert: Alert):
+def add_alert(alert: Alert, background_tasks: BackgroundTasks):
     conn = get_db()
     conn.execute(
         "INSERT INTO alerts (asset_id, type, severity, message, timestamp, resolved) "
@@ -398,6 +433,17 @@ def add_alert(alert: Alert):
     )
     conn.commit()
     conn.close()
+    # Slack-Benachrichtigung asynchron (siehe docs/SLACK_MCP.md) – blockiert
+    # weder den REST-Client noch scheitert der Alert selbst bei Slack-Problemen.
+    background_tasks.add_task(
+        notify_slack_alert,
+        alert.asset_id,
+        alert.type,
+        alert.severity,
+        alert.message,
+        "backend/api",
+        (alert.timestamp or datetime.now()).isoformat(),
+    )
     return {"status": "ok"}
 
 
@@ -608,6 +654,158 @@ async def mcp_extract_magic_link(token: str):
                 "email": _temp_inboxes[token]["email"],
             }
     return {"success": False, "error": "no magic link"}
+
+
+# ============ SLACK (MCP – provectus/slack-mcp-server) ============
+# Das Backend ist MCP-Client gegenüber dem Slack-MCP-Server (docker-compose-
+# Service `slack-mcp`) und stellt der App REST-Endpunkte zur Verfügung.
+# Details: docs/SLACK_MCP.md
+
+class SlackCallIn(BaseModel):
+    tool: str
+    arguments: Optional[dict] = None
+
+
+class SlackNotifyIn(BaseModel):
+    message: str
+    channel: Optional[str] = None
+    # Optional: Meldung wie einen Alert formatieren (Icon, Asset, Quelle).
+    asset_id: Optional[str] = None
+    alert_type: str = "STATUS"
+    severity: str = "INFO"
+
+
+def _slack_summary() -> dict:
+    """Konfigurations-Snapshot für /api/health (ohne Netzwerkaufruf)."""
+    cfg = slack_mcp.load_settings()
+    return {
+        "configured": cfg.configured or bool(cfg.webhook_url),
+        "mcp_url": cfg.http_endpoint if cfg.transport == "http" else cfg.sse_endpoint,
+        "transport": cfg.transport,
+        "notify_enabled": cfg.notify_enabled,
+        "notify_channel": cfg.notify_channel,
+        "min_severity": cfg.notify_min_severity,
+        "webhook_configured": bool(cfg.webhook_url),
+    }
+
+
+async def notify_slack_alert(
+    asset_id: str,
+    alert_type: str,
+    severity: str,
+    message: str,
+    source: str = "backend",
+    timestamp: Optional[str] = None,
+) -> dict:
+    """Meldet einen Alert an Slack – scheitert nie hart (Alerting bleibt stabil).
+
+    Läuft als Background-Task: Der REST-/MQTT-Pfad wird nicht blockiert, wenn
+    der Slack-MCP-Server langsam oder offline ist.
+    """
+    notifier = slack_mcp.get_notifier()
+    if not notifier.config.notify_enabled:
+        return {"ok": False, "skipped": "disabled"}
+    try:
+        result = await notifier.notify_alert(
+            asset_id=asset_id,
+            alert_type=alert_type,
+            severity=severity,
+            message=message,
+            source=source,
+            timestamp=timestamp,
+        )
+    except Exception as exc:  # noqa: BLE001 – Alerting darf nicht crashen
+        logger.warning("Slack-Benachrichtigung fehlgeschlagen: %s", exc)
+        return {"ok": False, "error": str(exc)}
+    if result.get("ok"):
+        logger.info(
+            "Slack: Alert %s (%s) → %s", asset_id, severity, result.get("channel")
+        )
+    else:
+        logger.info("Slack: Alert %s nicht gesendet (%s)", asset_id, result)
+    return result
+
+
+@app.get("/api/slack/health")
+async def slack_health(probe: bool = True):
+    """Erreichbarkeit des Slack-MCP-Servers + registrierte Tools."""
+    notifier = slack_mcp.get_notifier()
+    try:
+        info = await notifier.client.health(probe=probe)
+    except SlackMCPError as exc:
+        info = {"configured": notifier.config.configured, "reachable": False, "error": str(exc)}
+    info["notify"] = {
+        "enabled": notifier.config.notify_enabled,
+        "channel": notifier.config.notify_channel,
+        "min_severity": notifier.config.notify_min_severity,
+        "webhook_configured": bool(notifier.config.webhook_url),
+    }
+    return info
+
+
+@app.get("/api/slack/tools")
+async def slack_tools(refresh: bool = False):
+    """Registrierte MCP-Tools des Slack-MCP-Servers (gecacht)."""
+    try:
+        tools = await slack_mcp.get_notifier().client.list_tools(refresh=refresh)
+    except SlackMCPError as exc:
+        raise HTTPException(status_code=502, detail=f"Slack-MCP: {exc}") from exc
+    return {
+        "count": len(tools),
+        "tools": [
+            {"name": t.get("name", ""), "description": t.get("description", "")}
+            for t in tools
+        ],
+    }
+
+
+@app.get("/api/slack/channels")
+async def slack_channels(
+    channel_types: str = "public_channel,private_channel",
+    limit: int = 200,
+    refresh: bool = False,
+):
+    """Channel-Verzeichnis (MCP-Tool `channels_list`, CSV → JSON)."""
+    result = await slack_mcp.get_notifier().client.call_tool(
+        "channels_list",
+        {"channel_types": channel_types, "limit": min(max(limit, 1), 999)},
+    )
+    if not result.ok:
+        raise HTTPException(status_code=502, detail=result.error or "channels_list fehlgeschlagen")
+    channels = parse_channels_csv(result.text)
+    return {"count": len(channels), "channels": channels, "refresh": refresh}
+
+
+@app.post("/api/slack/call", dependencies=[Depends(require_api_key)])
+async def slack_call(body: SlackCallIn):
+    """Direkter MCP-Tool-Aufruf (z. B. conversations_history, users_search)."""
+    tool = body.tool.strip()
+    if not tool:
+        raise HTTPException(status_code=400, detail="tool erforderlich")
+    result = await slack_mcp.get_notifier().client.call_tool(tool, body.arguments or {})
+    if not result.ok and result.error and result.text == "":
+        raise HTTPException(status_code=502, detail=result.error)
+    return result.as_dict()
+
+
+@app.post("/api/slack/notify", dependencies=[Depends(require_api_key)])
+async def slack_notify(body: SlackNotifyIn):
+    """Meldung in einen Slack-Channel senden (manuell → ohne Severity-Gate)."""
+    text = body.message.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="message erforderlich")
+    if body.asset_id:
+        text = format_alert_message(
+            asset_id=body.asset_id,
+            alert_type=body.alert_type,
+            severity=body.severity,
+            message=text,
+            source="api",
+        )
+    result = await slack_mcp.get_notifier().send_text(text, body.channel)
+    if not result.get("ok"):
+        return JSONResponse(status_code=502, content=result)
+    return result
 
 
 # ============ WEBSOCKET ============

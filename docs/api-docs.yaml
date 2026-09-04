@@ -147,6 +147,116 @@ paths:
         '200':
           description: Liste der Sichtungen
 
+  /api/slack/health:
+    get:
+      summary: Slack-MCP-Status
+      description: Konfiguration, Erreichbarkeit des MCP-Servers, Tool-Anzahl.
+      tags: [Slack]
+      parameters:
+        - name: probe
+          in: query
+          description: 'true = MCP-Server live abfragen (initialize + tools/list)'
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              example:
+                configured: true
+                reachable: true
+                transport: http
+                url: 'http://slack-mcp:13080/mcp'
+                tools: 12
+                notify:
+                  enabled: true
+                  channel: '#secureguard-alerts'
+                  min_severity: WARNING
+
+  /api/slack/tools:
+    get:
+      summary: Registrierte MCP-Tools
+      tags: [Slack]
+      parameters:
+        - name: refresh
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Tool-Liste
+        '502':
+          description: Slack-MCP-Server nicht erreichbar
+
+  /api/slack/channels:
+    get:
+      summary: Channel-Verzeichnis (MCP-Tool channels_list)
+      tags: [Slack]
+      parameters:
+        - name: channel_types
+          in: query
+          schema:
+            type: string
+            default: public_channel,private_channel
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+      responses:
+        '200':
+          description: Channels als JSON (aus CSV des Tools)
+        '502':
+          description: Tool-Aufruf fehlgeschlagen
+
+  /api/slack/call:
+    post:
+      summary: Beliebigen MCP-Tool-Aufruf ausführen
+      description: Erfordert X-API-Key, sobald SECUREGUARD_API_KEY gesetzt ist.
+      tags: [Slack]
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlackCall'
+      responses:
+        '200':
+          description: Tool-Ergebnis (ok, text, is_error)
+        '401':
+          description: X-API-Key fehlt oder ist falsch
+        '502':
+          description: MCP-Fehler
+
+  /api/slack/notify:
+    post:
+      summary: Meldung in einen Slack-Channel senden
+      description: |
+        Manueller Versand (ohne Severity-Gate). Mit `asset_id` wird die Meldung
+        wie ein Alert formatiert. Automatische Alarme laufen über
+        POST /api/alerts bzw. MQTT `secureguard/+/alert`.
+      tags: [Slack]
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlackNotify'
+      responses:
+        '200':
+          description: Gesendet (transport mcp|webhook)
+        '401':
+          description: X-API-Key fehlt oder ist falsch
+        '502':
+          description: Nicht gesendet (MCP-Server/Webhook)
+
   /ws:
     get:
       summary: WebSocket-Endpunkt für Echtzeit-Updates
@@ -155,7 +265,32 @@ paths:
         Der Server forwarded auch MQTT-Telemetrie/Alerts an alle verbundenen Clients.
 
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
   schemas:
+    SlackCall:
+      type: object
+      required: [tool]
+      properties:
+        tool:
+          type: string
+          example: conversations_history
+        arguments:
+          type: object
+          additionalProperties: true
+          example: { channel_id: '#general', limit: '10' }
+    SlackNotify:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        channel: { type: string, example: '#secureguard-alerts' }
+        asset_id: { type: string, example: 'AA:BB:CC:DD:EE:01' }
+        alert_type: { type: string, default: STATUS }
+        severity: { type: string, enum: [INFO, WARNING, CRITICAL], default: INFO }
     Asset:
       type: object
       required: [id, name, mac, short_name]
