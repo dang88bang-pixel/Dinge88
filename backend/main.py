@@ -54,6 +54,8 @@ MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
 API_KEY = os.environ.get("SECUREGUARD_API_KEY", "").strip()
 # CORS: Komma-getrennte Origins; "*" = offen (dann ohne Credentials, siehe unten).
 CORS_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
+# Node-RED (für die Abhängigkeits-Inventur /api/system/dependencies).
+NODERED_URL = os.environ.get("NODERED_URL", "http://nodered:1880").strip().rstrip("/")
 
 
 async def require_api_key(x_api_key: str = Header(default="", alias="X-API-Key")) -> None:
@@ -806,6 +808,132 @@ async def slack_notify(body: SlackNotifyIn):
     if not result.get("ok"):
         return JSONResponse(status_code=502, content=result)
     return result
+
+
+# ============ ABHÄNGIGKEITEN (Inventur für das App-Einstellungsmenü) ============
+# Eine Quelle für "welche Anbindung gibt es, wohin, ist sie erreichbar" – die
+# App zeigt das unter Einstellungen → Anbindungen & Abhängigkeiten.
+
+@app.get("/api/system/dependencies")
+async def system_dependencies(probe: bool = True):
+    """Serverseitige Abhängigkeiten inkl. Status (für Settings/Health-Screen)."""
+    deps: List[dict] = []
+
+    # --- SQLite ---
+    db_detail = "nicht erreichbar"
+    db_ok = False
+    try:
+        conn = get_db()
+        counts = {
+            table: conn.execute(f"SELECT COUNT(*) AS c FROM {table}").fetchone()["c"]
+            for table in ("assets", "detections", "alerts")
+        }
+        conn.close()
+        db_ok = True
+        db_detail = ", ".join(f"{k}={v}" for k, v in counts.items())
+    except Exception as exc:  # noqa: BLE001 – Status statt Absturz
+        db_detail = str(exc)[:120]
+    deps.append({
+        "id": "database",
+        "name": "SQLite (Backend-DB)",
+        "kind": "storage",
+        "configured": True,
+        "reachable": db_ok,
+        "target": DB_PATH,
+        "detail": db_detail,
+    })
+
+    # --- MQTT-Broker ---
+    client = _mqtt_client
+    mqtt_ok = False
+    try:
+        mqtt_ok = bool(client and client.is_connected())
+    except Exception:  # noqa: BLE001
+        mqtt_ok = False
+    deps.append({
+        "id": "mqtt",
+        "name": "MQTT-Broker (Mosquitto)",
+        "kind": "broker",
+        "configured": bool(MQTT_BROKER),
+        "reachable": mqtt_ok,
+        "target": MQTT_BROKER,
+        "detail": f"Auth: {'ja' if MQTT_USERNAME else 'anonym'} · "
+                  f"Topics: secureguard/+/(telemetry|alert|status)",
+    })
+
+    # --- Slack-MCP-Server ---
+    try:
+        slack_info = await slack_mcp.get_notifier().client.health(probe=probe)
+        notify = slack_mcp.get_notifier().config
+        deps.append({
+            "id": "slack-mcp",
+            "name": "Slack-MCP-Server (provectus)",
+            "kind": "mcp",
+            "configured": slack_info.get("configured", False),
+            "reachable": slack_info.get("reachable"),
+            "target": slack_info.get("url", ""),
+            "detail": f"Transport: {slack_info.get('transport', '')} · "
+                      f"{slack_info.get('tools', 0)} Tools · "
+                      f"Channel: {notify.notify_channel} · "
+                      f"ab {notify.notify_min_severity}"
+                      + (f" · Fehler: {slack_info.get('error')}" if slack_info.get("error") else ""),
+        })
+    except Exception as exc:  # noqa: BLE001
+        deps.append({
+            "id": "slack-mcp",
+            "name": "Slack-MCP-Server (provectus)",
+            "kind": "mcp",
+            "configured": False,
+            "reachable": False,
+            "target": "",
+            "detail": str(exc)[:120],
+        })
+
+    # --- Slack Incoming Webhook (Fallback) ---
+    webhook = slack_mcp.get_notifier().config.webhook_url
+    deps.append({
+        "id": "slack-webhook",
+        "name": "Slack Incoming Webhook (Fallback)",
+        "kind": "webhook",
+        "configured": bool(webhook),
+        # Webhooks werden nie "geprobt" – ein Test würde wirklich posten.
+        "reachable": None,
+        "target": "gesetzt" if webhook else "nicht gesetzt",
+        "detail": "Nur aktiv, wenn der MCP-Post fehlschlägt",
+    })
+
+    # --- Node-RED ---
+    nodered_ok = None
+    nodered_detail = "nicht konfiguriert"
+    if NODERED_URL:
+        if probe:
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=4) as http_client:
+                    response = await http_client.get(NODERED_URL + "/")
+                nodered_ok = response.status_code < 500
+                nodered_detail = f"HTTP {response.status_code}"
+            except Exception as exc:  # noqa: BLE001
+                nodered_ok = False
+                nodered_detail = f"{type(exc).__name__}"[:120]
+        else:
+            nodered_detail = "Probe übersprungen"
+    deps.append({
+        "id": "nodered",
+        "name": "Node-RED (Flows)",
+        "kind": "flow",
+        "configured": bool(NODERED_URL),
+        "reachable": nodered_ok,
+        "target": NODERED_URL,
+        "detail": nodered_detail,
+    })
+
+    return {
+        "generated": datetime.now().isoformat(),
+        "probed": probe,
+        "count": len(deps),
+        "dependencies": deps,
+    }
 
 
 # ============ WEBSOCKET ============

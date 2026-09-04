@@ -485,7 +485,7 @@ getWhitelistedAssets, getAllAssets, getAssetByMac, getAssetById, resolveAsset, u
 
 ## 🖥️ Backend (FastAPI)
 
-### Endpoints (18)
+### Endpoints (19)
 
 | Methode | Pfad | Funktion |
 |---------|------|----------|
@@ -506,6 +506,7 @@ getWhitelistedAssets, getAllAssets, getAssetByMac, getAssetById, resolveAsset, u
 | GET | `/api/slack/channels` | Slack-Channel-Verzeichnis |
 | POST | `/api/slack/call` | MCP-Tool-Aufruf (X-API-Key) |
 | POST | `/api/slack/notify` | Meldung an Slack senden (X-API-Key) |
+| GET | `/api/system/dependencies` | Abhängigkeits-Inventur (für App-Einstellungen) |
 | WS | `/ws` | Echtzeit-Updates (Command + MQTT-Bridge) |
 
 ### MQTT → WebSocket Bridge
@@ -532,6 +533,7 @@ Verfügung – Slack-Tokens bleiben im Backend.
 | MCP-Client + REST-Bridge | `backend/slack_mcp.py` → `/api/slack/*` |
 | Alarm-Weiterleitung | `POST /api/alerts`, MQTT `secureguard/+/alert` |
 | App-Screen „💬 Slack (MCP)" | `presentation/ui/slack/`, Auto-Forwarder `SlackAlertForwarder` |
+| Einstellungen → „🧩 Anbindungen & Abhängigkeiten" | alle Endpunkte/Schlüssel + Live-Inventur des Backends |
 | Node-RED-Flow | `slack notify` + Inject „Slack Testmeldung" |
 | Doku & Tokens | [`docs/SLACK_MCP.md`](docs/SLACK_MCP.md) |
 

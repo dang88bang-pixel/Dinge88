@@ -50,6 +50,12 @@ class SlackService @Inject constructor(
     /** Backend-URL gesetzt? Ohne sie sind alle Aufrufe no-ops. */
     val isConfigured: Boolean get() = endpointConfig.backendBaseUrl.isNotBlank()
 
+    /** Schalter aus den Einstellungen (Auto-Alarme der App). */
+    val isEnabled: Boolean get() = endpointConfig.slackEnabled
+
+    /** Ziel-Channel aus den Einstellungen; leer = Default des Backends. */
+    val defaultChannel: String get() = endpointConfig.slackChannel
+
     private val _health = MutableStateFlow<SlackHealth?>(null)
     val health: StateFlow<SlackHealth?> = _health.asStateFlow()
 
@@ -225,7 +231,9 @@ class SlackService @Inject constructor(
                 "severity" to severity,
                 "alert_type" to alertType
             )
-            if (!channel.isNullOrBlank()) body["channel"] = channel
+            // Priorität: Aufrufer → Einstellungen → Default des Backends.
+            val target = channel?.takeIf { it.isNotBlank() } ?: defaultChannel
+            if (target.isNotBlank()) body["channel"] = target
             if (!assetId.isNullOrBlank()) body["asset_id"] = assetId
             val result = post("/api/slack/notify", gson.toJson(body)) ?: return@withContext null
             SlackNotifyResult(
@@ -261,6 +269,62 @@ class SlackService @Inject constructor(
         assetId = assetId,
         alertType = alertType
     )
+
+    // ============ ABHÄNGIGKEITEN (Einstellungen) ============
+
+    /** Eine serverseitige Abhängigkeit aus `GET /api/system/dependencies`. */
+    data class ServerDependency(
+        val id: String,
+        val name: String,
+        val kind: String,
+        val target: String,
+        val configured: Boolean,
+        val reachable: Boolean?,
+        val detail: String
+    )
+
+    /**
+     * Holt die serverseitige Abhängigkeits-Inventur (DB, MQTT, Slack-MCP,
+     * Webhook, Node-RED) – die App zeigt sie zusammen mit den lokalen
+     * Endpunkten im Einstellungsmenü.
+     */
+    suspend fun fetchDependencies(probe: Boolean = true): List<ServerDependency> =
+        withContext(Dispatchers.IO) {
+            if (!isConfigured) return@withContext emptyList()
+            _isProcessing.value = true
+            try {
+                val request = Request.Builder()
+                    .url(
+                        endpointConfig.backendBaseUrl +
+                            "/api/system/dependencies?probe=$probe"
+                    )
+                    .get()
+                    .applyAuth()
+                    .build()
+                http.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use emptyList()
+                    val json = JsonParser.parseString(response.body?.string().orEmpty())
+                        .asJsonObject
+                    json.get("dependencies")?.asJsonArray?.mapNotNull { el ->
+                        val o = el.asJsonObject
+                        ServerDependency(
+                            id = o.str("id"),
+                            name = o.str("name"),
+                            kind = o.str("kind"),
+                            target = o.str("target"),
+                            configured = o.get("configured")?.asBoolean ?: false,
+                            reachable = o.get("reachable")
+                                ?.takeIf { !it.isJsonNull }?.asBoolean,
+                            detail = o.str("detail")
+                        )
+                    }.orEmpty()
+                }
+            } catch (_: Exception) {
+                emptyList()
+            } finally {
+                _isProcessing.value = false
+            }
+        }
 
     // ============ INTERN ============
 

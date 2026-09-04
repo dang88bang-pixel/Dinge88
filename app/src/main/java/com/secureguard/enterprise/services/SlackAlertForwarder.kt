@@ -51,6 +51,9 @@ class SlackAlertForwarder @Inject constructor(
             Log.i(TAG, "Kein Backend konfiguriert – Slack-Forwarder bleibt inaktiv")
             return
         }
+        // Der Schalter aus den Einstellungen wird pro Alert geprüft (siehe
+        // maybeForward) – der Beobachter läuft also auch dann, wenn Slack
+        // gerade ausgeschaltet ist, und reagiert sofort auf das Umschalten.
         job = scope.launch {
             database.alertDao().observeAll()
                 .catch { error -> Log.w(TAG, "Alert-Beobachtung beendet", error) }
@@ -67,6 +70,7 @@ class SlackAlertForwarder @Inject constructor(
     }
 
     private suspend fun maybeForward(alert: Alert) {
+        if (!slackService.isEnabled) return              // Schalter in den Einstellungen
         if (alert.id == 0L) return                       // noch nicht persistiert
         if (alert.timestamp.time < startedAt) return     // Historie überspringen
         if (alert.severity.ordinal < minSeverity.ordinal) return

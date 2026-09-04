@@ -257,6 +257,40 @@ paths:
         '502':
           description: Nicht gesendet (MCP-Server/Webhook)
 
+  /api/system/dependencies:
+    get:
+      summary: Abhängigkeits-Inventur (Einstellungen)
+      description: |
+        Serverseitige Anbindungen mit Status: SQLite, MQTT-Broker,
+        Slack-MCP-Server, Slack-Webhook (Fallback), Node-RED. Die App rendert
+        daraus zusammen mit den lokalen Endpunkten die Liste unter
+        Einstellungen → „Anbindungen & Abhängigkeiten".
+      tags: [System]
+      parameters:
+        - name: probe
+          in: query
+          description: 'true = Erreichbarkeit live prüfen (MCP-Handshake, Node-RED-HTTP)'
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Liste der Abhängigkeiten
+          content:
+            application/json:
+              example:
+                generated: '2026-09-04T16:20:00'
+                probed: true
+                count: 5
+                dependencies:
+                  - id: slack-mcp
+                    name: Slack-MCP-Server (provectus)
+                    kind: mcp
+                    configured: true
+                    reachable: true
+                    target: 'http://slack-mcp:13080/mcp'
+                    detail: 'Transport: http · 12 Tools · Channel: #secureguard-alerts · ab WARNING'
+
   /ws:
     get:
       summary: WebSocket-Endpunkt für Echtzeit-Updates

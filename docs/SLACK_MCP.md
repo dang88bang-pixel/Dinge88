@@ -146,6 +146,24 @@ Alle Pfade liegen am Backend (Port 8000). Schreibende Endpunkte verlangen
 | `GET` | `/api/slack/channels?limit=200` | Channel-Verzeichnis (`channels_list`, CSV → JSON) |
 | `POST` | `/api/slack/call` | Beliebiger Tool-Aufruf: `{"tool":"…","arguments":{…}}` |
 | `POST` | `/api/slack/notify` | Meldung senden: `{"message":"…","channel":"#…","severity":"INFO","asset_id":"…","alert_type":"…"}` |
+| `GET` | `/api/system/dependencies` | Abhängigkeits-Inventur (DB, MQTT, Slack-MCP, Webhook, Node-RED) |
+
+### App-Einstellungen
+
+Unter **Einstellungen → 🧩 Anbindungen & Abhängigkeiten** sind alle Verbindungen
+hinterlegt – lokale Endpunkte (Backend, WebSocket, MQTT, MCP/Temp-Mail, LoRa,
+YOLO, CKAN, Find-My, DHL, externe API-Keys als „gesetzt/nicht gesetzt") **und**
+die serverseitigen Abhängigkeiten aus `GET /api/system/dependencies`. Dazu:
+
+* Schalter **„Slack-Alarme"** (`EndpointConfig.slackEnabled`) – steuert den
+  `SlackAlertForwarder`; wirkt sofort, kein App-Neustart.
+* Feld **„Slack-Channel"** (`EndpointConfig.slackChannel`) – Ziel-Channel der
+  App; leer = `SLACK_NOTIFY_CHANNEL` des Backends.
+* **„Status prüfen"** holt die Live-Inventur vom Backend (MCP-Handshake,
+  Node-RED-HTTP, MQTT-Verbindung).
+
+MCP-Server-URL, Bot-Tokens und Tool-Freigaben bleiben bewusst serverseitig
+(`.env`) – die App zeigt sie nur an und speichert keine Slack-Credentials.
 
 Beispiele:
 

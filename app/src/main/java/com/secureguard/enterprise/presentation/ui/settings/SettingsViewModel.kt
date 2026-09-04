@@ -3,12 +3,17 @@ package com.secureguard.enterprise.presentation.ui.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.secureguard.enterprise.BuildConfig
 import com.secureguard.enterprise.config.EndpointConfig
+import com.secureguard.enterprise.config.EndpointSnapshot
+import com.secureguard.enterprise.config.IntegrationInfo
+import com.secureguard.enterprise.config.IntegrationState
 import com.secureguard.enterprise.services.AgentForegroundService
 import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentSettings
 import com.secureguard.enterprise.services.BackendSyncService
 import com.secureguard.enterprise.services.MqttService
+import com.secureguard.enterprise.services.SlackService
 import com.secureguard.enterprise.services.WebSocketService
 import com.secureguard.enterprise.security.Permission
 import com.secureguard.enterprise.security.RoleManager
@@ -41,7 +46,13 @@ data class SettingsUiState(
     val loraGatewayUrl: String = "",
     val yoloServerUrl: String = "",
     val openDataApiUrl: String = "",
-    val findMyProxyUrl: String = ""
+    val findMyProxyUrl: String = "",
+    // Slack (MCP) – App-seitige Anteile, Server-Teile kommen aus der Inventur
+    val slackEnabled: Boolean = true,
+    val slackChannel: String = "",
+    // Vollständige Anbindungs-/Abhängigkeitsliste (App + Server)
+    val integrations: List<IntegrationInfo> = emptyList(),
+    val integrationsCheckedAt: String? = null
 )
 
 @HiltViewModel
@@ -57,13 +68,21 @@ class SettingsViewModel @Inject constructor(
     private val webSocketService: WebSocketService,
     private val backendSyncService: BackendSyncService,
     private val privacyService: com.secureguard.enterprise.services.PrivacyService,
-    private val roleManager: RoleManager
+    private val roleManager: RoleManager,
+    private val slackService: SlackService,
+    private val slackAlertForwarder: com.secureguard.enterprise.services.SlackAlertForwarder
 ) : ViewModel() {
+
+    /** Zwischenspeicher der Server-Inventur (für UI-Updates ohne neuen Abruf). */
+    private var serverDependencies: List<SlackService.ServerDependency> = emptyList()
 
     private val prefs = context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
 
     private val _uiState = MutableStateFlow(load())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    /** Quelle der Laufzeit-Endpunkte (Settings-UI überschreibt local.properties). */
+    private val SOURCE_ENDPOINTS = "Einstellungen / local.properties"
 
     private fun load(): SettingsUiState {
         val ep = endpointConfig.snapshot()
@@ -85,7 +104,10 @@ class SettingsViewModel @Inject constructor(
             loraGatewayUrl = ep.loraGatewayUrl,
             yoloServerUrl = ep.yoloServerUrl,
             openDataApiUrl = ep.openDataApiUrl,
-            findMyProxyUrl = ep.findMyProxyUrl
+            findMyProxyUrl = ep.findMyProxyUrl,
+            slackEnabled = ep.slackEnabled,
+            slackChannel = ep.slackChannel,
+            integrations = buildIntegrations(ep, emptyList(), backendReachable = null)
         )
     }
 
@@ -141,6 +163,200 @@ class SettingsViewModel @Inject constructor(
     fun setOpenDataApiUrl(v: String) = _uiState.update { it.copy(openDataApiUrl = v) }
     fun setFindMyProxyUrl(v: String) = _uiState.update { it.copy(findMyProxyUrl = v) }
 
+    fun setSlackChannel(v: String) = _uiState.update { it.copy(slackChannel = v) }
+
+    /** Schalter wirkt sofort (SlackAlertForwarder prüft ihn pro Alert). */
+    fun setSlackEnabled(value: Boolean) {
+        endpointConfig.update(slackEnabled = value)
+        _uiState.update {
+            it.copy(
+                slackEnabled = value,
+                integrations = buildIntegrations(
+                    endpointConfig.snapshot(), serverDependencies, backendReachable = null
+                ),
+                statusMessage = if (value) "✅ Slack-Alarme aktiviert" else "⚪ Slack-Alarme deaktiviert"
+            )
+        }
+    }
+
+    /**
+     * Prüft alle Anbindungen: lokale Endpunkte (MQTT live, übrige Konfiguration)
+     * plus die serverseitige Inventur des Backends (`/api/system/dependencies`).
+     */
+    fun refreshIntegrations() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val deps = runCatching { slackService.fetchDependencies() }.getOrDefault(emptyList())
+            serverDependencies = deps
+            val snapshot = endpointConfig.snapshot()
+            _uiState.update {
+                it.copy(
+                    integrations = buildIntegrations(
+                        snapshot,
+                        deps,
+                        backendReachable = if (snapshot.backendBaseUrl.isBlank()) null else deps.isNotEmpty()
+                    ),
+                    integrationsCheckedAt = java.text.SimpleDateFormat(
+                        "HH:mm:ss", java.util.Locale.getDefault()
+                    ).format(java.util.Date()),
+                    statusMessage = if (deps.isEmpty()) {
+                        "⚠️ Server-Inventur leer – Backend konfiguriert/erreichbar?"
+                    } else {
+                        "✅ ${deps.size} Server-Abhängigkeiten geprüft"
+                    }
+                )
+            }
+        }
+    }
+
+    /**
+     * Baut die komplette Liste: lokale Anbindungen (aus [EndpointSnapshot] und
+     * `BuildConfig`) + serverseitige Abhängigkeiten aus der Backend-Inventur.
+     * Secrets werden nur als „gesetzt/nicht gesetzt" angezeigt.
+     */
+    private fun buildIntegrations(
+        ep: EndpointSnapshot,
+        serverDeps: List<SlackService.ServerDependency>,
+        backendReachable: Boolean?
+    ): List<IntegrationInfo> {
+        fun endpoint(
+            id: String,
+            name: String,
+            kind: String,
+            url: String,
+            detail: String = ""
+        ) = IntegrationInfo(
+            id = id,
+            name = name,
+            kind = kind,
+            target = url.ifBlank { "nicht gesetzt" },
+            state = if (url.isBlank()) IntegrationState.DISABLED else IntegrationState.CONFIGURED,
+            source = SOURCE_ENDPOINTS,
+            detail = detail
+        )
+
+        fun externalApi(
+            id: String,
+            name: String,
+            key: String,
+            url: String,
+            needsKey: Boolean = true
+        ) = IntegrationInfo(
+            id = id,
+            name = name,
+            kind = "api",
+            target = url,
+            state = when {
+                !needsKey -> IntegrationState.CONFIGURED
+                key.isNotBlank() -> IntegrationState.CONFIGURED
+                else -> IntegrationState.DISABLED
+            },
+            source = "local.properties (BuildConfig)",
+            detail = if (needsKey) "API-Key: " + IntegrationInfo.secretState(key) else "ohne Key"
+        )
+
+        val local = mutableListOf<IntegrationInfo>()
+
+        local += IntegrationInfo(
+            id = "backend-app",
+            name = "SecureGuard Backend (FastAPI)",
+            kind = "http",
+            target = ep.backendBaseUrl.ifBlank { "nicht gesetzt" },
+            state = when {
+                ep.backendBaseUrl.isBlank() -> IntegrationState.DISABLED
+                backendReachable == true -> IntegrationState.CONNECTED
+                backendReachable == false -> IntegrationState.MISSING
+                else -> IntegrationState.CONFIGURED
+            },
+            source = SOURCE_ENDPOINTS,
+            detail = "REST + WebSocket + Slack-/MCP-Bridge"
+        )
+        local += endpoint("websocket-app", "WebSocket (Echtzeit)", "ws", ep.websocketUrl)
+        local += IntegrationInfo(
+            id = "mqtt-app",
+            name = "MQTT-Broker (Mosquitto)",
+            kind = "broker",
+            target = ep.mqttBrokerUrl.ifBlank { "nicht gesetzt" },
+            state = when {
+                mqttService.isConnected -> IntegrationState.CONNECTED
+                ep.mqttBrokerUrl.isBlank() -> IntegrationState.DISABLED
+                else -> IntegrationState.CONFIGURED
+            },
+            source = SOURCE_ENDPOINTS,
+            detail = if (ep.mqttUsername.isBlank()) "anonym" else "User: ${ep.mqttUsername}"
+        )
+        local += endpoint("mcp-app", "MCP / Temp-Mail Server", "mcp", ep.mcpServerUrl)
+        local += IntegrationInfo(
+            id = "slack-app",
+            name = "Slack-Alarme (App → Backend)",
+            kind = "notify",
+            target = ep.slackChannel.ifBlank { "Backend-Default" },
+            state = if (ep.slackEnabled) IntegrationState.CONFIGURED else IntegrationState.DISABLED,
+            source = "Einstellungen",
+            detail = "POST /api/slack/notify · Forwarder ab WARNING"
+        )
+        local += endpoint("lora-gateway", "LoRa-Gateway", "http", ep.loraGatewayUrl)
+        local += endpoint("yolo-server", "YOLO-Server (Objekterkennung)", "http", ep.yoloServerUrl)
+        local += endpoint("ckan", "CKAN / Open Data", "http", ep.openDataApiUrl)
+        local += endpoint("findmy", "Find-My-Proxy", "http", ep.findMyProxyUrl)
+        local += IntegrationInfo(
+            id = "dhl",
+            name = "DHL Packstation (Standorte)",
+            kind = "api",
+            target = ep.dhlApiUrl.ifBlank { "nicht gesetzt" },
+            state = if (ep.dhlApiUrl.isBlank()) IntegrationState.DISABLED
+            else IntegrationState.CONFIGURED,
+            source = SOURCE_ENDPOINTS,
+            detail = "Token: " + IntegrationInfo.secretState(ep.dhlApiToken)
+        )
+        local += IntegrationInfo(
+            id = "api-key",
+            name = "Backend-API-Key (X-API-Key)",
+            kind = "auth",
+            target = IntegrationInfo.secretState(ep.backendApiKey),
+            state = if (ep.backendApiKey.isBlank()) IntegrationState.DISABLED
+            else IntegrationState.CONFIGURED,
+            source = SOURCE_ENDPOINTS,
+            detail = "Schützt schreibende Endpunkte"
+        )
+
+        // Externe APIs (Schlüssel aus local.properties → BuildConfig)
+        local += externalApi("wigle", "WiGLE (BSSID → GPS)", BuildConfig.WIGLE_API_KEY, "https://api.wigle.net")
+        local += externalApi(
+            "openchargemap", "OpenChargeMap (Ladesäulen)",
+            BuildConfig.OPEN_CHARGE_MAP_KEY, "https://api.openchargemap.io"
+        )
+        local += externalApi("netatmo", "Netatmo (Wetter)", BuildConfig.NETATMO_TOKEN, "https://api.netatmo.com")
+        local += externalApi("google-geo", "Google Geolocation", BuildConfig.GOOGLE_API_KEY, "https://www.googleapis.com")
+        local += externalApi("helium", "Helium (LoRaWAN)", BuildConfig.HELIUM_API_KEY, "https://api.helium.io")
+        local += externalApi("maclookup", "MAC-Lookup (OUI)", "", "https://api.maclookup.app", needsKey = false)
+
+        // Firmware/Gateway (läuft über MQTT, keine eigene URL)
+        local += IntegrationInfo(
+            id = "esp32-gateway",
+            name = "ESP32-Gateway (Firmware)",
+            kind = "device",
+            target = "secureguard/<MAC>/command",
+            state = if (ep.mqttBrokerUrl.isBlank()) IntegrationState.DISABLED
+            else IntegrationState.CONFIGURED,
+            source = "MQTT-Topic",
+            detail = "Befehle/Telemetrie, Konfiguration per CONFIG-Payload"
+        )
+
+        val server = serverDeps.map { dep ->
+            IntegrationInfo(
+                id = dep.id,
+                name = dep.name,
+                kind = dep.kind,
+                target = dep.target.ifBlank { "nicht gesetzt" },
+                state = IntegrationInfo.stateFromProbe(dep.configured, dep.reachable),
+                source = "Backend (docker-compose)",
+                detail = dep.detail,
+                origin = IntegrationInfo.ORIGIN_SERVER
+            )
+        }
+        return local + server
+    }
+
     /** Speichert Endpunkte und reconnectet MQTT/WebSocket. */
     fun saveEndpoints() {
         // RBAC (F-44): Konfiguration erfordert CONFIGURE_AGENT
@@ -159,11 +375,16 @@ class SettingsViewModel @Inject constructor(
             loraUrl = s.loraGatewayUrl,
             yoloUrl = s.yoloServerUrl,
             ckanUrl = s.openDataApiUrl,
-            findMyUrl = s.findMyProxyUrl
+            findMyUrl = s.findMyProxyUrl,
+            slackEnabled = s.slackEnabled,
+            slackChannel = s.slackChannel
         )
         // Apply live
         mqttService.reconnect()
         webSocketService.reconnect()
+        // Slack-Forwarder (neu) starten – er war ohne Backend-URL inaktiv.
+        // start() ist idempotent und beachtet den Slack-Schalter pro Alert.
+        runCatching { slackAlertForwarder.start() }
         // Refresh UI from resolved values
         val snap = endpointConfig.snapshot()
         _uiState.update {
@@ -178,6 +399,9 @@ class SettingsViewModel @Inject constructor(
                 yoloServerUrl = snap.yoloServerUrl,
                 openDataApiUrl = snap.openDataApiUrl,
                 findMyProxyUrl = snap.findMyProxyUrl,
+                slackEnabled = snap.slackEnabled,
+                slackChannel = snap.slackChannel,
+                integrations = buildIntegrations(snap, serverDependencies, backendReachable = null),
                 statusMessage = "✅ Endpunkte gespeichert · MQTT/WS reconnect"
             )
         }
