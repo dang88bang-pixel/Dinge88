@@ -202,20 +202,15 @@
   "props": [
    {
     "p": "payload"
-   },
-   {
-    "p": "topic",
-    "vt": "env"
    }
   ],
-  "topic": "SG_DEFAULT_DEVICE_ID",
   "payload": "TELEMETRY",
   "payloadType": "str",
   "x": 170,
   "y": 460,
   "wires": [
    [
-    "sg_out_cmd"
+    "sg_cmd_topic"
    ]
   ]
  },
@@ -309,7 +304,7 @@
   "y": 340,
   "wires": [
    [
-    "sg_http_slack"
+    "sg_set_slack_headers"
    ]
   ]
  },
@@ -328,19 +323,8 @@
   "insecureHTTPParser": false,
   "authType": "",
   "senderr": true,
-  "headers": [
-   {
-    "keyType": "other",
-    "keyValue": "Content-Type",
-    "value": "application/json"
-   },
-   {
-    "keyType": "other",
-    "keyValue": "X-API-Key",
-    "value": "{{$env.SG_API_KEY}}"
-   }
-  ],
-  "x": 610,
+  "headers": [],
+  "x": 640,
   "y": 340,
   "wires": [
    [
@@ -380,13 +364,53 @@
   "once": false,
   "onceDelay": "",
   "topic": "",
-  "payload": "{\"message\":\"Node-RED → Slack: Testmeldung aus dem SecureGuard-Stack\",\"severity\":\"INFO\"}",
+  "payload": "{\"message\":\"Node-RED → Slack: Testmeldung aus dem SecureGuard-Stack\",\"severity\":\"WARNING\"}",
   "payloadType": "json",
   "x": 180,
   "y": 400,
   "wires": [
    [
+    "sg_set_slack_headers"
+   ]
+  ]
+ },
+ {
+  "id": "sg_set_slack_headers",
+  "type": "function",
+  "z": "sg_tab_main",
+  "name": "set slack headers",
+  "func": "// X-API-Key + Content-Type als msg.headers setzen.\n// Hinweis: {{$env.…}} im Header-Array des http-request-Nodes wird NICHT\n// aufgelöst (Header fehlt dann komplett → 401 am Backend). env.get()\n// in einem Function-Node liest die Compose-Env (SG_API_KEY).\nmsg.headers = {\n    'Content-Type': 'application/json',\n    'X-API-Key': env.get('SG_API_KEY') || ''\n};\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "x": 430,
+  "y": 340,
+  "wires": [
+   [
     "sg_http_slack"
+   ]
+  ]
+ },
+ {
+  "id": "sg_cmd_topic",
+  "type": "function",
+  "z": "sg_tab_main",
+  "name": "command topic",
+  "func": "// Ziel-Topic des Default-Gateways bauen. Die Firmware abonniert\n// secureguard/<device_id>/command (secureguard_esp32.ino:360) – ein\n// reiner device_id als Topic würde verworfen (\"Invalid topic\").\nconst device = env.get('SG_DEFAULT_DEVICE_ID') || 'ESP32_SecureGuard';\nmsg.topic = `secureguard/${device}/command`;\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "x": 250,
+  "y": 640,
+  "wires": [
+   [
+    "sg_out_cmd"
    ]
   ]
  }

@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import sqlite3
+import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import List, Optional, Set
@@ -250,12 +251,84 @@ def publish_command(asset_mac: str, command: str) -> bool:
 
 # ============ MQTT → WEBSOCKET BRIDGE ============
 
+# (Topic, QoS) – wird bei JEDEM Verbindungsaufbau erneut abonniert.
+MQTT_SUBSCRIPTIONS = [
+    ("secureguard/+/telemetry", 1),
+    ("secureguard/+/alert", 2),
+    ("secureguard/+/status", 1),
+    ("secureguard/broadcast", 0),
+]
+
+# True, solange die Subscriptions auf dem Broker liegen (für die Inventur).
+_mqtt_subscribed = False
+
+# Selbstheilung: Manche Broker (z. B. Session-Overtake/Expiry) verwerfen die
+# Subscriptions, obwohl die TCP-Verbindung lebt – `is_connected()` bleibt True
+# und die Echtzeitkette wäre still tot. Deshalb in festen Abständen erneut
+# abonnieren (idempotent). 0 schaltet den Watchdog aus.
+MQTT_RESUBSCRIBE_INTERVAL = int(os.environ.get("MQTT_RESUBSCRIBE_INTERVAL", "60"))
+_mqtt_watchdog_stop = None
+
+
+def mqtt_subscribe_all(mqtt_client) -> None:
+    """Alle Topics abonnieren – idempotent, beliebig oft aufrufbar."""
+    for topic, qos in MQTT_SUBSCRIPTIONS:
+        mqtt_client.subscribe(topic, qos=qos)
+
+
+def mqtt_resubscribe_once(mqtt_client) -> bool:
+    """Ein Watchdog-Durchlauf. True, wenn (erneut) abonniert wurde."""
+    global _mqtt_subscribed
+    try:
+        if not mqtt_client.is_connected():
+            _mqtt_subscribed = False
+            return False
+        mqtt_subscribe_all(mqtt_client)
+        _mqtt_subscribed = True
+        return True
+    except Exception:
+        _mqtt_subscribed = False
+        return False
+
+
+def _mqtt_watchdog_loop(mqtt_client, stop_event, interval: int) -> None:
+    while not stop_event.wait(interval):
+        if mqtt_resubscribe_once(mqtt_client):
+            logger.debug("MQTT-Subscriptions aufgefrischt (%d Topics)",
+                         len(MQTT_SUBSCRIPTIONS))
+
+
 def start_mqtt_subscriber():
     """Subscribes to all telemetry/alert/status topics and forwards to WebSockets."""
+    global _mqtt_subscribed, _mqtt_watchdog_stop
     client = get_mqtt_client()
     if client is None:
         logger.warning("MQTT nicht verfügbar – WebSocket-Forwarding deaktiviert")
         return
+
+    subscribe_all = mqtt_subscribe_all
+
+    def on_connect(mqtt_client, userdata, flags, rc):
+        """Wichtig: paho verbindet sich nach einem Abbruch selbst wieder, die
+        Subscriptions gehen dabei aber verloren. Ohne Re-Subscribe wäre die
+        komplette Echtzeitkette (MQTT → WebSocket/Slack) still tot, während
+        `is_connected()` weiter True meldet."""
+        global _mqtt_subscribed
+        if rc != 0:
+            logger.warning("MQTT-Connect abgelehnt (rc=%s)", rc)
+            return
+        subscribe_all(mqtt_client)
+        _mqtt_subscribed = True
+        logger.info("MQTT verbunden – %d Topics (erneut) abonniert",
+                    len(MQTT_SUBSCRIPTIONS))
+
+    def on_disconnect(mqtt_client, userdata, rc):
+        global _mqtt_subscribed
+        _mqtt_subscribed = False
+        logger.warning("MQTT getrennt (rc=%s) – Subscriptions weg, Reconnect läuft", rc)
+
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
 
     def on_message(mqtt_client, userdata, msg):
         """MQTT message received – format and broadcast to all WebSocket clients."""
@@ -288,12 +361,28 @@ def start_mqtt_subscriber():
             # Thread-sichere Uebergabe an die Haupt-Loop (Paho-Thread -> uvicorn)
             asyncio.run_coroutine_threadsafe(broadcast_websocket(ws_msg), loop)
 
-    client.subscribe("secureguard/+/telemetry")
-    client.subscribe("secureguard/+/alert")
-    client.subscribe("secureguard/+/status")
-    client.subscribe("secureguard/broadcast")
     client.on_message = on_message
-    logger.info("MQTT-Subscriber gestartet – Topics abonniert")
+    # Falls die Verbindung schon steht (CONNACK vor Callback-Zuordnung),
+    # einmal direkt abonnieren – ein Doppel-Abo ist unkritisch.
+    if client.is_connected():
+        subscribe_all(client)
+        _mqtt_subscribed = True
+    logger.info("MQTT-Subscriber gestartet – %d Topics konfiguriert",
+                len(MQTT_SUBSCRIPTIONS))
+
+    # Selbstheilungs-Watchdog (einmal pro Prozess; früheren Thread beenden).
+    if MQTT_RESUBSCRIBE_INTERVAL > 0:
+        if _mqtt_watchdog_stop is not None:
+            _mqtt_watchdog_stop.set()
+        _mqtt_watchdog_stop = threading.Event()
+        threading.Thread(
+            target=_mqtt_watchdog_loop,
+            args=(client, _mqtt_watchdog_stop, MQTT_RESUBSCRIBE_INTERVAL),
+            name="mqtt-resubscribe-watchdog",
+            daemon=True,
+        ).start()
+        logger.info("MQTT-Watchdog aktiv (Re-Subscribe alle %ss)",
+                    MQTT_RESUBSCRIBE_INTERVAL)
 
 
 async def _notify_mqtt_alert(topic: str, data) -> dict:
@@ -323,6 +412,25 @@ async def broadcast_websocket(message: str):
         except Exception:
             disconnected.add(ws)
     active_websockets.difference_update(disconnected)
+
+
+def broadcast_event(event_type: str, data: dict) -> None:
+    """REST-Mutation → alle WebSocket-Clients (Echtzeit-Flow, siehe README).
+
+    Die Endpunkte laufen als sync-`def` im Threadpool, daher die thread-sichere
+    Übergabe an die uvicorn-Event-Loop – identisch zum MQTT→WS-Bridge-Pfad.
+    Die App erwartet `{"type": …, "data": {…}}` (WebSocketService.kt).
+    """
+    loop = main_event_loop
+    if loop is None or not loop.is_running():
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(
+            broadcast_websocket(json.dumps({"type": event_type, "data": data})),
+            loop,
+        )
+    except RuntimeError:  # Loop wird gerade geschlossen (Shutdown)
+        logger.debug("WebSocket-Broadcast übersprungen: %s", event_type)
 
 
 # ============ API-ENDPUNKTE ============
@@ -393,6 +501,18 @@ def create_asset(asset: Asset):
     )
     conn.commit()
     conn.close()
+    # Echtzeit-Flow: andere Clients (App/Dashboard) sehen die Änderung sofort.
+    broadcast_event("asset_update", {
+        "id": asset.id,
+        "name": asset.name,
+        "mac": asset.mac,
+        "short_name": asset.short_name,
+        "status": asset.status,
+        "latitude": asset.latitude,
+        "longitude": asset.longitude,
+        "rssi": asset.rssi,
+        "last_seen": asset.last_seen.isoformat() if asset.last_seen else None,
+    })
     return asset
 
 
@@ -411,6 +531,14 @@ def add_detection(detection: Detection):
     )
     conn.commit()
     conn.close()
+    broadcast_event("telemetry", {
+        "asset_mac": detection.asset_mac,
+        "source_type": detection.source_type,
+        "node_id": detection.node_id,
+        "rssi": detection.rssi,
+        "latitude": detection.latitude,
+        "longitude": detection.longitude,
+    })
     return {"status": "ok"}
 
 
@@ -446,6 +574,14 @@ def add_alert(alert: Alert, background_tasks: BackgroundTasks):
         "backend/api",
         (alert.timestamp or datetime.now()).isoformat(),
     )
+    # Zusätzlich Live-Update an alle WS-Clients (Alert-Karte/Dashboard).
+    broadcast_event("alert", {
+        "asset_id": alert.asset_id,
+        "type": alert.type,
+        "severity": alert.severity,
+        "message": alert.message,
+        "timestamp": (alert.timestamp or datetime.now()).isoformat(),
+    })
     return {"status": "ok"}
 
 
@@ -858,7 +994,8 @@ async def system_dependencies(probe: bool = True):
         "reachable": mqtt_ok,
         "target": MQTT_BROKER,
         "detail": f"Auth: {'ja' if MQTT_USERNAME else 'anonym'} · "
-                  f"Topics: secureguard/+/(telemetry|alert|status)",
+                  f"Topics: secureguard/+/(telemetry|alert|status) · "
+                  f"{'abonniert' if _mqtt_subscribed else 'nicht abonniert'}",
     })
 
     # --- Slack-MCP-Server ---

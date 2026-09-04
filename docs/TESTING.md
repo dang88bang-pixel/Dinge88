@@ -30,9 +30,24 @@
 
 ```bash
 pip install -r backend/requirements-dev.txt
-pytest backend/tests -q              # 45 Tests
+pytest backend/tests -q              # 59 Tests
 pytest backend/tests/test_slack_mcp.py -q   # nur Slack-MCP (31 Tests)
 ```
+
+## Ketten-Check gegen den laufenden Stack
+
+```bash
+# Voraussetzung: MQTT-Broker :1883, Slack-MCP(-Stub) :13080, Backend :8000
+SECUREGUARD_API_KEY=… ./scripts/dev/chain-check.py     # 32 Prüfungen
+```
+
+Prüft mit echten Protokollen (HTTP, WebSocket, MQTT, MCP) alle
+Aktions-/Interaktionsketten: Aktion → MQTT-Command + Historie, MQTT → WebSocket
+(telemetry/status/broadcast), WS-Command → ack → Gateway, REST-Mutation →
+WS-Broadcast, Alert → Slack-MCP, MQTT-Alert → Slack, Crowd report → search,
+Detektion → Statistik, Abhängigkeits-Inventur und das X-API-Key-Gate.
+Ein eigener MQTT-Client simuliert dabei das ESP32-Gateway
+(`secureguard/+/command`).
 
 ## Kotlin-JVM-Schnellcheck ohne Android-SDK
 
@@ -57,6 +72,7 @@ trotzdem gemeldet. Toolchain-Suche: `java`/`JAVA_HOME` (Fallback
 | `test_api.py` | Health, Asset-CRUD, Befehle, MQTT-MAC-Normalisierung, Degraded-Health |
 | `test_slack_mcp.py` | MCP-Client (HTTP + SSE), Tool-Cache, API-Key, Severity-Gate, Webhook-Fallback, `/api/slack/*`, Alert-Weiterleitung |
 | `test_dependencies.py` | `/api/system/dependencies` – Inventur für das App-Einstellungsmenü (DB, MQTT, Slack-MCP, Webhook, Node-RED) |
+| `test_realtime_chains.py` | Aktions-/Echtzeitketten: WS-Command+ack, REST→WS-Broadcast (asset_update/telemetry/alert), Aktion→MQTT+Historie, MQTT-Reconnect→Re-Subscribe |
 
 Die Slack-Tests ersetzen den Go-Server durch einen `httpx.MockTransport`, der
 sich exakt wie mcp-go v0.44 verhält (`POST /mcp`, `Mcp-Session-Id`, Antworten

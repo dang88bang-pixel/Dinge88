@@ -52,6 +52,9 @@ services:
       # Optional (aus .env): MQTT-Broker-Auth (Produktion: allow_anonymous=false)
       - MQTT_USERNAME=${MQTT_USERNAME:-}
       - MQTT_PASSWORD=${MQTT_PASSWORD:-}
+      # Selbstheilung: Topics in diesem Abstand erneut abonnieren (0 = aus).
+      # Schützt die Echtzeitkette, falls der Broker Subscriptions verwirft.
+      - MQTT_RESUBSCRIBE_INTERVAL=${MQTT_RESUBSCRIBE_INTERVAL:-60}
       # Optional (aus .env): schreibende Endpunkte per X-API-Key schützen
       - SECUREGUARD_API_KEY=${SECUREGUARD_API_KEY:-}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}

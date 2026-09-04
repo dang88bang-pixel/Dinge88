@@ -208,6 +208,15 @@ Node-RED: Der Flow `format slack alert` → `slack notify` hängt am MQTT-Alert-
 **„Slack Testmeldung"** prüft die Kette manuell. `X-API-Key` und Ziel-Channel
 kommen aus `SG_API_KEY` bzw. `SG_SLACK_CHANNEL` (Compose-Env des Node-RED-Containers).
 
+> **Wichtig:** `{{$env.…}}` im Header-Array eines `http request`-Nodes wird von
+> Node-RED **nicht** aufgelöst – der Header fehlt dann komplett und das Backend
+> antwortet mit `401`, sobald `SECUREGUARD_API_KEY` gesetzt ist. Der Flow setzt
+> `X-API-Key`/`Content-Type` deshalb im Function-Node `sg_set_slack_headers`
+> per `msg.headers` (`env.get('SG_API_KEY')`). Gleiches gilt für Topics: Der
+> `TELEMETRY request`-Inject baut sein Topic im Function-Node `sg_cmd_topic`
+> (`secureguard/${SG_DEFAULT_DEVICE_ID}/command`) – die Firmware abonniert
+> genau dieses Topic, ein nackter device_id würde verworfen.
+
 Meldungsformat (Markdown → Slack `rich_text`):
 
 ```

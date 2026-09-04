@@ -307,6 +307,10 @@ MqttService   WebSocketService  NfcService
 | **WebSocket** | `WebSocketService` | OkHttp WebSocket | `events: SharedFlow<WebSocketEvent>` | Telemetry, Alert, AssetUpdate, SystemStatus, Connected, Disconnected, Error |
 | **NFC** | `NfcService` | Android `NfcAdapter` | `detections: SharedFlow<Detection>` | NDEF-Tag gelesen → Detection(NFC) |
 
+REST-Mutationen des Backends (`POST /api/assets`, `/api/detections`,
+`/api/alerts`) broadcasten dieselben Events (`asset_update`, `telemetry`,
+`alert`) an alle WebSocket-Clients – die UI bleibt also auch ohne MQTT aktuell.
+
 **MQTT-Topics:**
 ```
 secureguard/+/telemetry    (subscribe, QoS 1)
