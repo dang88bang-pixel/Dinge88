@@ -17,7 +17,7 @@ import javax.inject.Inject
 /**
  * ViewModel für den Slack-Screen: Status, Tools, Channels, Versand.
  *
- * Alle Aufrufe laufen über [SlackService] → Backend `/api/slack/*` →
+ * Alle Aufrufe laufen über [SlackService] → Backend `/api/slack/…` →
  * Slack-MCP-Server. Ohne konfiguriertes Backend bleibt die UI leer, stürzt
  * aber nicht ab.
  */

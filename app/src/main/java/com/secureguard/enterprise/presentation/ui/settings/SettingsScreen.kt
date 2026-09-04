@@ -234,7 +234,7 @@ fun SettingsScreen(
                         Text(
                             "Alle Verbindungen der App (lokal) und des Backends (Server): " +
                                 "Endpunkte, Schlüssel, Slack, MQTT, externe APIs. " +
-                                "„Status prüfen" holt die Live-Inventur vom Backend " +
+                                "„Status prüfen“ holt die Live-Inventur vom Backend " +
                                 "(GET /api/system/dependencies).",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant

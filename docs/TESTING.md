@@ -34,6 +34,24 @@ pytest backend/tests -q              # 45 Tests
 pytest backend/tests/test_slack_mcp.py -q   # nur Slack-MCP (31 Tests)
 ```
 
+## Kotlin-JVM-Schnellcheck ohne Android-SDK
+
+Für Umgebungen ohne Android-SDK/Gradle (CI-Container, air-gapped, Review):
+
+```bash
+./scripts/dev/kotlin-jvm-check.sh
+# optional: JUNIT_JAR=/pfad/junit-4.13.2.jar ./scripts/dev/kotlin-jvm-check.sh
+```
+
+Kompiliert die Android-freien Quellen (`config/IntegrationInfo.kt`) samt
+`IntegrationInfoTest.kt` mit `kotlinc`, führt die Tests per `JUnitCore` aus
+(`OK (4 tests)`) und läuft zusätzlich als **Syntax-Guard** über die
+Android-abhängigen Quellen (Compose/Hilt/Room): Ohne SDK scheitert dort die
+Typprüfung, Syntaxfehler (nicht geschlossene Strings/Kommentare) werden aber
+trotzdem gemeldet. Toolchain-Suche: `java`/`JAVA_HOME` (Fallback
+`pip install jdk4py`), `kotlinc`/`KOTLIN_HOME` (Fallback npm-Paket
+`kotlin-compiler`), `junit-4*.jar` (`JUNIT_JAR`, `~/.gradle`-Cache, `libs/`).
+
 | Datei | Abdeckung |
 |-------|-----------|
 | `test_api.py` | Health, Asset-CRUD, Befehle, MQTT-MAC-Normalisierung, Degraded-Health |

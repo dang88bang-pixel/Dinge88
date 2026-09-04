@@ -45,7 +45,7 @@ import androidx.navigation.NavController
  * Slack-Integration (MCP-Server: provectus/slack-mcp-server).
  *
  * Zeigt Status/Tools/Channels des Servers und versendet Meldungen – alles über
- * das SecureGuard-Backend (`/api/slack/*`), die Slack-Tokens verbleiben dort.
+ * das SecureGuard-Backend (Endpunkte `/api/slack/…`), die Slack-Tokens verbleiben dort.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
