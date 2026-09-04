@@ -2,7 +2,8 @@
 # =============================================================================
 # SecureGuard – Backend-Stack starten (Docker Compose)
 # =============================================================================
-# Startet Mosquitto + FastAPI + Node-RED und wartet auf /api/health.
+# Startet Mosquitto + FastAPI + Node-RED + Slack-MCP und wartet auf
+# /api/health.
 # Keine Passwörter im Script – MQTT-Auth siehe mosquitto/config/*.example
 # (Anwender setzt User/Pass selbst).
 # =============================================================================
@@ -40,11 +41,29 @@ for i in $(seq 1 30); do
   fi
 done
 
+echo "→ Prüfe Slack-MCP-Integration …"
+if slack_health=$(curl -fsS --max-time 8 http://127.0.0.1:8000/api/slack/health 2>/dev/null); then
+  case "$slack_health" in
+    *'"reachable": true'*|*'"reachable":true'*)
+      echo "✔ Slack-MCP erreichbar"
+      ;;
+    *'"configured": false'*|*'"configured":false'*)
+      echo "⚠ Slack nicht konfiguriert (.env: SLACK_MCP_* – siehe docs/SLACK_MCP.md)"
+      ;;
+    *)
+      echo "⚠ Slack-MCP nicht erreichbar (Tokens gesetzt? Demo-Modus aktiv?)"
+      ;;
+  esac
+else
+  echo "⚠ /api/slack/health nicht abrufbar"
+fi
+
 echo ""
 echo "Dienste:"
-echo "  Backend   http://127.0.0.1:8000/api/health"
-echo "  Node-RED  http://127.0.0.1:1880"
-echo "  MQTT      tcp://127.0.0.1:1883"
+echo "  Backend    http://127.0.0.1:8000/api/health"
+echo "  Slack-MCP  http://127.0.0.1:8000/api/slack/health  (MCP: 127.0.0.1:13080/mcp)"
+echo "  Node-RED   http://127.0.0.1:1880"
+echo "  MQTT       tcp://127.0.0.1:1883"
 echo ""
 echo "Smoke: ./scripts/smoke-check.sh"
 echo "Stop:  docker compose down"

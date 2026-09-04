@@ -21,6 +21,8 @@
 | **H · DSGVO** | Consent, Datenauskunft, Retention, Löschen | ✅ |
 | **I · Monitoring** | Health-Screen + `/api/health` + smoke-check | ✅ |
 | **J · Offline** | `scripts/offline/*` | ✅ |
+| **K · Slack (MCP)** | `slack-mcp/` + `/api/slack/*` + App-Screen + Node-RED-Flow | ✅ |
+| **L · Einstellungen** | alle Anbindungen/Abhängigkeiten zentral + `/api/system/dependencies` | ✅ |
 
 ---
 
@@ -103,6 +105,29 @@ Release-Build: `network_security_config` verbietet Cleartext → `ssl://broker:8
 
 ---
 
+## 4b. Slack (MCP) – Alarme in Slack
+
+```bash
+# .env: mindestens ein Slack-Token + Ziel-Channel
+SLACK_MCP_XOXB_TOKEN=xoxb-…          # Bot in den Channel einladen: /invite @bot
+SLACK_NOTIFY_CHANNEL=#secureguard-alerts
+SLACK_MCP_ADD_MESSAGE_TOOL=true      # Posting serverseitig freigeben
+SLACK_MCP_API_KEY=bitte-selbst-setzen  # Pflicht, sobald Port 13080 geöffnet wird
+
+docker compose up -d --build slack-mcp backend
+curl -s localhost:8000/api/slack/health     # reachable: true + Tool-Anzahl
+```
+
+* Dienst `slack-mcp` (provectus-Fork, Release `pv-v1.0.1`) läuft auf
+  `127.0.0.1:13080`; das Backend ist MCP-Client und stellt `/api/slack/*`.
+* Automatisch gemeldet wird ab `SLACK_NOTIFY_MIN_SEVERITY` (Default `WARNING`)
+  aus `POST /api/alerts`, MQTT `secureguard/+/alert` und der App
+  (`SlackAlertForwarder`).
+* Ohne Token: Demo-Modus (`SLACK_MCP_XOXP_TOKEN=demo`) – Verkabelung prüfbar.
+* Details, Tokens, Fehlersuche: [SLACK_MCP.md](SLACK_MCP.md).
+
+---
+
 ## 5. CI
 
 Workflow: `.github/workflows/build-release.yml` (Basis wie auf `main`).
@@ -128,6 +153,7 @@ Secrets (Anwender setzt Werte):
 - [ ] APK installiert, Permissions erteilt  
 - [ ] PIN vom Anwender gesetzt  
 - [ ] Endpunkte gespeichert, Backend-Sync ok  
+- [ ] Optional: Slack-MCP konfiguriert (`/api/slack/health` → `reachable: true`)  
 - [ ] Optional: ESP32 geflasht, MQTT Auth aktiv  
 - [ ] Optional: Release-Keystore + `assembleRelease`  
 

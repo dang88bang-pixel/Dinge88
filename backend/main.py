@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import sqlite3
+import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import List, Optional, Set
@@ -26,6 +27,9 @@ from fastapi import FastAPI, Header, HTTPException, WebSocket, BackgroundTasks, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+import slack_mcp
+from slack_mcp import SlackMCPError, format_alert_message, parse_channels_csv
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,6 +55,8 @@ MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
 API_KEY = os.environ.get("SECUREGUARD_API_KEY", "").strip()
 # CORS: Komma-getrennte Origins; "*" = offen (dann ohne Credentials, siehe unten).
 CORS_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
+# Node-RED (für die Abhängigkeits-Inventur /api/system/dependencies).
+NODERED_URL = os.environ.get("NODERED_URL", "http://nodered:1880").strip().rstrip("/")
 
 
 async def require_api_key(x_api_key: str = Header(default="", alias="X-API-Key")) -> None:
@@ -66,6 +72,13 @@ async def lifespan(_app: FastAPI):
     start_mqtt_subscriber()
     logger.info("SecureGuard Backend gestartet")
     yield
+    # Slack-MCP-Client sauber schließen (offene HTTP-/SSE-Verbindungen).
+    notifier = slack_mcp.peek_notifier()
+    if notifier is not None:
+        try:
+            await notifier.aclose()
+        except Exception as exc:  # pragma: no cover - Best effort beim Shutdown
+            logger.debug("Slack-MCP-Client nicht sauber geschlossen: %s", exc)
 
 
 app = FastAPI(title="SecureGuard API", version="1.0.1", lifespan=lifespan)
@@ -238,12 +251,84 @@ def publish_command(asset_mac: str, command: str) -> bool:
 
 # ============ MQTT → WEBSOCKET BRIDGE ============
 
+# (Topic, QoS) – wird bei JEDEM Verbindungsaufbau erneut abonniert.
+MQTT_SUBSCRIPTIONS = [
+    ("secureguard/+/telemetry", 1),
+    ("secureguard/+/alert", 2),
+    ("secureguard/+/status", 1),
+    ("secureguard/broadcast", 0),
+]
+
+# True, solange die Subscriptions auf dem Broker liegen (für die Inventur).
+_mqtt_subscribed = False
+
+# Selbstheilung: Manche Broker (z. B. Session-Overtake/Expiry) verwerfen die
+# Subscriptions, obwohl die TCP-Verbindung lebt – `is_connected()` bleibt True
+# und die Echtzeitkette wäre still tot. Deshalb in festen Abständen erneut
+# abonnieren (idempotent). 0 schaltet den Watchdog aus.
+MQTT_RESUBSCRIBE_INTERVAL = int(os.environ.get("MQTT_RESUBSCRIBE_INTERVAL", "60"))
+_mqtt_watchdog_stop = None
+
+
+def mqtt_subscribe_all(mqtt_client) -> None:
+    """Alle Topics abonnieren – idempotent, beliebig oft aufrufbar."""
+    for topic, qos in MQTT_SUBSCRIPTIONS:
+        mqtt_client.subscribe(topic, qos=qos)
+
+
+def mqtt_resubscribe_once(mqtt_client) -> bool:
+    """Ein Watchdog-Durchlauf. True, wenn (erneut) abonniert wurde."""
+    global _mqtt_subscribed
+    try:
+        if not mqtt_client.is_connected():
+            _mqtt_subscribed = False
+            return False
+        mqtt_subscribe_all(mqtt_client)
+        _mqtt_subscribed = True
+        return True
+    except Exception:
+        _mqtt_subscribed = False
+        return False
+
+
+def _mqtt_watchdog_loop(mqtt_client, stop_event, interval: int) -> None:
+    while not stop_event.wait(interval):
+        if mqtt_resubscribe_once(mqtt_client):
+            logger.debug("MQTT-Subscriptions aufgefrischt (%d Topics)",
+                         len(MQTT_SUBSCRIPTIONS))
+
+
 def start_mqtt_subscriber():
     """Subscribes to all telemetry/alert/status topics and forwards to WebSockets."""
+    global _mqtt_subscribed, _mqtt_watchdog_stop
     client = get_mqtt_client()
     if client is None:
         logger.warning("MQTT nicht verfügbar – WebSocket-Forwarding deaktiviert")
         return
+
+    subscribe_all = mqtt_subscribe_all
+
+    def on_connect(mqtt_client, userdata, flags, rc):
+        """Wichtig: paho verbindet sich nach einem Abbruch selbst wieder, die
+        Subscriptions gehen dabei aber verloren. Ohne Re-Subscribe wäre die
+        komplette Echtzeitkette (MQTT → WebSocket/Slack) still tot, während
+        `is_connected()` weiter True meldet."""
+        global _mqtt_subscribed
+        if rc != 0:
+            logger.warning("MQTT-Connect abgelehnt (rc=%s)", rc)
+            return
+        subscribe_all(mqtt_client)
+        _mqtt_subscribed = True
+        logger.info("MQTT verbunden – %d Topics (erneut) abonniert",
+                    len(MQTT_SUBSCRIPTIONS))
+
+    def on_disconnect(mqtt_client, userdata, rc):
+        global _mqtt_subscribed
+        _mqtt_subscribed = False
+        logger.warning("MQTT getrennt (rc=%s) – Subscriptions weg, Reconnect läuft", rc)
+
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
 
     def on_message(mqtt_client, userdata, msg):
         """MQTT message received – format and broadcast to all WebSocket clients."""
@@ -262,6 +347,10 @@ def start_mqtt_subscriber():
             except json.JSONDecodeError:
                 data = payload
             ws_msg = json.dumps({"type": "alert", "topic": topic, "data": data})
+            # Alert zusätzlich an Slack melden (Gateway/ESP32 → Backend → Slack).
+            loop = main_event_loop
+            if loop is not None and loop.is_running():
+                asyncio.run_coroutine_threadsafe(_notify_mqtt_alert(topic, data), loop)
         elif "/status" in topic:
             ws_msg = json.dumps({"type": "system_status", "topic": topic, "data": payload})
         else:
@@ -272,12 +361,46 @@ def start_mqtt_subscriber():
             # Thread-sichere Uebergabe an die Haupt-Loop (Paho-Thread -> uvicorn)
             asyncio.run_coroutine_threadsafe(broadcast_websocket(ws_msg), loop)
 
-    client.subscribe("secureguard/+/telemetry")
-    client.subscribe("secureguard/+/alert")
-    client.subscribe("secureguard/+/status")
-    client.subscribe("secureguard/broadcast")
     client.on_message = on_message
-    logger.info("MQTT-Subscriber gestartet – Topics abonniert")
+    # Falls die Verbindung schon steht (CONNACK vor Callback-Zuordnung),
+    # einmal direkt abonnieren – ein Doppel-Abo ist unkritisch.
+    if client.is_connected():
+        subscribe_all(client)
+        _mqtt_subscribed = True
+    logger.info("MQTT-Subscriber gestartet – %d Topics konfiguriert",
+                len(MQTT_SUBSCRIPTIONS))
+
+    # Selbstheilungs-Watchdog (einmal pro Prozess; früheren Thread beenden).
+    if MQTT_RESUBSCRIBE_INTERVAL > 0:
+        if _mqtt_watchdog_stop is not None:
+            _mqtt_watchdog_stop.set()
+        _mqtt_watchdog_stop = threading.Event()
+        threading.Thread(
+            target=_mqtt_watchdog_loop,
+            args=(client, _mqtt_watchdog_stop, MQTT_RESUBSCRIBE_INTERVAL),
+            name="mqtt-resubscribe-watchdog",
+            daemon=True,
+        ).start()
+        logger.info("MQTT-Watchdog aktiv (Re-Subscribe alle %ss)",
+                    MQTT_RESUBSCRIBE_INTERVAL)
+
+
+async def _notify_mqtt_alert(topic: str, data) -> dict:
+    """MQTT-Alert (`secureguard/<MAC>/alert`) → Slack-Benachrichtigung."""
+    parts = [p for p in topic.split("/") if p]
+    asset = parts[1].upper() if len(parts) > 1 else topic
+    if isinstance(data, dict):
+        return await notify_slack_alert(
+            asset_id=str(data.get("asset_id") or asset),
+            alert_type=str(data.get("type", "SECURITY")),
+            severity=str(data.get("severity", "WARNING")),
+            message=str(data.get("message", "")),
+            source=f"mqtt:{topic}",
+            timestamp=str(data.get("timestamp", "")) or None,
+        )
+    return await notify_slack_alert(
+        asset, "SECURITY", "WARNING", str(data), f"mqtt:{topic}"
+    )
 
 
 async def broadcast_websocket(message: str):
@@ -289,6 +412,25 @@ async def broadcast_websocket(message: str):
         except Exception:
             disconnected.add(ws)
     active_websockets.difference_update(disconnected)
+
+
+def broadcast_event(event_type: str, data: dict) -> None:
+    """REST-Mutation → alle WebSocket-Clients (Echtzeit-Flow, siehe README).
+
+    Die Endpunkte laufen als sync-`def` im Threadpool, daher die thread-sichere
+    Übergabe an die uvicorn-Event-Loop – identisch zum MQTT→WS-Bridge-Pfad.
+    Die App erwartet `{"type": …, "data": {…}}` (WebSocketService.kt).
+    """
+    loop = main_event_loop
+    if loop is None or not loop.is_running():
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(
+            broadcast_websocket(json.dumps({"type": event_type, "data": data})),
+            loop,
+        )
+    except RuntimeError:  # Loop wird gerade geschlossen (Shutdown)
+        logger.debug("WebSocket-Broadcast übersprungen: %s", event_type)
 
 
 # ============ API-ENDPUNKTE ============
@@ -331,6 +473,9 @@ def health():
         "detections": detections,
         "alerts": alerts,
         "service": "secureguard-backend",
+        # Konfiguration (nicht Erreichbarkeit!) der Slack-MCP-Integration –
+        # siehe GET /api/slack/health für den Live-Check.
+        "slack": _slack_summary(),
     }
 
 
@@ -356,6 +501,18 @@ def create_asset(asset: Asset):
     )
     conn.commit()
     conn.close()
+    # Echtzeit-Flow: andere Clients (App/Dashboard) sehen die Änderung sofort.
+    broadcast_event("asset_update", {
+        "id": asset.id,
+        "name": asset.name,
+        "mac": asset.mac,
+        "short_name": asset.short_name,
+        "status": asset.status,
+        "latitude": asset.latitude,
+        "longitude": asset.longitude,
+        "rssi": asset.rssi,
+        "last_seen": asset.last_seen.isoformat() if asset.last_seen else None,
+    })
     return asset
 
 
@@ -374,6 +531,14 @@ def add_detection(detection: Detection):
     )
     conn.commit()
     conn.close()
+    broadcast_event("telemetry", {
+        "asset_mac": detection.asset_mac,
+        "source_type": detection.source_type,
+        "node_id": detection.node_id,
+        "rssi": detection.rssi,
+        "latitude": detection.latitude,
+        "longitude": detection.longitude,
+    })
     return {"status": "ok"}
 
 
@@ -388,7 +553,7 @@ def list_detections(limit: int = 100):
 
 
 @app.post("/api/alerts", dependencies=[Depends(require_api_key)])
-def add_alert(alert: Alert):
+def add_alert(alert: Alert, background_tasks: BackgroundTasks):
     conn = get_db()
     conn.execute(
         "INSERT INTO alerts (asset_id, type, severity, message, timestamp, resolved) "
@@ -398,6 +563,25 @@ def add_alert(alert: Alert):
     )
     conn.commit()
     conn.close()
+    # Slack-Benachrichtigung asynchron (siehe docs/SLACK_MCP.md) – blockiert
+    # weder den REST-Client noch scheitert der Alert selbst bei Slack-Problemen.
+    background_tasks.add_task(
+        notify_slack_alert,
+        alert.asset_id,
+        alert.type,
+        alert.severity,
+        alert.message,
+        "backend/api",
+        (alert.timestamp or datetime.now()).isoformat(),
+    )
+    # Zusätzlich Live-Update an alle WS-Clients (Alert-Karte/Dashboard).
+    broadcast_event("alert", {
+        "asset_id": alert.asset_id,
+        "type": alert.type,
+        "severity": alert.severity,
+        "message": alert.message,
+        "timestamp": (alert.timestamp or datetime.now()).isoformat(),
+    })
     return {"status": "ok"}
 
 
@@ -608,6 +792,285 @@ async def mcp_extract_magic_link(token: str):
                 "email": _temp_inboxes[token]["email"],
             }
     return {"success": False, "error": "no magic link"}
+
+
+# ============ SLACK (MCP – provectus/slack-mcp-server) ============
+# Das Backend ist MCP-Client gegenüber dem Slack-MCP-Server (docker-compose-
+# Service `slack-mcp`) und stellt der App REST-Endpunkte zur Verfügung.
+# Details: docs/SLACK_MCP.md
+
+class SlackCallIn(BaseModel):
+    tool: str
+    arguments: Optional[dict] = None
+
+
+class SlackNotifyIn(BaseModel):
+    message: str
+    channel: Optional[str] = None
+    # Optional: Meldung wie einen Alert formatieren (Icon, Asset, Quelle).
+    asset_id: Optional[str] = None
+    alert_type: str = "STATUS"
+    severity: str = "INFO"
+
+
+def _slack_summary() -> dict:
+    """Konfigurations-Snapshot für /api/health (ohne Netzwerkaufruf)."""
+    cfg = slack_mcp.load_settings()
+    return {
+        "configured": cfg.configured or bool(cfg.webhook_url),
+        "mcp_url": cfg.http_endpoint if cfg.transport == "http" else cfg.sse_endpoint,
+        "transport": cfg.transport,
+        "notify_enabled": cfg.notify_enabled,
+        "notify_channel": cfg.notify_channel,
+        "min_severity": cfg.notify_min_severity,
+        "webhook_configured": bool(cfg.webhook_url),
+    }
+
+
+async def notify_slack_alert(
+    asset_id: str,
+    alert_type: str,
+    severity: str,
+    message: str,
+    source: str = "backend",
+    timestamp: Optional[str] = None,
+) -> dict:
+    """Meldet einen Alert an Slack – scheitert nie hart (Alerting bleibt stabil).
+
+    Läuft als Background-Task: Der REST-/MQTT-Pfad wird nicht blockiert, wenn
+    der Slack-MCP-Server langsam oder offline ist.
+    """
+    notifier = slack_mcp.get_notifier()
+    if not notifier.config.notify_enabled:
+        return {"ok": False, "skipped": "disabled"}
+    try:
+        result = await notifier.notify_alert(
+            asset_id=asset_id,
+            alert_type=alert_type,
+            severity=severity,
+            message=message,
+            source=source,
+            timestamp=timestamp,
+        )
+    except Exception as exc:  # noqa: BLE001 – Alerting darf nicht crashen
+        logger.warning("Slack-Benachrichtigung fehlgeschlagen: %s", exc)
+        return {"ok": False, "error": str(exc)}
+    if result.get("ok"):
+        logger.info(
+            "Slack: Alert %s (%s) → %s", asset_id, severity, result.get("channel")
+        )
+    else:
+        logger.info("Slack: Alert %s nicht gesendet (%s)", asset_id, result)
+    return result
+
+
+@app.get("/api/slack/health")
+async def slack_health(probe: bool = True):
+    """Erreichbarkeit des Slack-MCP-Servers + registrierte Tools."""
+    notifier = slack_mcp.get_notifier()
+    try:
+        info = await notifier.client.health(probe=probe)
+    except SlackMCPError as exc:
+        info = {"configured": notifier.config.configured, "reachable": False, "error": str(exc)}
+    info["notify"] = {
+        "enabled": notifier.config.notify_enabled,
+        "channel": notifier.config.notify_channel,
+        "min_severity": notifier.config.notify_min_severity,
+        "webhook_configured": bool(notifier.config.webhook_url),
+    }
+    return info
+
+
+@app.get("/api/slack/tools")
+async def slack_tools(refresh: bool = False):
+    """Registrierte MCP-Tools des Slack-MCP-Servers (gecacht)."""
+    try:
+        tools = await slack_mcp.get_notifier().client.list_tools(refresh=refresh)
+    except SlackMCPError as exc:
+        raise HTTPException(status_code=502, detail=f"Slack-MCP: {exc}") from exc
+    return {
+        "count": len(tools),
+        "tools": [
+            {"name": t.get("name", ""), "description": t.get("description", "")}
+            for t in tools
+        ],
+    }
+
+
+@app.get("/api/slack/channels")
+async def slack_channels(
+    channel_types: str = "public_channel,private_channel",
+    limit: int = 200,
+    refresh: bool = False,
+):
+    """Channel-Verzeichnis (MCP-Tool `channels_list`, CSV → JSON)."""
+    result = await slack_mcp.get_notifier().client.call_tool(
+        "channels_list",
+        {"channel_types": channel_types, "limit": min(max(limit, 1), 999)},
+    )
+    if not result.ok:
+        raise HTTPException(status_code=502, detail=result.error or "channels_list fehlgeschlagen")
+    channels = parse_channels_csv(result.text)
+    return {"count": len(channels), "channels": channels, "refresh": refresh}
+
+
+@app.post("/api/slack/call", dependencies=[Depends(require_api_key)])
+async def slack_call(body: SlackCallIn):
+    """Direkter MCP-Tool-Aufruf (z. B. conversations_history, users_search)."""
+    tool = body.tool.strip()
+    if not tool:
+        raise HTTPException(status_code=400, detail="tool erforderlich")
+    result = await slack_mcp.get_notifier().client.call_tool(tool, body.arguments or {})
+    if not result.ok and result.error and result.text == "":
+        raise HTTPException(status_code=502, detail=result.error)
+    return result.as_dict()
+
+
+@app.post("/api/slack/notify", dependencies=[Depends(require_api_key)])
+async def slack_notify(body: SlackNotifyIn):
+    """Meldung in einen Slack-Channel senden (manuell → ohne Severity-Gate)."""
+    text = body.message.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="message erforderlich")
+    if body.asset_id:
+        text = format_alert_message(
+            asset_id=body.asset_id,
+            alert_type=body.alert_type,
+            severity=body.severity,
+            message=text,
+            source="api",
+        )
+    result = await slack_mcp.get_notifier().send_text(text, body.channel)
+    if not result.get("ok"):
+        return JSONResponse(status_code=502, content=result)
+    return result
+
+
+# ============ ABHÄNGIGKEITEN (Inventur für das App-Einstellungsmenü) ============
+# Eine Quelle für "welche Anbindung gibt es, wohin, ist sie erreichbar" – die
+# App zeigt das unter Einstellungen → Anbindungen & Abhängigkeiten.
+
+@app.get("/api/system/dependencies")
+async def system_dependencies(probe: bool = True):
+    """Serverseitige Abhängigkeiten inkl. Status (für Settings/Health-Screen)."""
+    deps: List[dict] = []
+
+    # --- SQLite ---
+    db_detail = "nicht erreichbar"
+    db_ok = False
+    try:
+        conn = get_db()
+        counts = {
+            table: conn.execute(f"SELECT COUNT(*) AS c FROM {table}").fetchone()["c"]
+            for table in ("assets", "detections", "alerts")
+        }
+        conn.close()
+        db_ok = True
+        db_detail = ", ".join(f"{k}={v}" for k, v in counts.items())
+    except Exception as exc:  # noqa: BLE001 – Status statt Absturz
+        db_detail = str(exc)[:120]
+    deps.append({
+        "id": "database",
+        "name": "SQLite (Backend-DB)",
+        "kind": "storage",
+        "configured": True,
+        "reachable": db_ok,
+        "target": DB_PATH,
+        "detail": db_detail,
+    })
+
+    # --- MQTT-Broker ---
+    client = _mqtt_client
+    mqtt_ok = False
+    try:
+        mqtt_ok = bool(client and client.is_connected())
+    except Exception:  # noqa: BLE001
+        mqtt_ok = False
+    deps.append({
+        "id": "mqtt",
+        "name": "MQTT-Broker (Mosquitto)",
+        "kind": "broker",
+        "configured": bool(MQTT_BROKER),
+        "reachable": mqtt_ok,
+        "target": MQTT_BROKER,
+        "detail": f"Auth: {'ja' if MQTT_USERNAME else 'anonym'} · "
+                  f"Topics: secureguard/+/(telemetry|alert|status) · "
+                  f"{'abonniert' if _mqtt_subscribed else 'nicht abonniert'}",
+    })
+
+    # --- Slack-MCP-Server ---
+    try:
+        slack_info = await slack_mcp.get_notifier().client.health(probe=probe)
+        notify = slack_mcp.get_notifier().config
+        deps.append({
+            "id": "slack-mcp",
+            "name": "Slack-MCP-Server (provectus)",
+            "kind": "mcp",
+            "configured": slack_info.get("configured", False),
+            "reachable": slack_info.get("reachable"),
+            "target": slack_info.get("url", ""),
+            "detail": f"Transport: {slack_info.get('transport', '')} · "
+                      f"{slack_info.get('tools', 0)} Tools · "
+                      f"Channel: {notify.notify_channel} · "
+                      f"ab {notify.notify_min_severity}"
+                      + (f" · Fehler: {slack_info.get('error')}" if slack_info.get("error") else ""),
+        })
+    except Exception as exc:  # noqa: BLE001
+        deps.append({
+            "id": "slack-mcp",
+            "name": "Slack-MCP-Server (provectus)",
+            "kind": "mcp",
+            "configured": False,
+            "reachable": False,
+            "target": "",
+            "detail": str(exc)[:120],
+        })
+
+    # --- Slack Incoming Webhook (Fallback) ---
+    webhook = slack_mcp.get_notifier().config.webhook_url
+    deps.append({
+        "id": "slack-webhook",
+        "name": "Slack Incoming Webhook (Fallback)",
+        "kind": "webhook",
+        "configured": bool(webhook),
+        # Webhooks werden nie "geprobt" – ein Test würde wirklich posten.
+        "reachable": None,
+        "target": "gesetzt" if webhook else "nicht gesetzt",
+        "detail": "Nur aktiv, wenn der MCP-Post fehlschlägt",
+    })
+
+    # --- Node-RED ---
+    nodered_ok = None
+    nodered_detail = "nicht konfiguriert"
+    if NODERED_URL:
+        if probe:
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=4) as http_client:
+                    response = await http_client.get(NODERED_URL + "/")
+                nodered_ok = response.status_code < 500
+                nodered_detail = f"HTTP {response.status_code}"
+            except Exception as exc:  # noqa: BLE001
+                nodered_ok = False
+                nodered_detail = f"{type(exc).__name__}"[:120]
+        else:
+            nodered_detail = "Probe übersprungen"
+    deps.append({
+        "id": "nodered",
+        "name": "Node-RED (Flows)",
+        "kind": "flow",
+        "configured": bool(NODERED_URL),
+        "reachable": nodered_ok,
+        "target": NODERED_URL,
+        "detail": nodered_detail,
+    })
+
+    return {
+        "generated": datetime.now().isoformat(),
+        "probed": probe,
+        "count": len(deps),
+        "dependencies": deps,
+    }
 
 
 # ============ WEBSOCKET ============

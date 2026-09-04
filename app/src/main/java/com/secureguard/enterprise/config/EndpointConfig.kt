@@ -98,6 +98,20 @@ class EndpointConfig @Inject constructor(
         get() = prefs.getString(KEY_DHL_TOKEN, null).orEmpty()
             .ifBlank { BuildConfig.DHL_API_TOKEN }
 
+    // ---- Slack (MCP) ----
+
+    /**
+     * Slack-Alarme aus der App (SlackAlertForwarder). Der Versand läuft immer
+     * über das Backend (`POST /api/slack/notify`); der MCP-Server und die
+     * Slack-Tokens liegen dort (siehe docs/SLACK_MCP.md).
+     */
+    val slackEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SLACK_ENABLED, true)
+
+    /** Ziel-Channel der App; leer = Default des Backends (SLACK_NOTIFY_CHANNEL). */
+    val slackChannel: String
+        get() = prefs.getString(KEY_SLACK_CHANNEL, null).orEmpty().trim()
+
     /**
      * X-API-Key für schreibende Backend-Endpunkte (F-71). Leerer Prefs-Eintrag
      * fällt auf BuildConfig.SECUREGUARD_API_KEY zurück; beides leer = Header
@@ -123,7 +137,9 @@ class EndpointConfig @Inject constructor(
         findMyUrl: String? = null,
         dhlUrl: String? = null,
         dhlToken: String? = null,
-        apiKey: String? = null
+        apiKey: String? = null,
+        slackEnabled: Boolean? = null,
+        slackChannel: String? = null
     ) {
         prefs.edit().apply {
             mqttUrl?.let { putString(KEY_MQTT_URL, it.trim()) }
@@ -139,6 +155,8 @@ class EndpointConfig @Inject constructor(
             dhlUrl?.let { putString(KEY_DHL_URL, it.trim()) }
             dhlToken?.let { putString(KEY_DHL_TOKEN, it.trim()) }
             apiKey?.let { putString(KEY_API_KEY, it.trim()) }
+            slackEnabled?.let { putBoolean(KEY_SLACK_ENABLED, it) }
+            slackChannel?.let { putString(KEY_SLACK_CHANNEL, it.trim()) }
         }.apply()
     }
 
@@ -156,7 +174,9 @@ class EndpointConfig @Inject constructor(
         findMyProxyUrl = findMyProxyUrl,
         dhlApiUrl = dhlApiUrl,
         dhlApiToken = dhlApiToken,
-        backendApiKey = backendApiKey
+        backendApiKey = backendApiKey,
+        slackEnabled = slackEnabled,
+        slackChannel = slackChannel
     )
 
     companion object {
@@ -174,6 +194,8 @@ class EndpointConfig @Inject constructor(
         private const val KEY_API_KEY = "backend_api_key"
         private const val KEY_DHL_URL = "dhl_url"
         private const val KEY_DHL_TOKEN = "dhl_token"
+        private const val KEY_SLACK_ENABLED = "slack_enabled"
+        private const val KEY_SLACK_CHANNEL = "slack_channel"
 
         private const val DEFAULT_MQTT = "tcp://10.0.2.2:1883"
         private const val DEFAULT_CKAN = "https://demo.ckan.org/"
@@ -221,5 +243,7 @@ data class EndpointSnapshot(
     val findMyProxyUrl: String = "",
     val dhlApiUrl: String = "",
     val dhlApiToken: String = "",
-    val backendApiKey: String = ""
+    val backendApiKey: String = "",
+    val slackEnabled: Boolean = true,
+    val slackChannel: String = ""
 )

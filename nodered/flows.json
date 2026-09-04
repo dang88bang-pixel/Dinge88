@@ -71,7 +71,8 @@
   "y": 280,
   "wires": [
    [
-    "sg_debug_alert"
+    "sg_debug_alert",
+    "sg_slack_fmt"
    ]
   ]
  },
@@ -201,20 +202,15 @@
   "props": [
    {
     "p": "payload"
-   },
-   {
-    "p": "topic",
-    "vt": "env"
    }
   ],
-  "topic": "SG_DEFAULT_DEVICE_ID",
   "payload": "TELEMETRY",
   "payloadType": "str",
   "x": 170,
   "y": 460,
   "wires": [
    [
-    "sg_out_cmd"
+    "sg_cmd_topic"
    ]
   ]
  },
@@ -291,5 +287,131 @@
   "x": 570,
   "y": 540,
   "wires": []
+ },
+ {
+  "id": "sg_slack_fmt",
+  "type": "function",
+  "z": "sg_tab_main",
+  "name": "format slack alert",
+  "func": "// MQTT-Alert → Payload für POST /api/slack/notify\nconst p = msg.payload || {};\nconst parts = (msg.topic || '').split('/').filter(Boolean);\nconst asset = String(p.asset_id || parts[1] || 'unknown').toUpperCase();\nconst body = {\n    message: String(p.message || p.type || 'Alert vom Gateway'),\n    asset_id: asset,\n    alert_type: String(p.type || 'SECURITY'),\n    severity: String(p.severity || 'WARNING')\n};\n// Optionaler Ziel-Channel – leer lässt den Backend-Default gelten.\nconst channel = env.get('SG_SLACK_CHANNEL');\nif (channel) { body.channel = channel; }\nmsg.payload = body;\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "x": 390,
+  "y": 340,
+  "wires": [
+   [
+    "sg_set_slack_headers"
+   ]
+  ]
+ },
+ {
+  "id": "sg_http_slack",
+  "type": "http request",
+  "z": "sg_tab_main",
+  "name": "slack notify",
+  "method": "POST",
+  "ret": "obj",
+  "paytoqs": "ignore",
+  "url": "http://backend:8000/api/slack/notify",
+  "tls": "",
+  "persist": false,
+  "proxy": "",
+  "insecureHTTPParser": false,
+  "authType": "",
+  "senderr": true,
+  "headers": [],
+  "x": 640,
+  "y": 340,
+  "wires": [
+   [
+    "sg_debug_slack"
+   ]
+  ]
+ },
+ {
+  "id": "sg_debug_slack",
+  "type": "debug",
+  "z": "sg_tab_main",
+  "name": "slack",
+  "active": true,
+  "tosidebar": true,
+  "console": false,
+  "tostatus": true,
+  "complete": "payload",
+  "targetType": "msg",
+  "statusVal": "payload.ok",
+  "statusType": "auto",
+  "x": 790,
+  "y": 340,
+  "wires": []
+ },
+ {
+  "id": "sg_inject_slack_test",
+  "type": "inject",
+  "z": "sg_tab_main",
+  "name": "Slack Testmeldung",
+  "props": [
+   {
+    "p": "payload"
+   }
+  ],
+  "repeat": "",
+  "crontab": "",
+  "once": false,
+  "onceDelay": "",
+  "topic": "",
+  "payload": "{\"message\":\"Node-RED → Slack: Testmeldung aus dem SecureGuard-Stack\",\"severity\":\"WARNING\"}",
+  "payloadType": "json",
+  "x": 180,
+  "y": 400,
+  "wires": [
+   [
+    "sg_set_slack_headers"
+   ]
+  ]
+ },
+ {
+  "id": "sg_set_slack_headers",
+  "type": "function",
+  "z": "sg_tab_main",
+  "name": "set slack headers",
+  "func": "// X-API-Key + Content-Type als msg.headers setzen.\n// Hinweis: {{$env.…}} im Header-Array des http-request-Nodes wird NICHT\n// aufgelöst (Header fehlt dann komplett → 401 am Backend). env.get()\n// in einem Function-Node liest die Compose-Env (SG_API_KEY).\nmsg.headers = {\n    'Content-Type': 'application/json',\n    'X-API-Key': env.get('SG_API_KEY') || ''\n};\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "x": 430,
+  "y": 340,
+  "wires": [
+   [
+    "sg_http_slack"
+   ]
+  ]
+ },
+ {
+  "id": "sg_cmd_topic",
+  "type": "function",
+  "z": "sg_tab_main",
+  "name": "command topic",
+  "func": "// Ziel-Topic des Default-Gateways bauen. Die Firmware abonniert\n// secureguard/<device_id>/command (secureguard_esp32.ino:360) – ein\n// reiner device_id als Topic würde verworfen (\"Invalid topic\").\nconst device = env.get('SG_DEFAULT_DEVICE_ID') || 'ESP32_SecureGuard';\nmsg.topic = `secureguard/${device}/command`;\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "x": 250,
+  "y": 640,
+  "wires": [
+   [
+    "sg_out_cmd"
+   ]
+  ]
  }
 ]

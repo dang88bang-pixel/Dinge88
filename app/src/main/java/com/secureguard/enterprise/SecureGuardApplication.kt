@@ -31,6 +31,7 @@ class SecureGuardApplication : Application(), Configuration.Provider {
     @Inject lateinit var database: SecureGuardDatabase
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var backupManager: com.secureguard.enterprise.services.BackupManager
+    @Inject lateinit var slackAlertForwarder: com.secureguard.enterprise.services.SlackAlertForwarder
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -54,6 +55,10 @@ class SecureGuardApplication : Application(), Configuration.Provider {
         }
         runCatching { scheduleAgentWorker() }
             .onFailure { Log.w(TAG, "WorkManager-Scheduling nicht möglich (z. B. Direct Boot)", it) }
+        // Neue Alerts automatisch an Slack melden (nur aktiv, wenn das Backend
+        // konfiguriert ist – siehe docs/SLACK_MCP.md).
+        runCatching { slackAlertForwarder.start() }
+            .onFailure { Log.w(TAG, "Slack-Forwarder nicht gestartet", it) }
     }
 
     /**

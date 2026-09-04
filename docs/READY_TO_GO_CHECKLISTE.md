@@ -186,7 +186,28 @@ Legende:
   - API `http://localhost:8000/api/health`
   - WebSocket `ws://localhost:8000/ws`
   - Node-RED `http://localhost:1880`
+  - Slack-MCP `http://localhost:8000/api/slack/health` (`reachable: true`)
 - [ ] Firewall/Ports im Firmennetz freigeben (oder nur LAN)
+
+### B2) Slack (MCP) – optional, für Alarme in Slack
+
+- [ ] `.env` ergänzen (siehe `.env.example`, Abschnitt *Slack über MCP*):
+  ```bash
+  SLACK_MCP_XOXB_TOKEN=xoxb-…              # oder xoxp-… / xoxc-…+xoxd-…
+  SLACK_NOTIFY_CHANNEL=#secureguard-alerts
+  SLACK_MCP_ADD_MESSAGE_TOOL=true
+  SLACK_MCP_API_KEY=bitte-selbst-setzen    # sobald Port 13080 geöffnet wird
+  ```
+- [ ] Bot in den Ziel-Channel einladen (`/invite @<bot-name>`)
+- [ ] `docker compose up -d --build slack-mcp backend`
+- [ ] Testen:
+  ```bash
+  curl -s localhost:8000/api/slack/health
+  curl -X POST localhost:8000/api/slack/notify -H 'Content-Type: application/json' \
+       -d '{"message":"Testmeldung","channel":"#secureguard-alerts"}'
+  ```
+- [ ] Ohne Token läuft der Server im Demo-Modus (`SLACK_MCP_XOXP_TOKEN=demo`)
+- [ ] Details: [`docs/SLACK_MCP.md`](SLACK_MCP.md)
 
 ### C) `local.properties` – Endpunkte (Pflicht für Anbindung)
 
@@ -355,7 +376,8 @@ Priorität hoch → niedrig:
 9. ✅/⚙️ UI-Tests (Agent-Cycle-Logik, Login/PIN, Asset-CRUD) – lokal `./gradlew testDebugUnitTest` / `connectedDebugAndroidTest`  
 10. ✅ Monitoring (Health-Screen + Backend `/api/health` + `scripts/smoke-check.sh`)  
 11. ✅/⚙️ DSGVO: Consent, Datenauskunft, Retention 90d, Löschen Art.17 (AVV organisatorisch)  
-12. ✅ compileSdk 35
+12. ✅ compileSdk 35  
+13. ✅ Einstellungen: Anbindungen & Abhängigkeiten zentral (Backend/WebSocket/MQTT/MCP/Slack/LoRa/YOLO/CKAN/Find-My/DHL/API-Keys + Server-Inventur via `GET /api/system/dependencies`; Slack-Schalter + Channel)
 
 ---
 

@@ -219,6 +219,108 @@ fun SettingsScreen(
 
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .testTag("integrations_card"),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "🧩 Anbindungen & Abhängigkeiten",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Alle Verbindungen der App (lokal) und des Backends (Server): " +
+                                "Endpunkte, Schlüssel, Slack, MQTT, externe APIs. " +
+                                "„Status prüfen“ holt die Live-Inventur vom Backend " +
+                                "(GET /api/system/dependencies).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        HorizontalDivider()
+                        Text("💬 Slack (MCP)", style = MaterialTheme.typography.titleSmall)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(
+                                checked = state.slackEnabled,
+                                onCheckedChange = viewModel::setSlackEnabled,
+                                modifier = Modifier.testTag("settings_slack_enabled")
+                            )
+                            Text(
+                                "Alarme der App an Slack melden " +
+                                    "(läuft über das Backend, Tokens liegen dort)",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        androidx.compose.material3.OutlinedTextField(
+                            value = state.slackChannel,
+                            onValueChange = viewModel::setSlackChannel,
+                            label = { Text("Slack-Channel (leer = Backend-Default)") },
+                            placeholder = { Text("#secureguard-alerts") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("settings_slack_channel")
+                        )
+                        Text(
+                            "MCP-Server, Bot-Token und Freigaben werden serverseitig " +
+                                "konfiguriert (.env → SLACK_MCP_*, docs/SLACK_MCP.md) und " +
+                                "unten als Server-Abhängigkeit angezeigt.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.refreshIntegrations() },
+                                modifier = Modifier.testTag("integrations_refresh_button")
+                            ) { Text("Status prüfen") }
+                            Text(
+                                state.integrationsCheckedAt?.let { "zuletzt $it" }
+                                    ?: "noch nicht geprüft",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.align(Alignment.CenterVertically)
+                            )
+                        }
+
+                        HorizontalDivider()
+                        Text(
+                            "📡 ${state.integrations.size} Einträge",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        state.integrations.forEach { info ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("integration_row_${info.id}")
+                            ) {
+                                Text(
+                                    "${info.icon} ${info.name}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    "${info.stateLabel} · ${info.target}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Text(
+                                    listOf(info.source, info.detail)
+                                        .filter { it.isNotBlank() }
+                                        .joinToString(" · "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("🛡️ Datenschutz (DSGVO)",
                             style = MaterialTheme.typography.titleMedium)
@@ -282,6 +384,16 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
                                 .clickable { navController.navigate(Routes.NODE_STATUS) }
+                        )
+                        HorizontalDivider()
+                        Text(
+                            "Slack (MCP: Alerts & Meldungen)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .testTag("settings_slack_button")
+                                .clickable { navController.navigate(Routes.SLACK) }
                         )
                         HorizontalDivider()
                         Text(

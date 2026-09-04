@@ -7,6 +7,7 @@
 #   android-sdk/    platforms, build-tools, platform-tools, cmdline-tools
 #   platformio/     ESP32-Plattform + Libs (+ optionaler Cache)
 #   gradle/         Dependency- + Wrapper-Cache
+#   slack-mcp/      Slack-MCP-Server-Binaries (amd64 + arm64)
 #
 # Danach offline_repo/ per USB/Netzlaufwerk auf den Zielrechner kopieren und
 # dort scripts/offline/install-offline.sh ausführen.
@@ -24,12 +25,14 @@ SKIP_GRADLE=0
 SKIP_PIO=0
 SKIP_JDK=0
 SKIP_SDK=0
+SKIP_SLACK=0
 for arg in "$@"; do
   case "$arg" in
     --skip-gradle) SKIP_GRADLE=1 ;;
     --skip-pio|--skip-platformio) SKIP_PIO=1 ;;
     --skip-jdk) SKIP_JDK=1 ;;
     --skip-sdk|--skip-android) SKIP_SDK=1 ;;
+    --skip-slack|--skip-slack-mcp) SKIP_SLACK=1 ;;
     --help|-h)
       sed -n '2,20p' "$0" | sed 's/^# \?//'
       exit 0
@@ -50,6 +53,8 @@ echo
 [[ "$SKIP_PIO" == "1" ]] || bash "${SCRIPT_DIR}/download-platformio.sh"
 echo
 [[ "$SKIP_GRADLE" == "1" ]] || bash "${SCRIPT_DIR}/download-gradle-deps.sh"
+echo
+[[ "$SKIP_SLACK" == "1" ]] || bash "${SCRIPT_DIR}/download-slack-mcp.sh"
 echo
 
 # Gesamt-Manifest
@@ -79,6 +84,7 @@ Inhalt:
   android-sdk/   Android SDK (platforms, build-tools, platform-tools)
   platformio/    ESP32-Plattform + Bibliotheken
   gradle/        Gradle Wrapper + Dependency-Cache
+  slack-mcp/     Slack-MCP-Server (provectus) Binaries amd64/arm64
 
 Installation auf dem Offline-Rechner:
   1. Diesen Ordner nach <ziel>/offline_repo kopieren

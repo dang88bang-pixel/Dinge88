@@ -5,3 +5,6 @@ fastapi>=0.111,<0.116
 uvicorn[standard]>=0.30,<0.36
 paho-mqtt>=1.6,<2.0
 pydantic>=2.7,<3.0
+# Slack-MCP-Client (backend/slack_mcp.py): JSON-RPC über Streamable HTTP/SSE.
+# httpx war bereits Dev-Dependency (TestClient-Transport) – jetzt auch runtime.
+httpx>=0.27,<0.29
