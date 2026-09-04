@@ -60,6 +60,14 @@
 | Shell-Skript | `bash -n scripts/sync-console3d.sh` | grün |
 | Skill-Frontmatter | Parserlauf über alle `SKILL.md` | 8/8 gültig |
 | Keine Testkollision | `grep` über `app/src/test` | keine der geänderten ViewModels wird von Tests konstruiert |
+| Backend startet | `uvicorn main:app --host 0.0.0.0 --port 8000` | grün — MQTT fehlt, wird sauber degradiert |
+| Backend-API | `GET /api/health` über den Vite-Proxy | `{"status":"ok","assets":12,...}` |
+| Demo-Daten | `python3 scripts/seed-demo-data.py --seed 88` | 12 Assets, 75 Detektionen, 4 Alarme |
+| Live-Datenstrom | Zähler zweimal im Abstand von 6 s gelesen | 160 → 163 Detektionen, Backendpfad lebt |
+| Konsole liefert aus | `GET /` auf dem Dev-Server | HTTP 200, HUD-Markup vollständig |
+| WebSocket-Proxy | `ws://127.0.0.1:5173/ws` verbunden | grün — Echtzeitpfad erreicht das Backend |
+| Bundle deterministisch | `scripts/sync-console3d.sh` erneut | keine Änderung an den App-Assets |
+| Kotlin-API-Annahmen | Abgleich gegen Modelle, Repository, Services | 14/14 bestätigt (siehe unten) |
 
 ## Nicht nachgewiesen
 
@@ -71,17 +79,31 @@ Ehrlich und vollständig:
    `./gradlew :app:assembleDebug`.
 2. **Kein Browser.** Die 3D-Szene wurde nie gerendert. Nachgewiesen ist nur,
    dass sie fehlerfrei bündelt. Die Laufzeit ist ungeprüft.
-3. **Ungeprüfte API-Annahmen** im neuen Kotlin-Code — beim ersten Build als
-   Erstes zu erwarten:
-   - `SecureGuardRepository.acknowledgeAlert(Long)` / `acknowledgeAllAlerts()`
-   - `AgentService.sendAction(asset, String)`
-   - `RoleManager.require(Permission)` und `currentRole`
-   - `AgentStatus.uptimeMillis` / `.cycle` / `.settings.interval`
-   - `Asset.maintenanceDue` / `.shortName` / `.mac` / `.rssi`
-   - `Alert.severity` / `.timestamp`
-   - Routen `SCAN_QR`, `ADD_ASSET`, `assetDetail`, `SENSOR_FUSION`,
+3. **API-Annahmen inzwischen geprüft** (per Quelltextabgleich, nicht per
+   Compiler) — alle 14 haben sich bestätigt:
+   - `SecureGuardRepository.acknowledgeAlert(Long)` / `acknowledgeAllAlerts()` ✓
+   - `getUnacknowledgedAlertCount(): Flow<Int>` ✓
+   - `getAssetById(String)` / `resolveAsset(String)` ✓
+   - `AgentService.sendAction(Asset, String): Boolean` ✓
+   - `AgentService.start(AgentSettings)` / `stop()` / `flushOfflineQueue(): Int` ✓
+   - `AgentService.agentStatus: StateFlow<AgentStatus>` ✓
+   - `AgentStatus.uptimeMillis` / `.cycle` / `.settings.interval` ✓
+   - `RoleManager.require(Permission): Boolean` (gibt zurück, wirft nicht) ✓
+   - `RoleManager.currentRole` / `.role: StateFlow<Role>` ✓
+   - `OfflineQueue.pending: Flow<List<PendingAction>>` ✓
+   - `ActionType.wireCommand` / `.label` ✓
+   - `Asset.batteryLevel: Int?`, `lastSeen: Date?` — im Code korrekt als
+     `batteryLevel` bzw. `lastSeen?.time` verwendet ✓
+   - `Alert.severity: AlertSeverity`, `timestamp: Date` — als Enum bzw.
+     `.timestamp.time` verwendet ✓
+   - Alle Routen (`SCAN_QR`, `ADD_ASSET`, `assetDetail`, `SENSOR_FUSION`,
      `AGENT_CONFIG`, `ESP32_CONFIG`, `NODE_STATUS`, `TERMINAL`, `TEMP_MAIL`,
-     `ALERTS`
+     `ALERTS`, `HEALTH`, `SECURITY`) existieren in `Routes` ✓
+   - `when`-Ausdrücke über `DetectionSource` (13 Werte), `AssetStatus` (5) und
+     `AlertSeverity` (3) sind vollständig ✓
+
+   Das ersetzt keinen Compilerlauf, schließt aber die Klasse von Fehlern aus,
+   die hier am wahrscheinlichsten war.
 4. **Keine Leistungsmessung** der Szene auf Zielhardware.
 5. **Kein Rauchtest** der Brücke App ⇄ Konsole auf einem Gerät.
 
@@ -101,18 +123,20 @@ Ehrlich und vollständig:
 
 ## Folgeaufgaben
 
-- [ ] `./gradlew :app:assembleDebug` auf einer Maschine mit Toolchain,
-      Annahmen aus Abschnitt „Nicht nachgewiesen" Punkt 3 nachziehen
+- [ ] `./gradlew :app:assembleDebug` auf einer Maschine mit Toolchain
 - [ ] 3D-Konsole im Browser und in der App-WebView rauchtesten
 - [ ] `agent-os/Tasks/aktionskatalog-drift-schutz.md` (P0)
 - [ ] `agent-os/Tasks/design-system-restmigration.md` (P1)
 - [ ] `agent-os/Tasks/3d-leistungsbudget.md` (P1)
-- [ ] `agent-os/Tasks/alarm-badge-navigation.md` (P2)
+- [x] Alarm-Badge in der Navigation (`AppShellViewModel`) — Rest der Aufgabe
+      (gemeinsamer Quittierpfad) bleibt offen
+- [x] Verwaiste `StatCard.kt` / `ActionButton.kt` entfernt
+- [x] Toter `dynamicColor`-Zweig aus `Theme.kt` entfernt
 
 ## Bewertung
 
 | Achse | Note | Begründung |
 |-------|------|------------|
 | Zielbezug | grün | Zahlt auf G1, G2, G3, G5 ein |
-| Nachweis | **gelb** | Konsole belegt, Kotlin ungeprüft — Toolchain fehlt |
+| Nachweis | **gelb** | Konsole, Backend und Datenpfad belegt; Kotlin per Quelltextabgleich geprüft, aber nicht kompiliert — Toolchain fehlt |
 | Hinterlassenschaft | grün | Ziele, Aufgaben, Wissen und Skills sind dokumentiert |

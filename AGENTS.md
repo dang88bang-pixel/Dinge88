@@ -101,7 +101,9 @@ bash scripts/sync-console3d.sh          # Bundle in die App-Assets spiegeln
 
 # Backend
 pip install -r backend/requirements.txt
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
+uvicorn main:app --host 0.0.0.0 --port 8000 --app-dir backend
+python3 scripts/seed-demo-data.py --seed 88    # Demo-Flotte (12 Assets)
+python3 scripts/seed-demo-data.py --live       # laufender Detektionsstrom
 pytest backend/tests
 
 # Gesamtstack

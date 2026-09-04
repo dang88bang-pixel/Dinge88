@@ -11,12 +11,6 @@ Priorität und Nachweis — oder wird gestrichen.
 
 ## Offen
 
-- [ ] `StatCard.kt` und `ActionButton.kt` sind seit der Design-System-Migration
-      verwaist — löschen oder auf `SgMetricTile`/`SgQuickTile` umbiegen.
-- [ ] Alarm-Badge in der Bottom-Navigation
-      (`repository.getUnacknowledgedAlertCount()` existiert bereits).
-- [ ] `Theme.kt`: der `dynamicColor`-Zweig ist tot — entfernen oder als
-      Einstellung sichtbar machen.
 - [ ] Restliche Screens auf das Design-System heben: Karte, Sensor-Fusion,
       Node-Status, Terminal, Health, Temp-Mail, Einstellungen.
 - [ ] Konsolen-Build (`npm run build`) in `.github/workflows/build-release.yml`
@@ -49,3 +43,9 @@ Priorität und Nachweis — oder wird gestrichen.
 - [x] Aktionen-Center mit Katalog, Favoriten, Verlauf, Offline-Queue
 - [x] Dashboard, Asset-Liste und Asset-Karte neu bauen
 - [x] Agentic-OS-Framework auf das Projekt adaptieren
+- [x] Verwaiste `StatCard.kt` / `ActionButton.kt` gelöscht
+- [x] Alarm-Badge in der Bottom-Navigation (`AppShellViewModel`)
+- [x] Toten `dynamicColor`-Zweig aus `Theme.kt` entfernt
+- [x] Backend lokal lauffähig + `scripts/seed-demo-data.py` (Demo-Flotte, Live-Modus)
+- [x] `/ws`-Proxy im Vite-Dev-Server (`ws: true`), Echtzeit-Ereignisse erreichen die Konsole
+- [x] Kotlin-API-Annahmen der neuen Screens gegen die Modelle geprüft

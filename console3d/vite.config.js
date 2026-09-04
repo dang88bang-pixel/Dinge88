@@ -21,6 +21,15 @@ export default defineConfig({
         target: process.env.SECUREGUARD_BACKEND || 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false
+      },
+      // Echtzeit-Ereignisse des Backends. `ws: true` ist zwingend, sonst
+      // beantwortet Vite den Upgrade-Request mit 404 und die Konsole faellt
+      // still auf Polling zurueck.
+      '/ws': {
+        target: process.env.SECUREGUARD_BACKEND || 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false,
+        ws: true
       }
     }
   },

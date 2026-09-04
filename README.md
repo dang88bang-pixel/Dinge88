@@ -638,7 +638,18 @@ npm run dev      # http://0.0.0.0:5173 – Simulationsmodus, kein Backend nötig
 npm run build    # -> console3d/dist  (≈165 kB gzip)
 ```
 
-Mit Backend: `SECUREGUARD_BACKEND=http://127.0.0.1:8000 npm run dev`.
+Mit echtem Backend und Demo-Flotte (kein Feldgerät nötig):
+
+```bash
+pip3 install -r backend/requirements.txt
+python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --app-dir backend &
+python3 scripts/seed-demo-data.py --seed 88     # 12 Assets, Detektionen, Alarme
+python3 scripts/seed-demo-data.py --live &      # laufender Detektionsstrom
+cd console3d && npm run dev                     # HUD zeigt Quelle: backend
+```
+
+Der Dev-Server proxyt `/api` und `/ws` an das Backend. Vollständige Anleitung:
+`agent-os/Workflows/lokal-bereitstellen.md`.
 
 ### Einbettung in die App
 

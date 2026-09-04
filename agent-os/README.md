@@ -23,7 +23,8 @@ agent-os/
 ├── GOALS.md      G1–G5. Jede Aufgabe zahlt auf genau ein Ziel ein.
 ├── BACKLOG.md    Schnellerfassung. Wird über Workflows/backlog-verarbeiten.md geleert.
 ├── Tasks/        Eine Datei je Aufgabe, YAML-Frontmatter, Pflichtfeld „verification".
-├── Workflows/    backlog-verarbeiten · funktion-umsetzen · release · stoerung-im-feld
+├── Workflows/    backlog-verarbeiten · funktion-umsetzen · lokal-bereitstellen
+│                 · release · stoerung-im-feld
 ├── Knowledge/    architektur · aktionsprotokoll · 3d-konsole · design-system
 └── Evals/        Session-Reviews mit Abschnitt „Nicht nachgewiesen".
 ```

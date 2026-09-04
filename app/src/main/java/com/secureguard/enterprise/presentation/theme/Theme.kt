@@ -1,7 +1,6 @@
 package com.secureguard.enterprise.presentation.theme
 
 import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -70,17 +69,13 @@ private val LightEnterpriseScheme = lightColorScheme(
 @Composable
 fun SecureGuardTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val view = LocalView.current
-            if (darkTheme) DarkEnterpriseScheme else LightEnterpriseScheme
-        }
-        darkTheme -> DarkEnterpriseScheme
-        else -> LightEnterpriseScheme
-    }
+    // Bewusst kein Material-You/Dynamic-Color: die Statusfarben des
+    // Design-Systems (statusColor, severityColor, sourceColor) sind auf diese
+    // Palette abgestimmt. Eine vom Nutzer gefaerbte Oberflaeche wuerde die
+    // Bedeutung von Rot/Bernstein/Gruen im Lagebild verwaessern.
+    val colorScheme = if (darkTheme) DarkEnterpriseScheme else LightEnterpriseScheme
 
     val view = LocalView.current
     if (!view.isInEditMode) {
