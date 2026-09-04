@@ -108,6 +108,11 @@ pytest backend/tests
 
 # Gesamtstack
 docker compose up -d
+
+# CI (ersetzt den lokalen Build, wenn keine Toolchain vorhanden ist)
+bash scripts/install-ci-workflows.sh   # einmalig, braucht workflow-Scope zum Pushen
+gh run list --limit 5
+gh run view --log-failed
 ```
 
 ---
@@ -243,7 +248,12 @@ ln -sfn .agents/skills skills
 - Keine generierten Artefakte committen — **Ausnahme**:
   `app/src/main/assets/console3d/` (das gebaute 3D-Bundle wird bewusst
   mitgeliefert, damit die App offline funktioniert).
-- Release-APK entsteht über `.github/workflows/build-release.yml`.
+- Release-APK entsteht über `.github/workflows/build-release.yml`;
+  schnelle Rückmeldung auf jedem Branch über `.github/workflows/ci.yml`.
+- **Workflows ändern:** Agenten-Tokens haben die GitHub-Berechtigung
+  `workflows` in der Regel nicht — Pushes auf `.github/workflows/` werden
+  abgelehnt. Änderungen deshalb unter `ci/workflows/` ablegen und mit
+  `bash scripts/install-ci-workflows.sh` übernehmen lassen.
 
 ---
 

@@ -13,10 +13,10 @@ Priorität und Nachweis — oder wird gestrichen.
 
 - [ ] Restliche Screens auf das Design-System heben: Karte, Sensor-Fusion,
       Node-Status, Terminal, Health, Temp-Mail, Einstellungen.
-- [ ] Konsolen-Build (`npm run build`) in `.github/workflows/build-release.yml`
-      aufnehmen, damit App-Assets und Quelle nicht auseinanderlaufen.
 - [ ] Drift-Test: Kotlin-`ActionCatalog` gegen `console3d/src/data/catalog.js`
       automatisch vergleichen.
+- [ ] Lint grün machen, danach `continue-on-error` aus `ci/workflows/ci.yml`
+      entfernen.
 - [ ] Kaltstart bis erste Position messen (Ziel G1) — Makrobenchmark.
 - [ ] 3D-Konsole auf echtem Mittelklasse-Gerät profilen; ggf.
       Bloom-Pass unter einem FPS-Schwellwert abschalten.
@@ -49,3 +49,5 @@ Priorität und Nachweis — oder wird gestrichen.
 - [x] Backend lokal lauffähig + `scripts/seed-demo-data.py` (Demo-Flotte, Live-Modus)
 - [x] `/ws`-Proxy im Vite-Dev-Server (`ws: true`), Echtzeit-Ereignisse erreichen die Konsole
 - [x] Kotlin-API-Annahmen der neuen Screens gegen die Modelle geprüft
+- [x] CI-Workflows geschrieben: JDK/SDK über offizielle Actions, Lauf auf jedem
+      Branch, Bundle-Drift-Check (`ci/workflows/`, Aktivierung offen)

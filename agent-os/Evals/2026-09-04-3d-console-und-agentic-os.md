@@ -75,8 +75,14 @@ Ehrlich und vollständig:
 
 1. **Kein Kotlin-Build.** Die Sandbox hat kein JDK und kein Android-SDK,
    `dl.google.com` ist blockiert. Der gesamte Kotlin-Anteil ist **gelesen,
-   nicht kompiliert**. Erste Handlung auf einer Maschine mit Toolchain:
-   `./gradlew :app:assembleDebug`.
+   nicht kompiliert**.
+
+   Lösungsweg gelegt, aber noch nicht abgeschlossen: `ci/workflows/ci.yml`
+   baut `assembleDebug` und `testDebugUnitTest` auf jedem Push. Aktivierung
+   scheiterte daran, dass das Agenten-Token die GitHub-Berechtigung
+   `workflows` nicht besitzt — `bash scripts/install-ci-workflows.sh` plus ein
+   Push mit `workflow`-Scope schließt die Lücke. Siehe
+   `agent-os/Tasks/ci-workflows-aktivieren.md` (P0).
 2. **Kein Browser.** Die 3D-Szene wurde nie gerendert. Nachgewiesen ist nur,
    dass sie fehlerfrei bündelt. Die Laufzeit ist ungeprüft.
 3. **API-Annahmen inzwischen geprüft** (per Quelltextabgleich, nicht per
@@ -123,7 +129,8 @@ Ehrlich und vollständig:
 
 ## Folgeaufgaben
 
-- [ ] `./gradlew :app:assembleDebug` auf einer Maschine mit Toolchain
+- [ ] `agent-os/Tasks/ci-workflows-aktivieren.md` (P0) — CI liefert den
+      fehlenden Kotlin-Build
 - [ ] 3D-Konsole im Browser und in der App-WebView rauchtesten
 - [ ] `agent-os/Tasks/aktionskatalog-drift-schutz.md` (P0)
 - [ ] `agent-os/Tasks/design-system-restmigration.md` (P1)
