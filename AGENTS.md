@@ -75,13 +75,20 @@ Eine Aufgabe gilt erst als erledigt, wenn Nachweis erbracht ist:
 
 | Änderung betrifft | Nachweis |
 |-------------------|----------|
+| alles (Kurzform) | `bash scripts/verify-all.sh` grün |
 | `app/` | `./gradlew :app:assembleDebug` **und** `:app:testDebugUnitTest` grün |
-| `console3d/` | `npm run build` grün + manueller Smoke-Test im Browser |
+| `console3d/` | `npm test` **und** `npm run build` grün + Smoke-Test im Browser |
 | `backend/` | `pytest backend/tests` grün |
+| Aktions-Katalog | `python3 scripts/check-action-drift.py` grün |
 | `firmware/` | Kompilat oder begründeter Hinweis, warum nicht prüfbar |
 | UI-Änderung | Beschreibung *und* Screenshot/Preview-Link |
 
 Kein Nachweis = nicht fertig. „Sollte funktionieren" ist kein Nachweis.
+
+`scripts/verify-all.sh` fasst alles zusammen, was ohne Android-Toolchain
+prüfbar ist: Befehlssatz-Drift, 168 Konsolentests, Bundle-Build samt Abgleich
+mit den App-Assets und 42 Backend-Tests. Was es *nicht* kann, sagt es selbst:
+Der Android-Build läuft nur im CI, die WebGL-Szene nur im echten Browser.
 
 ---
 
@@ -96,6 +103,8 @@ Kein Nachweis = nicht fertig. „Sollte funktionieren" ist kein Nachweis.
 
 # 3D Operations Center
 cd console3d && npm ci && npm run dev   # Live-Konsole auf :5173
+cd console3d && npm test                # 168 Tests (Fachlogik + HUD in jsdom)
+cd console3d && npm run test:watch      # dieselben Tests im Beobachtungsmodus
 cd console3d && npm run build           # Bundle nach console3d/dist
 bash scripts/sync-console3d.sh          # Bundle in die App-Assets spiegeln
 
@@ -105,6 +114,10 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --app-dir backend
 python3 scripts/seed-demo-data.py --seed 88    # Demo-Flotte (12 Assets)
 python3 scripts/seed-demo-data.py --live       # laufender Detektionsstrom
 pytest backend/tests
+
+# Querschnitt
+bash scripts/verify-all.sh                     # alles Prüfbare in einem Lauf
+python3 scripts/check-action-drift.py -v       # App ↔ Konsole ↔ Firmware
 
 # Gesamtstack
 docker compose up -d

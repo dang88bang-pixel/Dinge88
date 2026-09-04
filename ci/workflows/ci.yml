@@ -32,6 +32,20 @@ env:
   BUILD_TOOLS: '35.0.0'
 
 jobs:
+  # Läuft als erstes und in Sekunden: Wenn Android, 3D-Konsole und Firmware
+  # unterschiedliche Befehle sprechen, ist jeder nachfolgende grüne Build
+  # wertlos – die Bedienerin drückt dann Knöpfe, die das Gerät nicht kennt.
+  contract:
+    name: Befehlssatz – Drift zwischen App, Konsole und Firmware
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Aktions-Katalog vergleichen
+        run: python3 scripts/check-action-drift.py --verbose
+
   android:
     name: Android – kompilieren und testen
     runs-on: ubuntu-latest
@@ -124,6 +138,13 @@ jobs:
       - name: Abhängigkeiten installieren
         working-directory: console3d
         run: npm ci
+
+      # 132 Tests: Katalog, Store, Simulation, Geo, Native-Bridge und das
+      # komplette HUD (Auswahl, Aktionen, Bestätigung, Tastatur, Palette,
+      # Alarme, Warteschlange) gegen das echte index.html in jsdom.
+      - name: Tests ausführen
+        working-directory: console3d
+        run: npm test
 
       - name: Bundle bauen
         working-directory: console3d

@@ -79,12 +79,17 @@ export function batteryColor (pct) {
 
 /** Zeichnet eine Sparkline in ein <canvas>. */
 export function sparkline (canvas, values, color) {
+  if (!canvas || typeof canvas.getContext !== 'function') return
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   const w = canvas.clientWidth || 120
   const h = canvas.clientHeight || 24
   canvas.width = w * dpr
   canvas.height = h * dpr
+  // getContext() liefert null, wenn der Browser das Kontingent an
+  // 2D-Kontexten erschöpft hat. Die Sparkline ist Dekoration – sie darf das
+  // Rendern des restlichen HUD niemals abbrechen.
   const ctx = canvas.getContext('2d')
+  if (!ctx) return
   ctx.scale(dpr, dpr)
   ctx.clearRect(0, 0, w, h)
   if (!values || values.length < 2) return

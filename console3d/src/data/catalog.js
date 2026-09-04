@@ -71,7 +71,7 @@ export const ACTIONS = [
     confirmText: 'Der Antrieb wird sofort gesperrt. Nur ausführen, wenn das Fahrzeug steht – sonst besteht Unfallgefahr.'
   },
   {
-    id: 'RESTART', wire: 'RESTART', title: 'Neustart', icon: '🔄',
+    id: 'RESTART', wire: 'RESTART', title: 'Gerät neu starten', icon: '🔄',
     desc: 'Controller neu starten – kurzer Verbindungsverlust.',
     category: 'CONTROL', risk: 'critical', color: '#ff9100',
     requiresOnline: true, queueable: false, key: '5',
