@@ -1,0 +1,5 @@
+name: release-apk
+description: Baut ein signiertes SecureGuard-Release-APK inklusive Konsolen-Sync, Protokollprüfung, Rauchtest und Veröffentlichung.
+version: 1
+invocation:
+  trigger: explicit

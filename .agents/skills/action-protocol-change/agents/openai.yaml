@@ -1,0 +1,5 @@
+name: action-protocol-change
+description: Pflichtablauf für neue oder geänderte Gerätebefehle. Hält Android-Katalog, 3D-Konsole und ESP32-Firmware synchron.
+version: 1
+invocation:
+  trigger: implicit

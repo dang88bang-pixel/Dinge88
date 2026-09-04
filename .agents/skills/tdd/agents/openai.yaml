@@ -1,0 +1,5 @@
+name: tdd
+description: Test zuerst für neue Geschäftslogik in services/, data/repository/ und backend/. Nicht für UI-Layout.
+version: 1
+invocation:
+  trigger: explicit

@@ -5,12 +5,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
@@ -19,6 +22,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.navArgument
 import com.secureguard.enterprise.presentation.ui.actions.ActionsScreen
 import com.secureguard.enterprise.presentation.ui.agent.AgentConfigScreen
@@ -37,16 +41,20 @@ import com.secureguard.enterprise.presentation.ui.sensorfusion.SensorFusionScree
 import com.secureguard.enterprise.presentation.ui.security.SecurityScreen
 import com.secureguard.enterprise.presentation.ui.esp32.Esp32ConfigScreen
 import com.secureguard.enterprise.presentation.ui.health.HealthScreen
+import com.secureguard.enterprise.presentation.ui.ops.OpsCenter3DScreen
 
 private const val ANIM_MS = 250
 
 @Composable
-fun SecureGuardApp() {
+fun SecureGuardApp(shellViewModel: AppShellViewModel = hiltViewModel()) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
     val showBottomBar = NavItem.bottomNavItems.any { it.route == currentRoute }
+    // Offene Alarme werden am Dashboard-Tab angezeigt, damit sie auch von
+    // anderen Top-Level-Screens aus sichtbar bleiben.
+    val openAlerts by shellViewModel.unacknowledgedAlerts.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -65,7 +73,25 @@ fun SecureGuardApp() {
                                     }
                                 }
                             },
-                            icon = { Icon(item.icon, contentDescription = label) },
+                            icon = {
+                                val badgeCount = if (item == NavItem.Dashboard) openAlerts else 0
+                                if (badgeCount > 0) {
+                                    BadgedBox(
+                                        badge = {
+                                            Badge {
+                                                Text(if (badgeCount > 9) "9+" else "$badgeCount")
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            item.icon,
+                                            contentDescription = "$label, $badgeCount offene Alarme"
+                                        )
+                                    }
+                                } else {
+                                    Icon(item.icon, contentDescription = label)
+                                }
+                            },
                             label = { Text(label) }
                         )
                     }
@@ -129,6 +155,9 @@ fun SecureGuardApp() {
             }
             composable(Routes.HEALTH) {
                 HealthScreen(navController = navController)
+            }
+            composable(Routes.OPS_3D) {
+                OpsCenter3DScreen(navController = navController)
             }
             composable(
                 route = Routes.ASSET_DETAIL,

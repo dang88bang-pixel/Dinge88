@@ -26,6 +26,8 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 - [Sicherheit & Berechtigungen](#-sicherheit--berechtigungen)
 - [Backend (FastAPI)](#-backend-fastapi)
 - [Firmware (ESP32)](#-firmware-esp32)
+- [3D Operations Center](#-3d-operations-center)
+- [Agentic OS (Agenten-Framework)](#-agentic-os-agenten-framework)
 - [Docker-Stack](#-docker-stack)
 - [Abhängigkeiten (63 Libraries)](#-abhängigkeiten-63-libraries)
 - [Build & CI](#-build--ci)
@@ -584,6 +586,133 @@ Command Char:   6BA1B218-15A8-461F-9FA8-5DC85327FD15 (Write)
 | `device_id` | `ESP32_SecureGuard` | Geräte-ID |
 
 Konfiguration änderbar via MQTT-Befehl `CONFIG` mit JSON-Payload.
+
+---
+
+## 🧊 3D Operations Center
+
+Räumliches Lagebild auf Basis von **Three.js** (MIT-Lizenz, kostenfrei, keine
+Nutzungsstufen). Eine Codebasis, zwei Laufzeiten: Browser und Android-WebView.
+
+```
+console3d/
+├── index.html          HUD-Markup
+├── vite.config.js      base './', 0.0.0.0:5173, Proxy /api -> Backend
+└── src/
+    ├── main.js         Verdrahtung, Quellenwahl, Tastaturkürzel
+    ├── core/           store · simulation · api · native (App-Brücke) · geo
+    ├── data/catalog.js Kanäle, Kategorien, Aktionen (Spiegel des Kotlin-Katalogs)
+    ├── scene/world.js  Szene, Kamera, Postprocessing, Knoten, Labels
+    └── ui/             dom · panels · dock · overlays
+```
+
+**Inhalt der Szene:** Bodenraster mit Distanzringen, Sternenfeld, pulsierender
+Agent-Kern, 12 Kanal-Pylonen, ein Knoten je Asset mit CSS2D-Label,
+`UnrealBloomPass` für die Glut-Optik.
+
+**HUD:** Kennzahlen, Kanalauslastung, Live-Ereignisfeed, Asset-Liste mit Suche
+und Mehrfachauswahl, Aktions-Dock, Log- und Alarm-Schublade, Befehlspalette
+(`⌘/Strg + K`), Bestätigungsdialoge, Toasts.
+
+**Datenquellen mit Rückfall** — die Konsole ist nie leer:
+
+| Priorität | Quelle | Bedingung |
+|-----------|--------|-----------|
+| 1 | `native` | läuft in der App, `window.SecureGuardNative` vorhanden |
+| 2 | `backend` | `/api/health` antwortet |
+| 3 | `simulation` | immer verfügbar (12 Assets, Bewegung, Detektionen, Alarme) |
+
+**Zusätzliche Aktionen nur in der Szene:** `SWEEP` (Radar-Sweep), `FOCUS`
+(Kamerafokus), `GEOFENCE` (Zonenringe), `HEATMAP` (Detektionsdichte).
+Die acht Geräteaktionen entsprechen 1:1 dem Kotlin-`ActionCatalog`.
+
+**Tastatur:** `⌘/Strg+K` Palette · `Leertaste` Agent · `L` Log · `A` Alarme ·
+`V` Ansicht · `D` Quelle · `H` Hilfe · `1`–`8` Aktionen · `r f g m` Szene.
+
+### Entwicklung
+
+```bash
+cd console3d
+npm ci
+npm run dev      # http://0.0.0.0:5173 – Simulationsmodus, kein Backend nötig
+npm run build    # -> console3d/dist  (≈165 kB gzip)
+```
+
+Mit echtem Backend und Demo-Flotte (kein Feldgerät nötig):
+
+```bash
+pip3 install -r backend/requirements.txt
+python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --app-dir backend &
+python3 scripts/seed-demo-data.py --seed 88     # 12 Assets, Detektionen, Alarme
+python3 scripts/seed-demo-data.py --live &      # laufender Detektionsstrom
+cd console3d && npm run dev                     # HUD zeigt Quelle: backend
+```
+
+Der Dev-Server proxyt `/api` und `/ws` an das Backend. Vollständige Anleitung:
+`agent-os/Workflows/lokal-bereitstellen.md`.
+
+### Einbettung in die App
+
+```bash
+bash scripts/sync-console3d.sh   # baut und spiegelt nach app/src/main/assets/console3d/
+```
+
+`OpsCenter3DScreen` liefert die Assets über `shouldInterceptRequest` unter dem
+virtuellen Origin `https://ops.secureguard.local/` aus — ES-Module lassen sich
+in einer WebView nicht über `file://` laden. `OpsCenterViewModel` hält einen
+`@Volatile`-Snapshot, den das JS-Interface `SecureGuardNative` synchron
+zurückgibt. Details: `agent-os/Knowledge/3d-konsole.md`.
+
+---
+
+## 🤖 Agentic OS (Agenten-Framework)
+
+Adaption des Agentic-Personal-OS-Ansatzes auf dieses Projekt: eine
+dateibasierte Betriebsschicht, die KI-Agenten (Claude Code, Codex, Arena,
+OpenClaw) dieselbe Arbeitsweise, dieselben Qualitätsschranken und dieselben
+Sicherheitsregeln gibt.
+
+```
+AGENTS.md              gemeinsames Verhalten – Quelle der Wahrheit
+CLAUDE.md / CODEX.md   Runtime-Wrapper, verweisen auf AGENTS.md
+.agents/skills/        8 Skill-Packs nach Agent-Skills-Standard
+agent-os/
+├── GOALS.md           G1–G5, woran Arbeit gemessen wird
+├── BACKLOG.md         Schnellerfassung
+├── Tasks/             Aufgaben mit YAML-Frontmatter und Pflichtfeld „verification"
+├── Workflows/         Backlog verarbeiten · Funktion umsetzen · Release · Störung im Feld
+├── Knowledge/         Architektur · Aktionsprotokoll · 3D-Konsole · Design-System
+└── Evals/             Session-Reviews, inkl. „was wurde NICHT nachgewiesen"
+```
+
+**Kernprinzipien**
+
+1. **Zielbezug** — jede Aufgabe zahlt auf ein Ziel in `GOALS.md` ein.
+2. **Nachweispflicht** — nichts gilt als fertig ohne ausführbaren Beleg
+   (`.agents/skills/verification/SKILL.md`).
+3. **Progressive Disclosure** — Skills werden erst geladen, wenn sie gebraucht
+   werden.
+4. **Protokollintegrität** — Gerätebefehle werden nur über
+   `.agents/skills/action-protocol-change/SKILL.md` geändert, damit Android,
+   3D-Konsole und Firmware nicht auseinanderlaufen.
+
+| Skill | Zweck |
+|-------|-------|
+| `verification` | Nachweis vor jeder Fertigmeldung |
+| `secureguard-ui-review` | Prüfliste für sichtbare Änderungen |
+| `compose-design-system` | Compose-Oberflächen mit den `Sg*`-Bausteinen |
+| `three-scene-review` | Änderungen an der Three.js-Szene |
+| `action-protocol-change` | Neue/geänderte Gerätebefehle |
+| `release-apk` | Signiertes Release inkl. Konsolen-Sync |
+| `systematic-debugging` | Ursachensuche statt Symptomkosmetik |
+| `tdd` | Test zuerst für Geschäftslogik |
+
+Andere Runtimes anbinden:
+
+```bash
+mkdir -p .claude && ln -sfn ../.agents/skills .claude/skills
+ln -sfn .agents/skills skills
+```
 
 ---
 
