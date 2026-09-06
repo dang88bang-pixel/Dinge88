@@ -37,6 +37,7 @@ import com.secureguard.enterprise.presentation.ui.sensorfusion.SensorFusionScree
 import com.secureguard.enterprise.presentation.ui.security.SecurityScreen
 import com.secureguard.enterprise.presentation.ui.esp32.Esp32ConfigScreen
 import com.secureguard.enterprise.presentation.ui.health.HealthScreen
+import com.secureguard.enterprise.presentation.ui.ports.AutomaticPortViewScreen
 import com.secureguard.enterprise.presentation.ui.slack.SlackScreen
 
 private const val ANIM_MS = 250
@@ -133,6 +134,9 @@ fun SecureGuardApp() {
             }
             composable(Routes.SLACK) {
                 SlackScreen(navController = navController)
+            }
+            composable(Routes.PORTS) {
+                AutomaticPortViewScreen(navController = navController)
             }
             composable(
                 route = Routes.ASSET_DETAIL,

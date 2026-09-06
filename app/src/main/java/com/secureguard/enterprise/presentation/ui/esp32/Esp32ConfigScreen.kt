@@ -49,6 +49,7 @@ fun Esp32ConfigScreen(
     val assets by viewModel.assets.collectAsState()
     val lastCommand by viewModel.lastCommand.collectAsState()
     val usbDevices by viewModel.usbDevices.collectAsState()
+    val usbStatus by viewModel.usbStatus.collectAsState()
     var wifiSsid by remember { mutableStateOf("SECUREGUARD") }
     var wifiPass by remember { mutableStateOf("") }
     var mqttHost by remember { mutableStateOf("192.168.1.100") }
@@ -190,16 +191,30 @@ fun Esp32ConfigScreen(
                 }
             }
 
-            // USB-Serial Scan
+            // USB-Serial Scan (automatische Port-Ansicht)
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("USB-Serial Adapter", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text("USB-Serial Adapter & Ports",
+                            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Erkennt angesteckte Adapter und deren Ports automatisch – " +
+                                "auch bei Anschluss und nach Berechtigungsanfrage. " +
+                                "Fehlende USB-Berechtigung wird automatisch angefragt.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Spacer(Modifier.height(8.dp))
                         Button(
                             onClick = { viewModel.scanUsbDevices() },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Adapter scannen") }
+                        ) { Text("Jetzt neu scannen") }
+                        usbStatus?.let {
+                            Spacer(Modifier.height(8.dp))
+                            Text(it, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
                         usbDevices?.let {
                             Spacer(Modifier.height(8.dp))
                             Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp,

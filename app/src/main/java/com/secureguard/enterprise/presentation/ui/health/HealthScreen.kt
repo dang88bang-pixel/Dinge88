@@ -27,12 +27,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.presentation.navigation.Routes
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -46,7 +49,14 @@ fun HealthScreen(
     val health by viewModel.health.collectAsState()
     val loading by viewModel.loading.collectAsState()
 
-    LaunchedEffect(Unit) { viewModel.refresh() }
+    // Automatische Aktualisierung: läuft, solange der Screen sichtbar ist
+    // (kein manueller Refresh nötig).
+    LaunchedEffect(Unit) {
+        while (true) {
+            viewModel.refresh()
+            delay(10_000)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -105,6 +115,37 @@ fun HealthScreen(
                             },
                             style = MaterialTheme.typography.bodyMedium
                         )
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("health_ports_link")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { navController.navigate(Routes.PORTS) }
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "🔌 Automatische Port-Ansicht",
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                "Alle Verbindungs- & Stack-Ports live (offen/zu, Latenz)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text("›", style = MaterialTheme.typography.titleLarge)
                     }
                 }
             }
