@@ -1,0 +1,11 @@
+buildType      : release
+versionName    : 1.1.0
+versionCode    : 2
+minSdk         : 26
+targetSdk      : 35
+compileSdk     : 35
+ciRunId        : 34333904461
+commit         : 51d5c2112274e94117bad2b5c7f472dfaa968842
+timestamp (UTC): 2026-09-09T09:22:57.584239347Z
+
+BUILD ERFOLGREICH
