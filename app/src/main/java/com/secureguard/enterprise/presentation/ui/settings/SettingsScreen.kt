@@ -432,6 +432,16 @@ fun SettingsScreen(
                                 .clickable { navController.navigate(Routes.HEALTH) }
                         )
                         HorizontalDivider()
+                        Text(
+                            "Automatische Port-Ansicht (Verbindungen & Stack)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .testTag("settings_ports_button")
+                                .clickable { navController.navigate(Routes.PORTS) }
+                        )
+                        HorizontalDivider()
                         Spacer(Modifier.height(8.dp))
                         Text("🤖 Vordergrund-Dienst", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(4.dp))

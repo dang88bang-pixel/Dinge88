@@ -47,6 +47,9 @@ class MainActivity : ComponentActivity() {
                 "MainActivity",
                 "USB-Permission für ${device?.deviceName}: ${if (granted) "erteilt" else "verweigert"}"
             )
+            // Offene Ansichten (z. B. automatische Port-Ansicht im ESP32-Screen)
+            // automatisch über das Ergebnis informieren → Liste aktualisiert sich.
+            usbSerialService.notifyPermissionResult(device, granted)
         }
     }
 
@@ -159,8 +162,9 @@ class MainActivity : ComponentActivity() {
         device ?: return
         val driver = usbSerialService.availableDrivers()
             .firstOrNull { it.device.deviceId == device.deviceId } ?: return
+        usbSerialService.notifyDeviceAttached(device.deviceName)
         if (!usbSerialService.hasPermission(driver)) {
-            usbSerialService.requestPermission(driver)
+            usbSerialService.requestPermissionIfMissing(driver)
         }
     }
 

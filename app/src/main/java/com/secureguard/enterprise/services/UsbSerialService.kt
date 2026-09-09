@@ -2,20 +2,39 @@ package com.secureguard.enterprise.services
 
 import android.content.Context
 import android.content.Intent
+import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/** Ereignis der USB-/Seriell-Bridge (automatische Port-Ansicht). */
+sealed interface UsbSerialEvent {
+    /** Ergebnis einer USB-Berechtigungsanfrage (Systemdialog). */
+    data class PermissionResult(val deviceName: String?, val granted: Boolean) : UsbSerialEvent
+
+    /** Ein USB-Seriell-Adapter wurde angesteckt. */
+    data class DeviceAttached(val deviceName: String) : UsbSerialEvent
+}
 
 /**
  * USB/Serial-Anbindung (kabelgebunden) über usb-serial-for-android.
  * Erkennt angeschlossene USB-Seriell-Adapter (z. B. FTDI, CP210x, CH34x)
  * und liest/z. B. Telemetrie von angeschlossener Hardware.
+ *
+ * Automatische Port-Ansicht: [events] meldet Anstecken und
+ * Berechtigungsergebnisse, damit offene Ansichten ihre Port-Liste ohne
+ * manuelles Scannen aktualisieren können. [requestPermissionIfMissing]
+ * fragt fehlende Berechtigungen automatisch (mit Cooldown) an.
  *
  * Hinweis: Für den Zugriff muss die USB-Berechtigung erteilt sein
  * (`UsbManager.requestPermission` aus einer Activity).
@@ -25,8 +44,36 @@ class UsbSerialService @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
+    companion object {
+        /** Broadcast-Action für das USB-Permission-Ergebnis. */
+        const val ACTION_USB_PERMISSION = "com.secureguard.enterprise.USB_PERMISSION"
+
+        /** Mindestabstand zwischen zwei automatischen Berechtigungsanfragen. */
+        private const val PERMISSION_REQUEST_COOLDOWN_MS = 15_000L
+    }
+
     private val usbManager: UsbManager =
         context.getSystemService(Context.USB_SERVICE) as UsbManager
+
+    private val _events = MutableSharedFlow<UsbSerialEvent>(extraBufferCapacity = 8)
+    val events: SharedFlow<UsbSerialEvent> = _events.asSharedFlow()
+
+    private val lastPermissionRequestAt = ConcurrentHashMap<Int, Long>()
+
+    /** Meldet ein Berechtigungsergebnis an offene Ansichten. */
+    fun notifyPermissionResult(device: UsbDevice?, granted: Boolean) {
+        _events.tryEmit(
+            UsbSerialEvent.PermissionResult(
+                deviceName = device?.deviceName,
+                granted = granted
+            )
+        )
+    }
+
+    /** Meldet einen angesteckten Adapter an offene Ansichten. */
+    fun notifyDeviceAttached(deviceName: String) {
+        _events.tryEmit(UsbSerialEvent.DeviceAttached(deviceName))
+    }
 
     /** Alle gefundenen USB-Serial-Geräte. */
     fun availableDrivers(): List<UsbSerialDriver> =
@@ -34,6 +81,23 @@ class UsbSerialService @Inject constructor(
 
     fun hasPermission(driver: UsbSerialDriver): Boolean =
         usbManager.hasPermission(driver.device)
+
+    /**
+     * Fordert die USB-Berechtigung automatisch an, falls sie fehlt und nicht
+     * gerade erst (Cooldown) angefragt wurde – kein doppelter Dialog nach
+     * Ablehnung, aber automatische Anfrage beim ersten Öffnen/Anstecken.
+     * Das Ergebnis kommt als Broadcast mit [ACTION_USB_PERMISSION] zurück
+     * (Empfänger: MainActivity).
+     */
+    fun requestPermissionIfMissing(driver: UsbSerialDriver): Boolean {
+        if (usbManager.hasPermission(driver.device)) return false
+        val now = System.currentTimeMillis()
+        val last = lastPermissionRequestAt[driver.device.deviceId]
+        if (last != null && now - last < PERMISSION_REQUEST_COOLDOWN_MS) return false
+        lastPermissionRequestAt[driver.device.deviceId] = now
+        requestPermission(driver)
+        return true
+    }
 
     /**
      * Fordert die USB-Berechtigung für ein Gerät an. Das Ergebnis kommt als
@@ -53,11 +117,6 @@ class UsbSerialService @Inject constructor(
         }
         val pendingIntent = android.app.PendingIntent.getBroadcast(context, 0, intent, flags)
         usbManager.requestPermission(driver.device, pendingIntent)
-    }
-
-    companion object {
-        /** Broadcast-Action für das USB-Permission-Ergebnis. */
-        const val ACTION_USB_PERMISSION = "com.secureguard.enterprise.USB_PERMISSION"
     }
 
     /**

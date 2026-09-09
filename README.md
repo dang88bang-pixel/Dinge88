@@ -19,8 +19,8 @@ Infrastruktur, Crowdsourcing und Satellit**, orchestriert von einem
 - [Detection-Kanäle](#-detection-kanäle-9)
 - [Echtzeit-Kanäle](#-echtzeit-kanäle-3)
 - [Externe APIs (8)](#-externe-apis-8)
-- [Services (33)](#-services-33)
-- [UI-Screens (18)](#-ui-screens-18)
+- [Services (37)](#-services-37)
+- [UI-Screens (19)](#-ui-screens-19)
 - [Datenmodelle (8)](#-datenmodelle-8)
 - [Datenbank (Room v2)](#-datenbank-room-v2)
 - [Sicherheit & Berechtigungen](#-sicherheit--berechtigungen)
@@ -340,7 +340,7 @@ secureguard/{MAC}/command  (publish für spezifisches Asset)
 
 ---
 
-## ⚙️ Services (30)
+## ⚙️ Services (37)
 
 | Service | Dependencies | Funktion |
 |---------|-------------|----------|
@@ -374,10 +374,17 @@ secureguard/{MAC}/command  (publish für spezifisches Asset)
 | `ApiNodeManager` | 5 Services | 11 Nodes: Circuit-Breaker + Rate-Limits |
 | `AgentForegroundService` | AgentService, NotificationService | Android Foreground Service |
 | `DetectionCapable` | – | Abstract Base (SharedFlow) |
+| `AgentSettingsStore` | SharedPreferences, Gson | Agent-Einstellungen persistieren (Defaults) |
+| `BackendSyncService` | EndpointConfig, Repository | Sync Assets/Detektionen mit dem Backend |
+| `HealthMonitorService` | EndpointConfig, DB, MQTT/WS/Agent/Nodes/Sync | System-Health-Snapshot (Dashboard/Settings/Health) |
+| `PrivacyService` | Database, AuditLogService | DSGVO: Datenauskunft, Retention, Löschung (Art. 15/17) |
+| `SlackService` | EndpointConfig (OkHttp) | Slack-MCP REST: Status, Tools, Channels, Versand |
+| `SlackAlertForwarder` | Database, SlackService | Alerts (≥ WARNING) automatisch an Slack melden |
+| `AutomaticPortView` | EndpointConfig, OkHttp | Automatic Port View: native TCP-Port-Probe-Bridge, Ziele + Auto-Refresh automatisch, keine Berechtigungen |
 
 ---
 
-## 📱 UI-Screens (18)
+## 📱 UI-Screens (19)
 
 | Screen | ViewModel | Route | Funktionen |
 |--------|-----------|-------|-----------|
@@ -393,6 +400,13 @@ secureguard/{MAC}/command  (publish für spezifisches Asset)
 | **SettingsScreen** | SettingsViewModel | `settings` | Profil (editierbar), Notifications, Verbindungen, DSGVO, Backup/CSV/PDF, ForegroundService |
 | **NodeStatusScreen** | NodeStatusViewModel | `node_status` | 11 Nodes: Status, Toggle, Test-Suche |
 | **TempMailScreen** | TempMailViewModel | `temp_mail` | Inbox erstellen, OTP abrufen, Log |
+| **TerminalScreen** | TerminalViewModel | `terminal` | Agent-Terminal: status, start, stop, cycle, flush |
+| **SensorFusionScreen** | SensorFusionViewModel | `sensor_fusion` | Sensor-Fusion: BLE + WiFi + GPS + Live-Daten |
+| **SecurityScreen** | SecurityViewModel | `security` | Security Center: Checks, Signierung, RBAC |
+| **Esp32ConfigScreen** | Esp32ConfigViewModel | `esp32_config` | WiFi/MQTT-CONFIG ans Gateway; USB-Serial-Ports (automatische Port-Ansicht) |
+| **HealthScreen** | HealthViewModel | `health` | System-Health: Komponenten, Auto-Refresh (10 s), Link zur Port-Ansicht |
+| **SlackScreen** | SlackViewModel | `slack` | Slack (MCP): Status, Tools, Channels, Versand, Verlauf |
+| **AutomaticPortViewScreen** | AutomaticPortViewViewModel | `ports` | Automatic Port View: Verbindungs-/Stack-Ports live (offen/zu, Latenz, HTTP-Health), Auto-Refresh (5 s), Ziele automatisch aus den Einstellungen |
 | **LockScreen** | – | (Modal) | PIN-Eingabe, Versuchsanzeige |
 
 ---

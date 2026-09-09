@@ -23,6 +23,9 @@ class HealthViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
+            // In-flight-Schutz: kein Stapeln bei Auto-Refresh (10-s-Loop),
+            // die laufende Messung liefert bereits den nächsten Stand.
+            if (_loading.value) return@launch
             _loading.value = true
             _health.value = runCatching { healthMonitorService.snapshot() }.getOrNull()
             _loading.value = false
