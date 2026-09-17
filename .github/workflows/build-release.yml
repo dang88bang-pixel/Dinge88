@@ -18,7 +18,6 @@ on:
           - debug
           - release
 
-# Nur der neueste Lauf pro Branch/Ref wird ausgeführt; überholte werden abgebrochen.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -53,14 +52,11 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
 
-      # Gradle Wrapper validieren + Dependency-/Wrapper-Cache (großer Speedup).
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: false
 
-      # Install the Android SDK cmdline-tools + required packages (einmalig,
-      # danach über actions/cache wiederverwendet).
       - name: Install Android SDK
         run: |
           ANDROID_ROOT="${ANDROID_HOME:-$HOME/android-sdk}"
@@ -80,35 +76,25 @@ jobs:
           "$ANDROID_ROOT/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;${{ env.COMPILE_SDK }}" "build-tools;${{ env.BUILD_TOOLS }}" "platform-tools"
 
-      # Android-SDK-Komponenten zwischen Läufen cachen (erspart Download/Unzip).
       - name: Cache Android SDK
         uses: actions/cache@v4
         with:
           path: ${{ env.ANDROID_HOME }}
           key: android-sdk-${{ env.COMPILE_SDK }}-${{ env.BUILD_TOOLS }}
 
-      # Release-Keystore aus Secret dekodieren (nur für Release-Builds).
-      - name: Decode Keystore
+      # IMPORTANT: app/build.gradle.kts expects the keystore at the project root.
+      - name: Decode release keystore
         if: matrix.task == 'assembleRelease'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > app/secureguard-keystore.jks
-            echo "Keystore written (size: $(wc -c < app/secureguard-keystore.jks) bytes)."
-          else
-            echo "::warning::KEYSTORE_BASE64 is not set - APK wird UNSIGNIERT gebaut."
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 fehlt. Ein Release darf nicht unsigniert ausgeliefert werden."
+            exit 1
           fi
-
-      # Signing-Konfiguration nur dann anwenden, wenn der Keystore existiert.
-      - name: Prepare signing config
-        if: matrix.task == 'assembleRelease'
-        run: |
-          if [ -f "app/secureguard-keystore.jks" ]; then
-            echo "SG_HAS_KEYSTORE=true" >> "$GITHUB_ENV"
-          else
-            echo "SG_HAS_KEYSTORE=false" >> "$GITHUB_ENV"
-          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > secureguard-keystore.jks
+          test -s secureguard-keystore.jks
+          echo "Release keystore bereitgestellt."
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
@@ -120,12 +106,23 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew ${{ matrix.task }} --no-daemon --stacktrace
 
-      # APK benennen + Prüfsumme berechnen.
+      - name: Verify release APK is signed
+        if: matrix.task == 'assembleRelease'
+        run: |
+          APK=$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)
+          test -n "$APK"
+          "$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}/apksigner" verify --print-certs "$APK"
+          echo "Verified signed release APK: $APK"
+
       - name: Prepare APK artifacts
         run: |
           mkdir -p apk-out
-          cp app/build/outputs/apk/release/*.apk apk-out/ 2>/dev/null || true
-          cp app/build/outputs/apk/debug/*.apk apk-out/ 2>/dev/null || true
+          if [ "${{ matrix.task }}" = "assembleRelease" ]; then
+            cp app/build/outputs/apk/release/*.apk apk-out/
+          else
+            cp app/build/outputs/apk/debug/*.apk apk-out/
+          fi
           cd apk-out
           sha256sum *.apk > SHA256SUMS.txt
           ls -la
@@ -172,25 +169,13 @@ jobs:
           body: |
             ## 🛡️ SecureGuard Enterprise
 
-            ### ✅ Funktionen
-            - 📡 LoRa/LoRaWAN
-            - 🧠 Selbstlernender Agent
-            - 🗺️ OpenStreetMap-Karte
-            - 🎮 Fernsteuerung (Alarm, Motor, Batterie)
-            - 👁️ Optische Erkennung
-            - 🌍 Apple/Google Crowdsourcing (nur mit Einwilligung)
-            - 🏙️ Urbane Infrastruktur
-            - 📡 GPS/GLONASS/Galileo
-            - 🔒 DSGVO-konform
-
             ### 📦 Download
-            - **APK**: `secureguard-pro.apk`
+            - **APK**: `release.apk`
+            - **SHA-256**: `SHA256SUMS.txt`
 
             ### 🔑 Signatur
-            - APK **signiert**, wenn die Keystore-Secrets gesetzt sind.
-            - Sonst wird eine **unsignierte** APK erzeugt (`app-release-unsigned.apk`).
-
-            > 🔐 Prüfsummen siehe `SHA256SUMS.txt` im Release.
+            - Release wird nur veröffentlicht, wenn `KEYSTORE_*`-Secrets vorhanden sind.
+            - Der CI-Schritt `apksigner verify` muss erfolgreich sein.
           files: |
             ./apk/*.apk
             ./apk/SHA256SUMS.txt
