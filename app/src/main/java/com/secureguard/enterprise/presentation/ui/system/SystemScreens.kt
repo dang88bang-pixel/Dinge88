@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -161,7 +162,7 @@ fun SplashScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("Initialisierung", style = MaterialTheme.typography.titleLarge)
-                checks.forEach { c ->
+                for (c in checks) {
                     CheckRow(c)
                 }
                 Row(
@@ -270,7 +271,7 @@ fun SystemStatusScreen(
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
-            checks.forEach { c -> CheckRow(c) }
+            for (c in checks) { CheckRow(c) }
             SgSecondaryButton(
                 text = "Erneut prüfen",
                 icon = Icons.Default.Refresh,
