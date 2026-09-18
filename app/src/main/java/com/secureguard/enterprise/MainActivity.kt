@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
                 context.getSharedPreferences("secureguard_settings", Context.MODE_PRIVATE)
             }
             var darkMode by remember {
-                mutableStateOf(settingsPrefs.getBoolean("dark_mode", false))
+                mutableStateOf(settingsPrefs.getBoolean("dark_mode", true))
             }
             androidx.compose.runtime.DisposableEffect(settingsPrefs) {
                 val listener =
