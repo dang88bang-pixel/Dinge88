@@ -135,7 +135,7 @@ fun ActionsScreen(
                 SgSectionHeader(
                     title = "Ziel-Assets (${selected.size} ausgewählt)",
                     actionLabel = if (selected.isEmpty()) null else "Alle abwählen",
-                    onAction = if (selected.isEmpty()) null else { viewModel.clearSelection() }
+                    onAction = { viewModel.clearSelection() }
                 )
             }
             if (assets.isEmpty()) {
@@ -206,7 +206,7 @@ fun ActionsScreen(
                 SgSectionHeader(
                     title = "Offline-Queue (${pending.size})",
                     actionLabel = if (pending.isEmpty()) null else "Retry",
-                    onAction = if (pending.isEmpty()) null else { viewModel.retryQueue() }
+                    onAction = { viewModel.retryQueue() }
                 )
             }
             if (pending.isEmpty()) {
