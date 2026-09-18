@@ -1,14 +1,11 @@
 package com.secureguard.enterprise.presentation.ui.sensorfusion
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -27,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -93,6 +91,49 @@ fun SensorFusionScreen(
                         SgSectionHeader(title = "Quellen")
                         Text(
                             "Stand: $lastCheck · NFC: ${if (state.nfcAvailable) "verfügbar" else "nicht verfügbar"} · USB-Seriell-Adapter: ${state.usbDevices}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Echte GNSS-Satellitendaten via LocationManager/GnssStatus (Android 11).
+            item {
+                SgCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SgSectionHeader(title = "GNSS-Satelliten")
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Sichtbar: ${state.satellitesInView}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "Zur Fixierung genutzt: ${state.satellitesUsedInFix}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        SgStatusBadge(
+                            status = if (state.gnssTracking && state.satellitesInView > 0) {
+                                SgStatus.HEALTHY
+                            } else if (state.gnssTracking) {
+                                SgStatus.WARNING
+                            } else {
+                                SgStatus.UNKNOWN
+                            }
+                        )
+                        Text(
+                            if (!state.gnssTracking) {
+                                "Kein GNSS-Status – Standortberechtigung (ACCESS_FINE_LOCATION) wird benötigt."
+                            } else {
+                                "GNSS-Empfang aktiv."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

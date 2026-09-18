@@ -17,7 +17,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -53,7 +52,6 @@ class DashboardViewModel @Inject constructor(
     private val agentSettingsStore: AgentSettingsStore,
     private val apiNodeManager: ApiNodeManager,
     private val mqttService: MqttService,
-    private val databaseCleanup: com.secureguard.enterprise.services.DatabaseCleanup,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -67,7 +65,6 @@ class DashboardViewModel @Inject constructor(
     private val channelActivity = MutableStateFlow<List<ChannelActivity>>(emptyList())
 
     init {
-        startAgent()
         viewModelScope.launch {
             // Detection-Trend.
             repository.getAllDetections().collect { detections ->
@@ -82,7 +79,6 @@ class DashboardViewModel @Inject constructor(
             repository.getWhitelistedAssets().collect { assets ->
                 val online = assets.count { it.status == AssetStatus.ONLINE }
                 onlineHistory.value = (onlineHistory.value + online.toFloat()).takeLast(24)
-                openAlarms.value = 0
             }
         }
         viewModelScope.launch {
@@ -105,28 +101,40 @@ class DashboardViewModel @Inject constructor(
             .sortedByDescending { it.count }
     }
 
+    private data class FleetSnapshot5(
+        val assets: List<com.secureguard.enterprise.data.model.Asset>,
+        val alerts: Int,
+        val agent: com.secureguard.enterprise.services.AgentStatus,
+        val nodes: Map<*, *>,
+        val sync: String
+    )
+
     val uiState: StateFlow<DashboardUiState> = combine(
-        repository.getWhitelistedAssets(),
-        openAlarms,
-        agentService.agentStatus,
-        apiNodeManager.nodeStatus,
-        lastSync,
+        combine(
+            repository.getWhitelistedAssets(),
+            openAlarms,
+            agentService.agentStatus,
+            apiNodeManager.nodeStatus,
+            lastSync
+        ) { assets, alerts, agent, nodes, sync ->
+            FleetSnapshot5(assets, alerts, agent, nodes, sync)
+        },
         detectionHistory,
         onlineHistory,
         channelActivity
-    ) { assets, alerts, agent, nodes, sync, detTrend, onTrend, channels ->
+    ) { base, detTrend, onTrend, channels ->
         DashboardUiState(
-            totalAssets = assets.size,
-            onlineAssets = assets.count { it.status == AssetStatus.ONLINE },
-            offlineAssets = assets.count { it.status == AssetStatus.OFFLINE },
-            maintenanceAssets = assets.count { it.status == AssetStatus.MAINTENANCE },
-            searchingAssets = assets.count { it.status == AssetStatus.SEARCHING },
-            alertCount = alerts,
+            totalAssets = base.assets.size,
+            onlineAssets = base.assets.count { it.status == AssetStatus.ONLINE },
+            offlineAssets = base.assets.count { it.status == AssetStatus.OFFLINE },
+            maintenanceAssets = base.assets.count { it.status == AssetStatus.MAINTENANCE },
+            searchingAssets = base.assets.count { it.status == AssetStatus.SEARCHING },
+            alertCount = base.alerts,
             detectionCount = detTrend.lastOrNull()?.toInt() ?: 0,
-            nodeCount = nodes.size,
-            agentRunning = agent.running,
+            nodeCount = base.nodes.size,
+            agentRunning = base.agent.running,
             mqttConnected = mqttService.isConnected,
-            lastSyncTime = sync,
+            lastSyncTime = base.sync,
             detectionTrend = detTrend,
             onlineTrend = onTrend,
             channelActivity = channels

@@ -28,7 +28,6 @@ import androidx.navigation.NavController
 import com.secureguard.enterprise.BuildConfig
 import com.secureguard.enterprise.presentation.designsystem.SgCard
 import com.secureguard.enterprise.presentation.designsystem.SgIconButton
-import com.secureguard.enterprise.presentation.designsystem.SgSectionHeader
 import com.secureguard.enterprise.presentation.navigation.Routes
 
 /**
@@ -111,16 +110,18 @@ private fun HelpSection(
 ) {
     SgCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                androidx.compose.foundation.layout.Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    SgSectionHeader(title = title)
-                }
-                content()
+            androidx.compose.foundation.layout.Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
             }
+            content()
         }
     }
 }

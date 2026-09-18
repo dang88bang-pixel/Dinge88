@@ -98,7 +98,7 @@ fun AboutScreen(navController: NavController) {
                     OpenSourceLib("Eclipse Paho (mqttv3)", "1.2.5", "EPL-2.0",
                         "© Eclipse Foundation")
                     Text(
-                        "Vollständige Lizenztexte: ${"java.io.File("console3d/THIRD_PARTY_NOTICES.md")} im Repository",
+                        "Vollständige Lizenztexte: console3d/THIRD_PARTY_NOTICES.md im Repository",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

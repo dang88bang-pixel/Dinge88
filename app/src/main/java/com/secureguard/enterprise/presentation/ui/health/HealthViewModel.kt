@@ -1,15 +1,14 @@
 package com.secureguard.enterprise.presentation.ui.health
 
+import android.bluetooth.BluetoothManager
 import android.content.Context
-import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.net.wifi.WifiManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.secureguard.enterprise.services.BleService
 import com.secureguard.enterprise.services.HealthMonitorService
 import com.secureguard.enterprise.services.NfcService
-import com.secureguard.enterprise.services.SatelliteService
 import com.secureguard.enterprise.services.UsbSerialService
-import com.secureguard.enterprise.services.WifiService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,11 +24,6 @@ data class HealthItem(
     val label: String,
     val level: HealthLevel,
     val detail: String
-)
-
-/** Basis-Komponenten §16 (App, DB, Agent, Netzwerk, BLE, WiFi, GPS, USB, NFC, Backend). */
-val BASE_HEALTH_COMPONENTS = listOf(
-    "App", "Datenbank", "Agent", "Netzwerk", "BLE", "WiFi", "GPS", "USB", "NFC", "Backend"
 )
 
 data class HealthUiState(
@@ -49,9 +43,6 @@ data class HealthUiState(
 @HiltViewModel
 class HealthViewModel @Inject constructor(
     private val healthMonitorService: HealthMonitorService,
-    private val bleService: BleService,
-    private val wifiService: WifiService,
-    private val satelliteService: SatelliteService,
     private val usbSerialService: UsbSerialService,
     private val nfcService: NfcService,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
@@ -77,70 +68,115 @@ class HealthViewModel @Inject constructor(
         }
     }
 
-    /** Baut die 10 Komponenten mit Text/Icon-Status (nie nur Farbe). */
+    /** Baut die Komponenten aus echten Quellen (nie nur Farbe, immer Text/Icon). */
     private fun buildUiState(system: HealthMonitorService.SystemHealth?): HealthUiState {
+        val component = { id: String ->
+            system?.components?.firstOrNull { it.id == id }
+        }
+        val db = component("db")
+        val agent = component("agent")
+        val mqtt = component("mqtt")
+        val backend = component("backend")
+
         val items = mutableListOf<HealthItem>()
 
-        // App
-        items += HealthItem("App", Healthy, "läuft")
+        // App (läuft, wenn dieser ViewModel existiert).
+        items += HealthItem("App", HealthLevel.HEALTHY, "läuft")
 
-        // Datenbank
+        // Datenbank (Room/SQLCipher).
         items += HealthItem(
             "Datenbank",
-            if (system == null) levelOf(null) else levelOf(system.assetCount >= 0),
-            system?.let { "${it.assetCount} Assets · ${it.detectionCount} Detektionen" } ?: "keine Daten"
+            when {
+                db == null -> HealthLevel.UNKNOWN
+                db.ok -> HealthLevel.HEALTHY
+                else -> HealthLevel.ERROR
+            },
+            db?.detail ?: "nicht geprüft"
         )
 
-        // Agent
+        // Agent.
         val agentRunning = system?.agentRunning == true
         items += HealthItem(
             "Agent",
-            if (agentRunning) Healthy else Warning,
+            if (agentRunning) HealthLevel.HEALTHY else HealthLevel.WARNING,
             if (agentRunning) "läuft · Zyklus ${system?.agentCycle ?: 0}" else "gestoppt"
         )
 
-        // Netzwerk
-        val backendComponent = system?.components?.firstOrNull { it.id == "backend" }
+        // Netzwerk (MQTT-Verbindung + konfigurierte URL).
         items += HealthItem(
             "Netzwerk",
             when {
-                backendComponent?.ok == true -> Healthy
-                system?.components?.any { it.id == "mqtt" && it.ok } == true -> Warning
-                system == null -> Unknown
-                else -> Error
+                mqtt?.detail?.startsWith("verbunden") == true -> HealthLevel.HEALTHY
+                mqtt?.ok == true -> HealthLevel.WARNING
+                mqtt == null -> HealthLevel.UNKNOWN
+                else -> HealthLevel.ERROR
             },
-            backendComponent?.detail?.take(80) ?: "offline"
+            mqtt?.detail ?: "nicht geprüft"
         )
 
-        // BLE
-        items += HealthItem("BLE", if (bleService.hasHardware()) Healthy else Warning, if (bleService.hasHardware()) "Hardware vorhanden" else "Hardware nicht erkannt")
+        // BLE (via BluetoothManager – echte Adapter-Hardware).
+        val bleAdapter = runCatching {
+            (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+        }.getOrNull()
+        items += HealthItem(
+            "BLE",
+            if (bleAdapter != null) HealthLevel.HEALTHY else HealthLevel.WARNING,
+            if (bleAdapter != null) "BLE-Adapter vorhanden" else "kein BLE-Adapter"
+        )
 
-        // WiFi
-        items += HealthItem("WiFi", if (wifiService.hasHardware()) Healthy else Warning, if (wifiService.hasHardware()) "Hardware vorhanden" else "Hardware nicht erkannt")
+        // WiFi (via WifiManager – echte Hardware).
+        val wifiManager = runCatching {
+            context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        }.getOrNull()
+        items += HealthItem(
+            "WiFi",
+            if (wifiManager != null) HealthLevel.HEALTHY else HealthLevel.WARNING,
+            if (wifiManager != null) "WiFi-Hardware vorhanden" else "kein WiFi"
+        )
 
-        // GPS
-        items += HealthItem("GPS", if (satelliteService.hasHardware()) Healthy else Warning, if (satelliteService.hasHardware()) "Hardware vorhanden" else "Hardware nicht erkannt")
+        // GPS (via LocationManager – echter Provider).
+        val gpsAvailable = runCatching {
+            val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            lm?.getProvider(LocationManager.GPS_PROVIDER) != null
+        }.getOrDefault(false)
+        items += HealthItem(
+            "GPS",
+            if (gpsAvailable) HealthLevel.HEALTHY else HealthLevel.WARNING,
+            if (gpsAvailable) "GPS-Provider vorhanden" else "kein GPS-Provider"
+        )
 
-        // USB
+        // USB-Seriell (treibergestützt, echte Treiberliste).
         val usbDrivers = runCatching { usbSerialService.availableDrivers().size }.getOrDefault(0)
-        items += HealthItem("USB", if (usbDrivers > 0) Healthy else Unknown, "$usbDrivers Adapter erkannt")
+        items += HealthItem(
+            "USB",
+            when {
+                usbDrivers > 0 -> HealthLevel.HEALTHY
+                else -> HealthLevel.UNKNOWN
+            },
+            "$usbDrivers Adapter erkannt"
+        )
 
-        // NFC
-        items += HealthItem("NFC", if (nfcService.isAvailable()) Healthy else Unknown, if (nfcService.isAvailable()) "Adapter vorhanden" else "kein NFC-Adapter")
+        // NFC.
+        items += HealthItem(
+            "NFC",
+            if (nfcService.isAvailable()) HealthLevel.HEALTHY else HealthLevel.UNKNOWN,
+            if (nfcService.isAvailable()) "Adapter vorhanden" else "kein NFC-Adapter"
+        )
 
-        // Backend
+        // Backend (HTTP-Health).
         items += HealthItem(
             "Backend",
             when {
-                backendComponent == null -> Unknown
-                backendComponent.ok -> Healthy
-                else -> Error
+                backend == null -> HealthLevel.UNKNOWN
+                backend.ok -> HealthLevel.HEALTHY
+                else -> HealthLevel.ERROR
             },
-            backendComponent?.detail?.take(80) ?: "nicht geprüft"
+            backend?.detail?.take(90) ?: "nicht geprüft"
         )
 
         val ts = system?.checkedAt?.let {
-            java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(it))
+            java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+                .format(java.util.Date(it))
         } ?: "–"
 
         return HealthUiState(
@@ -152,18 +188,5 @@ class HealthViewModel @Inject constructor(
             openAlerts = system?.openAlerts ?: 0,
             agentRunning = agentRunning
         )
-    }
-
-    private fun levelOf(ok: Boolean?): HealthLevel = when (ok) {
-        true -> HealthLevel.HEALTHY
-        false -> HealthLevel.ERROR
-        null -> HealthLevel.UNKNOWN
-    }
-
-    companion object {
-        val Healthy = HealthLevel.HEALTHY
-        val Warning = HealthLevel.WARNING
-        val Error = HealthLevel.ERROR
-        val Unknown = HealthLevel.UNKNOWN
     }
 }

@@ -16,7 +16,6 @@ import com.secureguard.enterprise.services.AgentService
 import com.secureguard.enterprise.services.AgentStatus
 import com.secureguard.enterprise.services.AuditLogService
 import com.secureguard.enterprise.services.MqttService
-import com.secureguard.enterprise.services.OfflineQueue
 import com.secureguard.enterprise.services.SatelliteService
 import com.secureguard.enterprise.services.WebSocketService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -54,14 +53,13 @@ data class OpsSnapshot(
  *
  * Einzige Business-Logik: bestehende Services/Repositories als Snapshot für
  * die WebView-Präsentation bereitstellen und Aktionen über die vorhandenen
- * Kanäle ([AgentService.sendAction], [OfflineQueue]) dispatch-en. Keine
- * parallele/konkurrierende Fachlogik (§44).
+ * Kanäle ([AgentService.sendAction], Offline-Queue via [AgentService.flushOfflineQueue])
+ * dispatch-en. Keine parallele/konkurrierende Fachlogik (§44).
  */
 @HiltViewModel
 class OpsCenterViewModel @Inject constructor(
     private val repository: SecureGuardRepository,
     private val agentService: AgentService,
-    private val offlineQueue: OfflineQueue,
     private val mqttService: MqttService,
     private val webSocketService: WebSocketService,
     private val apiNodeManager: ApiNodeManager,
@@ -113,14 +111,27 @@ class OpsCenterViewModel @Inject constructor(
     private val _webEvents = MutableStateFlow<String?>(null)
     val webEvents: StateFlow<String?> = _webEvents.asStateFlow()
 
+    private data class FiveTuple(
+        val assets: List<Asset>,
+        val alarms: List<Alert>,
+        val detections: List<Detection>,
+        val queue: List<PendingAction>,
+        val agent: AgentStatus
+    )
+
     init {
         viewModelScope.launch {
             // Auf echte Daten lauschen und den Snapshot fortlaufend aktualisieren.
+            // combine() kann max. 5 Flows → in zwei Stufen zusammenführen.
             kotlinx.coroutines.flow.combine(
-                assetsFlow, alarmsFlow, detectionsFlow, queueFlow,
-                agentService.agentStatus, apiNodeManager.nodeStatus
-            ) { a, al, d, q, agent, nodes ->
-                buildSnapshot(a, al, d, q, agent, nodes.size)
+                kotlinx.coroutines.flow.combine(
+                    assetsFlow, alarmsFlow, detectionsFlow, queueFlow, agentService.agentStatus
+                ) { a, al, d, q, agent ->
+                    FiveTuple(a, al, d, q, agent)
+                },
+                apiNodeManager.nodeStatus
+            ) { base, nodes ->
+                buildSnapshot(base.assets, base.alarms, base.detections, base.queue, base.agent, nodes.size)
             }.collect { snap ->
                 snapshot = snap
             }

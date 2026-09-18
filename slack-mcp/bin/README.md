@@ -1,7 +1,10 @@
-# `slack-mcp/bin/` – optionale Offline-Binaries
+# `slack-mcp/bin/` – optionale Offline-Binaries (nur für `run-local.sh`)
 
-Hier abgelegte Binaries werden vom `slack-mcp/Dockerfile` **bevorzugt** verwendet
-(kein Download während `docker build`, air-gapped-tauglich).
+Hier abgelegte Binaries werden von **`slack-mcp/run-local.sh`** (lokaler
+Betrieb ohne Docker) **bevorzugt** verwendet. Das `Dockerfile` baut den Server
+hingegen aus dem gepinnten Release-Tag mit `CGO_ENABLED=0` — die offiziellen
+Release-Binaries sind glibc-gelinkt und liefen auf dem Alpine-Runtime-Image
+nicht (`slack-mcp-server: not found`, exit 127).
 
 ## Befüllen (Rechner mit Internetzugang)
 
