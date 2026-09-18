@@ -86,7 +86,7 @@ jobs:
       - name: Decode release keystore
         if: matrix.task == 'assembleRelease'
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
             echo "::error::KEYSTORE_BASE64 fehlt. Ein Release darf nicht unsigniert ausgeliefert werden."
@@ -99,11 +99,19 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      - name: Unit tests
+        if: matrix.task == 'assembleDebug'
+        run: ./gradlew test --no-daemon --stacktrace
+
+      - name: Lint
+        if: matrix.task == 'assembleDebug'
+        run: ./gradlew lint --no-daemon --stacktrace
+
       - name: Build ${{ matrix.task }}
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew ${{ matrix.task }} --no-daemon --stacktrace
 
       - name: Verify release APK is signed
@@ -142,6 +150,29 @@ jobs:
           path: apk-out/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: ${{ matrix.retention }}
+
+  android-11-smoke:
+    name: Android 11 / API 30 smoke tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+      - name: Android 11 instrumentation tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          script: ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
 
   release:
     runs-on: ubuntu-latest
