@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.ui.graphics.Color
+import com.secureguard.enterprise.presentation.theme.AccentCyan
+import com.secureguard.enterprise.presentation.theme.SurfaceCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,7 +57,10 @@ fun SecureGuardApp() {
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = SurfaceCard,
+                    contentColor = Color.White
+                ) {
                     NavItem.bottomNavItems.forEach { item ->
                         val label = stringResource(item.labelRes)
                         NavigationBarItem(
@@ -68,7 +75,14 @@ fun SecureGuardApp() {
                                 }
                             },
                             icon = { Icon(item.icon, contentDescription = label) },
-                            label = { Text(label) }
+                            label = { Text(label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = AccentCyan,
+                                selectedTextColor = AccentCyan,
+                                indicatorColor = Color(0xFF163D5A),
+                                unselectedIconColor = Color(0xFF8899AA),
+                                unselectedTextColor = Color(0xFF8899AA)
+                            )
                         )
                     }
                 }
