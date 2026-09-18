@@ -2,29 +2,23 @@ package com.secureguard.enterprise.presentation.navigation
 
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.secureguard.enterprise.R
 
-/** Top-level destinations shown in the bottom navigation bar (i18n via @StringRes). */
 sealed class NavItem(val route: String, @StringRes val labelRes: Int, val icon: ImageVector) {
     data object Dashboard : NavItem("dashboard", R.string.nav_dashboard, Icons.Default.Dashboard)
     data object Assets : NavItem("assets", R.string.nav_assets, Icons.Default.LocalShipping)
     data object Map : NavItem("map", R.string.nav_map, Icons.Default.Map)
     data object Actions : NavItem("actions", R.string.nav_actions, Icons.Default.Bolt)
     data object Settings : NavItem("settings", R.string.nav_settings, Icons.Default.Settings)
-
-    companion object {
-        val bottomNavItems = listOf(Dashboard, Assets, Map, Actions, Settings)
-    }
+    companion object { val bottomNavItems = listOf(Dashboard, Assets, Map, Actions, Settings) }
 }
 
-/** All named routes used across the app (including detail / config screens). */
 object Routes {
     const val DASHBOARD = "dashboard"
     const val ASSETS = "assets"
@@ -45,5 +39,9 @@ object Routes {
     const val HEALTH = "health"
     const val SLACK = "slack"
     const val PORTS = "ports"
+    const val HELP = "help"
+    const val ABOUT = "about"
+    const val SPLASH = "splash"
+    const val SYSTEM_STATUS = "system_status"
     fun assetDetail(id: String) = "asset_detail/$id"
 }
