@@ -157,8 +157,9 @@ class SensorFusionViewModel @Inject constructor(
             }
         }
         gnssCallback = callback
-        val registered = runCatching { lm.registerGnssStatusCallback(callback) }.isSuccess
-        _gnssTracking.value = registered
+        // Tracking-Status wird ausschließlich vom echten Callback (onStarted/onStopped)
+        // gesetzt – niemals als „läuft" gemeldet, nur weil eine Registrierung geklappt hat.
+        runCatching { lm.registerGnssStatusCallback(callback) }
     }
 
     private fun hasFineLocationPermission(): Boolean =
