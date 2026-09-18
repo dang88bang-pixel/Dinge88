@@ -1,85 +1,95 @@
 package com.secureguard.enterprise.presentation.ui.sensorfusion
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.secureguard.enterprise.data.model.Asset
+import com.secureguard.enterprise.data.model.Detection
+import com.secureguard.enterprise.data.model.DetectionSource
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
+import com.secureguard.enterprise.services.NfcService
+import com.secureguard.enterprise.services.UsbSerialService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
-data class FusionState(
-    val isActive: Boolean = false,
-    val confidence: Int = 0,
-    val deviation: String = "0.0",
-    val channels: Int = 0,
-    val latitude: String = "–",
-    val longitude: String = "–",
-    val satellites: Int = 0,
-    val gpsSignal: String = "–",
-    val gpsStatus: String = "Standby",
-    val magX: String = "0.0",
-    val magY: String = "0.0",
-    val magZ: String = "0.0",
-    val heading: Int = 0,
-    val headingDir: String = "N",
-    val networkNodes: Int = 0,
-    val rssiNodes: List<Pair<String, String>> = emptyList()
+/** Eine Sensorquelle mit Quelle + letzter Aktualisierungszeit (§12). */
+data class SensorChannel(
+    val source: DetectionSource,
+    val label: String,
+    val detected: Boolean,
+    val lastCount: Int,
+    val lastUpdate: String
+)
+
+data class FusionUIBundle(
+    val sources: List<SensorChannel> = emptyList(),
+    val lastDetection: Detection? = null,
+    val nfcAvailable: Boolean = false,
+    val usbDevices: Int = 0,
+    val error: String? = null
 )
 
 @HiltViewModel
 class SensorFusionViewModel @Inject constructor(
-    private val repository: SecureGuardRepository
+    private val repository: SecureGuardRepository,
+    private val nfcService: NfcService,
+    private val usbSerialService: UsbSerialService,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    val assets = repository.getWhitelistedAssets()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val lastCheck = MutableStateFlow("–")
 
-    private val _fusionState = MutableStateFlow(FusionState())
-    val fusionState: StateFlow<FusionState> = _fusionState
+    val uiState: StateFlow<FusionUIBundle> = combine(
+        repository.getAllDetections(),
+        lastCheck
+    ) { detections, _ -> build(detections) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FusionUIBundle())
 
-    init {
-        updateFusionFromAssets()
-    }
-
-    private fun updateFusionFromAssets() {
-        viewModelScope.launch {
-            repository.getWhitelistedAssets().collect { assetList ->
-                val locatedAssets = assetList.filter { it.latitude != null && it.longitude != null }
-                val avgLat = locatedAssets.mapNotNull { it.latitude }.average()
-                val avgLon = locatedAssets.mapNotNull { it.longitude }.average()
-
-                val rssiNodes = assetList.take(4).map { asset ->
-                    "Knoten ${asset.shortName}" to "${asset.rssi} dBm"
-                }
-
-                val activeChannels = assetList.flatMap { a ->
-                    listOf("BLE", "WiFi", "LoRa", "GPS", "MQTT")
-                }.distinct().size.coerceAtMost(9)
-
-                _fusionState.value = FusionState(
-                    isActive = assetList.any { it.rssi != 0 },
-                    confidence = if (locatedAssets.isNotEmpty()) (70 + locatedAssets.size * 5).coerceAtMost(99) else 0,
-                    deviation = if (locatedAssets.isNotEmpty()) "0.${(4 - locatedAssets.size.coerceAtMost(3))}" else "–",
-                    channels = activeChannels.coerceAtLeast(1),
-                    latitude = if (avgLat.isNaN()) "–" else "%.4f".format(avgLat),
-                    longitude = if (avgLon.isNaN()) "–" else "%.4f".format(avgLon),
-                    satellites = if (locatedAssets.isNotEmpty()) (8 + locatedAssets.size).coerceAtMost(14) else 0,
-                    gpsSignal = if (locatedAssets.isNotEmpty()) "Stark" else "–",
-                    gpsStatus = if (locatedAssets.isNotEmpty()) "Aktiv" else "Standby",
-                    magX = "%.1f".format(40.0 + assetList.size * 1.2),
-                    magY = "%.1f".format(20.0 + assetList.size * 0.8),
-                    magZ = "%.1f".format(-15.0 + assetList.size * 0.3),
-                    heading = (340 + assetList.size * 2) % 360,
-                    headingDir = "NW",
-                    networkNodes = assetList.size,
-                    rssiNodes = rssiNodes
+    private fun build(detections: List<Detection>): FusionUIBundle {
+        val fmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        val newest = detections.maxByOrNull { it.timestamp }
+        val sources = DetectionSource.entries
+            .filter { src ->
+                src in listOf(
+                    DetectionSource.BLE, DetectionSource.WIFI,
+                    DetectionSource.LORA, DetectionSource.NFC, DetectionSource.OPTICAL,
+                    DetectionSource.URBAN, DetectionSource.CROWD, DetectionSource.SATELLITE,
+                    DetectionSource.MQTT, DetectionSource.WEBSOCKET, DetectionSource.TELEMETRY
                 )
             }
+            .map { src ->
+                val bySource = detections.filter { it.sourceType == src }
+                val last = bySource.maxByOrNull { it.timestamp }
+                SensorChannel(
+                    source = src,
+                    label = src.name,
+                    detected = last != null,
+                    lastCount = bySource.size,
+                    lastUpdate = last?.timestamp?.let { fmt.format(it) } ?: "–"
+                )
+            }
+        return FusionUIBundle(
+            sources = sources,
+            lastDetection = newest,
+            nfcAvailable = nfcService.isAvailable(),
+            usbDevices = runCatching { usbSerialService.availableDrivers().size }.getOrDefault(0),
+            error = null
+        )
+    }
+
+    fun refresh() {
+        lastCheck.update {
+            SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         }
     }
 }

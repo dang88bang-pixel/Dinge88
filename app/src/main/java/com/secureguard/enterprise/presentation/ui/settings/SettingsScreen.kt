@@ -442,6 +442,34 @@ fun SettingsScreen(
                                 .clickable { navController.navigate(Routes.PORTS) }
                         )
                         HorizontalDivider()
+                        Text(
+                            "3D Operations Center (WebView)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .testTag("settings_ops3d_button")
+                                .clickable { navController.navigate(Routes.OPS_3D) }
+                        )
+                        HorizontalDivider()
+                        Text(
+                            "Hilfe & Support",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.HELP) }
+                        )
+                        HorizontalDivider()
+                        Text(
+                            "Über SecureGuard",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { navController.navigate(Routes.ABOUT) }
+                        )
+                        HorizontalDivider()
                         Spacer(Modifier.height(8.dp))
                         Text("🤖 Vordergrund-Dienst", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(4.dp))

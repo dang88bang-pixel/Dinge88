@@ -53,7 +53,7 @@ object AppModule {
             SecureGuardDatabase.DATABASE_NAME
         )
             .openHelperFactory(factory)
-            .addMigrations(SecureGuardDatabase.MIGRATION_1_2)
+            .addMigrations(SecureGuardDatabase.MIGRATION_1_2, SecureGuardDatabase.MIGRATION_2_3)
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
             .also {
@@ -81,6 +81,8 @@ object AppModule {
     fun provideRepository(
         assetDao: AssetDao,
         detectionDao: DetectionDao,
-        alertDao: AlertDao
-    ): SecureGuardRepository = SecureGuardRepositoryImpl(assetDao, detectionDao, alertDao)
+        alertDao: AlertDao,
+        pendingActionDao: PendingActionDao
+    ): SecureGuardRepository =
+        SecureGuardRepositoryImpl(assetDao, detectionDao, alertDao, pendingActionDao)
 }

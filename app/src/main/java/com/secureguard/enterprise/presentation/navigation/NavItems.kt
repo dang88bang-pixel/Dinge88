@@ -2,12 +2,11 @@ package com.secureguard.enterprise.presentation.navigation
 
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.secureguard.enterprise.R
 
@@ -45,5 +44,11 @@ object Routes {
     const val HEALTH = "health"
     const val SLACK = "slack"
     const val PORTS = "ports"
+    const val HELP = "help"
+    const val ABOUT = "about"
+    const val SPLASH = "splash"
+    const val SYSTEM_STATUS = "system_status"
+    const val OPS_3D = "ops_3d"
+
     fun assetDetail(id: String) = "asset_detail/$id"
 }

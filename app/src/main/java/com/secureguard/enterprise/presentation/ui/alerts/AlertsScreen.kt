@@ -9,15 +9,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -28,15 +32,21 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.data.model.Alert
 import com.secureguard.enterprise.data.model.AlertSeverity
+import com.secureguard.enterprise.presentation.designsystem.SgCard
+import com.secureguard.enterprise.presentation.designsystem.SgEmptyState
+import com.secureguard.enterprise.presentation.designsystem.SgIconButton
+import com.secureguard.enterprise.presentation.designsystem.SgSecondaryButton
+import com.secureguard.enterprise.presentation.designsystem.SgStatusBadge
+import com.secureguard.enterprise.presentation.designsystem.SgStatus
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
-import androidx.compose.material3.ExperimentalMaterial3Api
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,81 +54,184 @@ fun AlertsScreen(
     navController: NavController,
     viewModel: AlertsViewModel = hiltViewModel()
 ) {
-    val alerts by viewModel.alerts.collectAsState()
+    val alerts by viewModel.visibleAlerts.collectAsState()
+    val filter by viewModel.uiState.collectAsState()
+    val loading by viewModel.loading.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("🔔 Alarme") },
+                title = { Text("🚨 Alarme") },
                 navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
-                    }
+                    SgIconButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Zurück",
+                        onClick = { navController.navigateUp() }
+                    )
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.acknowledgeAll() }) {
-                        Icon(Icons.Default.DoneAll, contentDescription = "Alle bestätigen")
-                    }
+                    SgIconButton(
+                        icon = Icons.Default.DoneAll,
+                        contentDescription = "Alle quittieren",
+                        onClick = { viewModel.acknowledgeAll() }
+                    )
+                    SgIconButton(
+                        icon = Icons.Default.DeleteSweep,
+                        contentDescription = "Abgeschlossene entfernen",
+                        onClick = { viewModel.deleteResolved() }
+                    )
                 }
             )
         }
     ) { padding ->
-        if (alerts.isEmpty()) {
-            Box(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // Filter-Chips (Kategorien, mit Text).
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Keine Alarme vorhanden",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                AlertFilter.entries.forEach { f ->
+                    val selected = filter.filter == f
+                    SgSecondaryButton(
+                        text = f.label,
+                        onClick = { viewModel.setFilter(f) },
+                        modifier = Modifier.weight(1f),
+                        enabled = !selected
+                    )
+                }
             }
-        } else {
+
+            if (loading) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 32.dp)
+                )
+                return@Column
+            }
+
+            if (alerts.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    SgEmptyState(
+                        icon = Icons.Default.NotificationsOff,
+                        title = "Keine Alarme",
+                        message = "Für den gewählten Filter (${filter.filter.label}) liegen keine Alarme vor.",
+                        actionLabel = "Aktualisieren",
+                        onAction = { viewModel.retry() }
+                    )
+                }
+                return@Column
+            }
+
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(alerts, key = { it.id }) { alert ->
-                    val color = when (alert.severity) {
-                        AlertSeverity.CRITICAL -> Color(0xFFC62828)
-                        AlertSeverity.WARNING -> Color(0xFFF9A825)
-                        AlertSeverity.INFO -> Color(0xFF1565C0)
-                    }
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = color.copy(alpha = 0.08f)
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(alert.type.name,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = color, fontWeight = FontWeight.Bold)
-                                Text(
-                                    SimpleDateFormat("dd.MM. HH:mm", Locale.getDefault())
-                                        .format(alert.timestamp),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Text(alert.message, style = MaterialTheme.typography.bodyMedium)
-                            if (!alert.acknowledged) {
-                                TextButton(onClick = { viewModel.acknowledge(alert.id) }) {
-                                    Text("Bestätigen")
-                                }
-                            }
-                        }
-                    }
+                    AlertRow(
+                        alert = alert,
+                        onAcknowledge = { viewModel.acknowledge(alert.id) },
+                        onResolve = { viewModel.resolve(alert.id) }
+                    )
+                }
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    SgSecondaryButton(
+                        text = "Aktualisieren",
+                        icon = Icons.Default.Refresh,
+                        onClick = { viewModel.retry() },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
     }
+}
+
+/** Ende-zu-Ende-Zeile mit Inline-Quittierung (§9). */
+@Composable
+private fun AlertRow(
+    alert: Alert,
+    onAcknowledge: () -> Unit,
+    onResolve: () -> Unit
+) {
+    val severity = when (alert.severity) {
+        AlertSeverity.CRITICAL -> SgStatus.ALARM
+        AlertSeverity.WARNING -> SgStatus.WARNING
+        AlertSeverity.INFO -> SgStatus.INFO
+    }
+    val stateText = when {
+        alert.resolved -> "abgeschlossen"
+        alert.acknowledged -> "quittiert"
+        else -> "aktiv"
+    }
+
+    SgCard(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (alert.resolved) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        contentDescription = "Priorität ${alert.severity}",
+                        tint = severity.color,
+                        modifier = Modifier.width(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "${alert.type}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                SgStatusBadge(status = severity)
+            }
+            Text(
+                alert.message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Asset: ${alert.assetId} · ${formatTime(alert.timestamp)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Status: $stateText",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = severity.color
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                if (!alert.acknowledged && !alert.resolved) {
+                    TextButton(onClick = onAcknowledge) { Text("Quittieren", color = severity.color) }
+                }
+                if (!alert.resolved) {
+                    TextButton(onClick = onResolve) { Text("Abschließen", color = severity.color) }
+                }
+            }
+        }
+    }
+}
+
+private fun formatTime(date: Date?): String {
+    if (date == null) return "–"
+    return SimpleDateFormat("dd.MM. HH:mm:ss", Locale.getDefault()).format(date)
 }

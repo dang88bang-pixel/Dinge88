@@ -24,7 +24,7 @@ import com.secureguard.enterprise.data.model.PendingAction
         AuditLog::class,
         PendingAction::class
     ],
-    version = 2,
+    version = 3,
     // Schemas werden nach app/schemas exportiert (room.schemaLocation in build.gradle.kts)
     // → Voraussetzung für automatische Migration-Tests (room-testing).
     exportSchema = true
@@ -44,6 +44,16 @@ abstract class SecureGuardDatabase : RoomDatabase() {
          * v1 → v2: Audit-Log- und Offline-Queue-Tabellen ergänzen.
          * Bestehende Daten (assets/detections/alerts) bleiben unverändert.
          */
+        /**
+         * v2 → v3: `alerts.resolved` ergänzt (Quittierung ≠ Abschluss).
+         * Bestehende Alarme gelten als nicht resolved (0).
+         */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `alerts` ADD COLUMN `resolved` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

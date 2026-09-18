@@ -25,11 +25,20 @@ interface AlertDao {
     @Query("UPDATE alerts SET acknowledged = 1 WHERE id = :id")
     suspend fun acknowledge(id: Long)
 
+    @Query("UPDATE alerts SET resolved = 1, acknowledged = 1 WHERE id = :id")
+    suspend fun resolve(id: Long)
+
     @Query("UPDATE alerts SET acknowledged = 1")
     suspend fun acknowledgeAll()
 
     @Query("DELETE FROM alerts")
     suspend fun clear()
+
+    @Query("DELETE FROM alerts WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM alerts WHERE resolved = 1")
+    suspend fun deleteResolved()
 
     @Query("DELETE FROM alerts WHERE timestamp < :cutoff")
     suspend fun deleteOlderThan(cutoff: Long): Int

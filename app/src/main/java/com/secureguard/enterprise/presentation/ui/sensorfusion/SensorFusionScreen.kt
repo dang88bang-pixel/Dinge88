@@ -1,6 +1,5 @@
 package com.secureguard.enterprise.presentation.ui.sensorfusion
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,195 +7,157 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.GpsFixed
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.SatelliteAlt
-import androidx.compose.material.icons.filled.WifiTethering
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.secureguard.enterprise.presentation.designsystem.SgCard
+import com.secureguard.enterprise.presentation.designsystem.SgEmptyState
+import com.secureguard.enterprise.presentation.designsystem.SgIconButton
+import com.secureguard.enterprise.presentation.designsystem.SgSectionHeader
+import com.secureguard.enterprise.presentation.designsystem.SgStatus
+import com.secureguard.enterprise.presentation.designsystem.SgStatusBadge
+import kotlinx.coroutines.delay
 
+/**
+ * Sensor Fusion (§12): zeigt ausschließlich vorhandene Sensorquellen aus den
+ * echten Detektionsdaten (Repository). Quelle + letzte Aktualisierungszeit je
+ * Kanal. Keine erfundenen Rohwerte.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SensorFusionScreen(
     navController: NavController,
     viewModel: SensorFusionViewModel = hiltViewModel()
 ) {
-    val fusionState by viewModel.fusionState.collectAsState()
-    val assets by viewModel.assets.collectAsState()
+    val state by viewModel.uiState.collectAsState()
+    val lastCheck by viewModel.lastCheck.collectAsState()
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            viewModel.refresh()
+            delay(10_000)
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sensordaten-Fusion & Präzisions-Ortung") },
+                title = { Text("Sensor Fusion") },
                 navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
-                    }
+                    SgIconButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Zurück",
+                        onClick = { navController.navigateUp() }
+                    )
+                },
+                actions = {
+                    SgIconButton(
+                        icon = Icons.Default.Refresh,
+                        contentDescription = "Aktualisieren",
+                        onClick = { viewModel.refresh() }
+                    )
                 }
             )
         }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Fusion Status Header
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(12.dp)
-                                .clip(CircleShape)
-                                .background(if (fusionState.isActive) Color(0xFF00E676) else Color(0xFFFF1744))
-                        )
-                        Spacer(Modifier.size(8.dp))
+            item {
+                SgCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SgSectionHeader(title = "Quellen")
                         Text(
-                            if (fusionState.isActive) "Live-Tracking" else "Inaktiv",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (fusionState.isActive) Color(0xFF00E676) else Color(0xFFFF1744)
+                            "Stand: $lastCheck · NFC: ${if (state.nfcAvailable) "verfügbar" else "nicht verfügbar"} · USB-Seriell-Adapter: ${state.usbDevices}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            "OBJ-${assets.size}",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Text("Fusions-Status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        MetricValue("${fusionState.confidence}%", "Konfidenz")
-                        MetricValue("± ${fusionState.deviation}m", "Abweichung")
-                        MetricValue("${fusionState.channels}/9", "Kanäle")
                     }
                 }
             }
 
-            // GPS
-            SensorCard(Icons.Default.GpsFixed, "GPS", fusionState.gpsStatus, listOf(
-                "Lat / Long" to "${fusionState.latitude}° N, ${fusionState.longitude}° E",
-                "Satelliten" to "${fusionState.satellites} / 14",
-                "Signalstärke" to fusionState.gpsSignal
-            ))
-
-            // Magnetometer
-            SensorCard(Icons.Default.Explore, "Magnetometer", if (fusionState.isActive) "Kalibriert" else "Standby", listOf(
-                "X-Achse" to "${fusionState.magX} μT",
-                "Y-Achse" to "${fusionState.magY} μT",
-                "Z-Achse" to "${fusionState.magZ} μT"
-            ))
-
-            // Kompass
-            SensorCard(Icons.Default.Navigation, "Kompass", "${fusionState.heading}° ${fusionState.headingDir}", emptyList())
-
-            // Netzwerk RSSI
-            SensorCard(Icons.Default.WifiTethering, "Netzwerk (RSSI)", "${fusionState.networkNodes} Knoten", fusionState.rssiNodes)
-
-            // Assets mit Position
-            if (assets.isNotEmpty()) {
-                Text("Getrackte Assets", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                assets.take(5).forEach { asset ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
+            if (state.sources.isEmpty()) {
+                item {
+                    SgEmptyState(
+                        icon = Icons.Default.Sensors,
+                        title = "Keine Sensordaten",
+                        message = "Noch keine Detektionen über einen Sensor geliefert – Daten erscheinen hier automatisch."
+                    )
+                }
+            } else {
+                items(state.sources) { channel ->
+                    SgCard(modifier = Modifier.fillMaxWidth()) {
                         Row(
-                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Column {
-                                Text(asset.shortName, fontWeight = FontWeight.SemiBold)
+                            Column(Modifier.weight(1f)) {
+                                Text(channel.label, style = MaterialTheme.typography.titleSmall)
                                 Text(
-                                    "${asset.latitude ?: 0.0}, ${asset.longitude ?: 0.0}",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp,
+                                    "Letzte Aktualisierung: ${channel.lastUpdate}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "Detektionen: ${channel.lastCount}",
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Text(
-                                "📶 ${asset.rssi} dBm",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp
+                            SgStatusBadge(
+                                status = if (channel.detected) SgStatus.HEALTHY else SgStatus.WARNING
                             )
                         }
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun SensorCard(icon: ImageVector, title: String, status: String, data: List<Pair<String, String>>) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.size(8.dp))
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                Text(status, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
-            }
-            if (data.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                data.forEach { (label, value) ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(value, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+            state.lastDetection?.let { last ->
+                item {
+                    SgCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            SgSectionHeader(title = "Letzte Detektion")
+                            Text("Quelle: ${last.sourceType} · ${last.assetMac}",
+                                style = MaterialTheme.typography.bodyMedium)
+                            Text("RSSI: ${last.rssi} dBm",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun MetricValue(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            state.error?.let { err ->
+                item {
+                    Text(err, color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
     }
 }

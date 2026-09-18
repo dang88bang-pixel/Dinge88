@@ -146,6 +146,14 @@ android {
     }
 }
 
+// Room-Schema-Exportort (exportSchema = true) – Zielverzeichnis für
+// Migrations-Tests.
+kapt {
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+}
+
 dependencies {
     // Core
     implementation(libs.androidx.core.ktx)
@@ -155,6 +163,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.appcompat)
+
+    // WebView (3D Ops Center) – AndroidX WebKit abstraction for secure local asset delivery.
+    implementation(libs.androidx.webkit)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
@@ -244,6 +255,11 @@ dependencies {
 
     // Unit tests
     testImplementation(libs.junit)
+    testImplementation(libs.truth)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 
     // Instrumented tests
     androidTestImplementation(libs.androidx.test.ext.junit)

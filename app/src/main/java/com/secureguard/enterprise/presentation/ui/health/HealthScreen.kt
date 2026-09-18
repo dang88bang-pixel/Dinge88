@@ -11,8 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -47,6 +51,7 @@ fun HealthScreen(
     viewModel: HealthViewModel = hiltViewModel()
 ) {
     val health by viewModel.health.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     val loading by viewModel.loading.collectAsState()
 
     // Automatische Aktualisierung: läuft, solange der Screen sichtbar ist
@@ -64,7 +69,7 @@ fun HealthScreen(
                 title = { Text("System-Health") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
                     }
                 },
                 actions = {
@@ -150,32 +155,56 @@ fun HealthScreen(
                 }
             }
 
-            items(health?.components.orEmpty()) { c ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .padding(12.dp)
-                            .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                c.label,
-                                fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                c.detail,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(if (c.ok) "✅" else "❌")
-                    }
-                }
+            item {
+                Text(
+                    "✋ Aktuelle Atempause: ${uiState.heartbeatPaused}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
+            items(uiState.items) { item ->
+                HealthRow(item)
+            }
+            item {
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+/** Komponente mit Text + Icon + Zustandsbadge (§16). */
+@Composable
+private fun HealthRow(item: HealthItem) {
+    val status = when (item.level) {
+        HealthLevel.HEALTHY -> com.secureguard.enterprise.presentation.designsystem.SgStatus.HEALTHY
+        HealthLevel.WARNING -> com.secureguard.enterprise.presentation.designsystem.SgStatus.WARNING
+        HealthLevel.ERROR -> com.secureguard.enterprise.presentation.designsystem.SgStatus.ALARM
+        HealthLevel.UNKNOWN -> com.secureguard.enterprise.presentation.designsystem.SgStatus.UNKNOWN
+    }
+    val icon = when (item.level) {
+        HealthLevel.HEALTHY -> Icons.Default.CheckCircle
+        HealthLevel.WARNING -> Icons.Default.Warning
+        HealthLevel.ERROR -> Icons.Default.Error
+        HealthLevel.UNKNOWN -> Icons.Default.Help
+    }
+    com.secureguard.enterprise.presentation.designsystem.SgCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = null, tint = status.color)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    item.detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            com.secureguard.enterprise.presentation.designsystem.SgStatusBadge(status = status)
         }
     }
 }

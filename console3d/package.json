@@ -1,0 +1,19 @@
+{
+  "name": "secureguard-ops-center-3d",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SecureGuard 3D Operations Center – Three.js scene + HUD, served to the Android WebView from local assets.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "0.160.0"
+  },
+  "devDependencies": {
+    "vite": "5.4.11"
+  }
+}

@@ -6,6 +6,7 @@ import com.secureguard.enterprise.data.model.AlertType
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.AssetStatus
 import com.secureguard.enterprise.data.model.Detection
+import com.secureguard.enterprise.data.model.PendingAction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import java.util.Date
@@ -60,6 +61,9 @@ interface SecureGuardRepository {
     suspend fun insertAlert(alert: Alert): Long
     suspend fun acknowledgeAlert(id: Long)
     suspend fun acknowledgeAllAlerts()
+    suspend fun resolveAlert(id: Long)
+    suspend fun deleteAlert(id: Long)
+    suspend fun deleteResolvedAlerts()
 
     /** Convenience helper that builds and persists an alert. */
     suspend fun raiseAlert(
@@ -68,12 +72,18 @@ interface SecureGuardRepository {
         severity: AlertSeverity,
         message: String
     ): Long
+
+    // ---- Offline Queue (Actions Center / Ops Center) ----
+    fun getPendingActions(): Flow<List<PendingAction>>
+    suspend fun snapshotPendingActions(): List<PendingAction>
+    suspend fun removePendingAction(id: Long)
 }
 
 class SecureGuardRepositoryImpl(
     private val assetDao: com.secureguard.enterprise.data.local.dao.AssetDao,
     private val detectionDao: com.secureguard.enterprise.data.local.dao.DetectionDao,
-    private val alertDao: com.secureguard.enterprise.data.local.dao.AlertDao
+    private val alertDao: com.secureguard.enterprise.data.local.dao.AlertDao,
+    private val pendingActionDao: com.secureguard.enterprise.data.local.dao.PendingActionDao
 ) : SecureGuardRepository {
 
     override fun getWhitelistedAssets(): Flow<List<Asset>> = assetDao.observeWhitelisted()
@@ -156,6 +166,9 @@ class SecureGuardRepositoryImpl(
     override suspend fun insertAlert(alert: Alert): Long = alertDao.insert(alert)
     override suspend fun acknowledgeAlert(id: Long) = alertDao.acknowledge(id)
     override suspend fun acknowledgeAllAlerts() = alertDao.acknowledgeAll()
+    override suspend fun resolveAlert(id: Long) = alertDao.resolve(id)
+    override suspend fun deleteAlert(id: Long) = alertDao.deleteById(id)
+    override suspend fun deleteResolvedAlerts() = alertDao.deleteResolved()
 
     override suspend fun raiseAlert(
         assetId: String,
@@ -171,4 +184,9 @@ class SecureGuardRepositoryImpl(
             timestamp = Date()
         )
     )
+
+    // ---- Offline Queue ----
+    override fun getPendingActions(): Flow<List<PendingAction>> = pendingActionDao.observeAll()
+    override suspend fun snapshotPendingActions(): List<PendingAction> = pendingActionDao.getAll()
+    override suspend fun removePendingAction(id: Long) = pendingActionDao.deleteById(id)
 }

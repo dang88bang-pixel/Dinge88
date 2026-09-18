@@ -13,5 +13,6 @@ data class Alert(
     val severity: AlertSeverity,
     val message: String,
     val acknowledged: Boolean = false,
+    val resolved: Boolean = false,
     val timestamp: Date = Date()
 )
