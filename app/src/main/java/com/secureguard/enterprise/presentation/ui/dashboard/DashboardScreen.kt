@@ -32,7 +32,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Terminal
-import androidx.compose.material.icons.filled.ThreeDRotation
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.MaterialTheme
@@ -72,7 +72,7 @@ private val QUICK_TILES = listOf(
     Triple(Routes.ESP32_CONFIG, "ESP32", Icons.Default.BugReport),
     Triple(Routes.SLACK, "Slack", Icons.Default.FactCheck),
     Triple(Routes.TEMP_MAIL, "Temp Mail", Icons.Default.Mail),
-    Triple(Routes.OPS_3D, "3D Ops", Icons.Default.ThreeDRotation)
+    Triple(Routes.OPS_3D, "3D Ops", Icons.Default.ViewInAr)
 )
 
 @Composable
@@ -311,7 +311,7 @@ fun DashboardScreen(
                 )
                 SgPrimaryButton(
                     text = if (uiState.agentRunning) "Suchzyklus" else "3D Ops",
-                    icon = if (uiState.agentRunning) Icons.Default.Search else Icons.Default.ThreeDRotation,
+                    icon = if (uiState.agentRunning) Icons.Default.Search else Icons.Default.ViewInAr,
                     onClick = {
                         if (uiState.agentRunning) viewModel.runCycle()
                         else navController.navigate(Routes.OPS_3D)
