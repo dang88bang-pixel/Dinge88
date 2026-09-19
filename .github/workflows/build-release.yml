@@ -213,22 +213,10 @@ jobs:
           heap-size: 512M
           disable-animations: true
           # Kein KVM auf GitHub-Linux-Runnern → Software-Emulation, die lange
-          # bootet. Großzügiges Timeout + explizites Ready-Wait vor den Tests.
+          # bootet (≈5–6 min). Der Runner wartet selbst auf `sys.boot_completed`.
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
-          script: |
-            adb wait-for-device
-            for i in $(seq 1 120); do
-              BOOTED="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
-              SDK="$(adb shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r')"
-              if [ "$BOOTED" = "1" ] && [ -n "$SDK" ]; then
-                echo "Emulator bereit (SDK=$SDK, boot_completed=1) nach ${i} Versuchen."
-                break
-              fi
-              sleep 5
-            done
-            adb shell input keyevent 82 || true
-            ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
+          script: ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
 
   slack-mcp-image:
     name: Slack-MCP image + MCP handshake
