@@ -45,7 +45,7 @@ class MacValidationTest {
             assetMac = "m", sourceType = DetectionSource.LORA,
             rssi = -45, timestamp = Date()
         )
-        val best = listOf(d1, d2).minByOrNull { it.rssi }!!
+        val best = listOf(d1, d2).maxByOrNull { it.rssi }!!
         val result = SearchResult(found = true, detection = best, accuracy = best.rssi)
         assertEquals(DetectionSource.LORA, result.detection!!.sourceType)
         assertEquals(-45, result.accuracy)

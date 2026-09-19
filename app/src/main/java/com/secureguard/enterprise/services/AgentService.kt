@@ -395,7 +395,7 @@ class AgentService @Inject constructor(
             DetectionSource.TELEMETRY, DetectionSource.MQTT, DetectionSource.WEBSOCKET -> 1
             else -> 2
         }
-        return candidates.sortedWith(compareBy(::tier).thenByDescending { it.rssi }).first()
+        return candidates.sortedWith(compareBy(::tier).thenByDescending { it.rssi }.thenByDescending { it.timestamp.time }).first()
     }
 
     private fun buildChannelList(

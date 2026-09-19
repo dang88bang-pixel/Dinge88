@@ -38,7 +38,7 @@ class AgentCycleLogicTest {
             rssi = -40,
             timestamp = Date()
         )
-        val best = listOf(weak, strong).minByOrNull { it.rssi }!!
+        val best = listOf(weak, strong).maxByOrNull { it.rssi }!!
         val result = SearchResult(found = true, detection = best, accuracy = best.rssi)
         assertThat(result.found).isTrue()
         assertThat(result.detection!!.sourceType).isEqualTo(DetectionSource.BLE)

@@ -4,11 +4,19 @@ import com.google.common.truth.Truth.assertThat
 import com.secureguard.enterprise.services.PrivacyService
 import org.json.JSONObject
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Vertrag der Datenauskunft: keine Secret-Felder, Art.15-Marker.
  * Passwörter legt der Anwender selbst fest – sie gehören nicht in den Export.
+ *
+ * Läuft unter Robolectric, damit `org.json` eine echte Implementierung hat
+ * (im Mockable-Android-JAR sind die Methoden "Stub!"-Stubs).
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class PrivacyExportContractTest {
 
     @Test
