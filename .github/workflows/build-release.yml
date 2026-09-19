@@ -102,9 +102,9 @@ jobs:
             echo "::error::ANDROID_KEYSTORE_BASE64 fehlt — RELEASE BLOCKED (Signing-Secrets fehlen)."
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > secureguard-keystore.jks
-          test -s secureguard-keystore.jks
-          echo "Release keystore bereitgestellt ($(wc -c < secureguard-keystore.jks) bytes)."
+          echo "$KEYSTORE_BASE64" | base64 -d > secureguard-keystore.p12
+          test -s secureguard-keystore.p12
+          echo "Release keystore bereitgestellt ($(wc -c < secureguard-keystore.p12) bytes)."
 
 
       - name: Make Gradle wrapper executable

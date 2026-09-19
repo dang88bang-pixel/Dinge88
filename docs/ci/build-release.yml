@@ -94,8 +94,8 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > app/secureguard-keystore.jks
-            echo "Keystore written (size: $(wc -c < app/secureguard-keystore.jks) bytes)."
+            echo "$KEYSTORE_BASE64" | base64 -d > app/secureguard-keystore.p12
+            echo "Keystore written (size: $(wc -c < app/secureguard-keystore.p12) bytes)."
           else
             echo "::warning::KEYSTORE_BASE64 is not set - APK wird UNSIGNIERT gebaut."
           fi
@@ -104,7 +104,7 @@ jobs:
       - name: Prepare signing config
         if: matrix.task == 'assembleRelease'
         run: |
-          if [ -f "app/secureguard-keystore.jks" ]; then
+          if [ -f "app/secureguard-keystore.p12" ]; then
             echo "SG_HAS_KEYSTORE=true" >> "$GITHUB_ENV"
           else
             echo "SG_HAS_KEYSTORE=false" >> "$GITHUB_ENV"

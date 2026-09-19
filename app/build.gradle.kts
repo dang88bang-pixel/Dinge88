@@ -14,7 +14,8 @@ plugins {
 
 // Keystore from environment (CI) or local.properties; falls back to the debug
 // keystore so `assembleRelease` always produces an installable signed APK.
-val keystoreFile = rootProject.file("secureguard-keystore.jks")
+// PKCS12 (industry standard, apksigner-compatible) statt veraltetem JKS.
+val keystoreFile = rootProject.file("secureguard-keystore.p12")
 val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
 val keyAlias = System.getenv("KEY_ALIAS") ?: "secureguard"
 val keyPassword = System.getenv("KEY_PASSWORD") ?: keystorePassword
@@ -83,6 +84,7 @@ android {
     val releaseSigning = signingConfigs.create("release") {
         if (keystoreFile.exists()) {
             storeFile = keystoreFile
+            storeType = "PKCS12"
             storePassword = keystorePassword
             this.keyAlias = keyAlias
             keyPassword = keyPassword
