@@ -177,6 +177,10 @@ jobs:
     name: Android 11 / API 30 smoke tests
     runs-on: ubuntu-latest
     needs: build
+    # Läuft auch, wenn nur der Release-Leg (Signing-Secrets) blockiert ist:
+    # `connectedDebugAndroidTest` baut die Debug-App selbst und hängt nicht
+    # am Release. Nur bei Abbruch (cancel) wird der Lauf übersprungen.
+    if: ${{ !cancelled() }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
