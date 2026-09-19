@@ -35,7 +35,7 @@ class AssetCrudTest {
         db = Room.inMemoryDatabaseBuilder(context, SecureGuardDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        repo = SecureGuardRepositoryImpl(db.assetDao(), db.detectionDao(), db.alertDao())
+        repo = SecureGuardRepositoryImpl(db.assetDao(), db.detectionDao(), db.alertDao(), db.pendingActionDao())
     }
 
     @After

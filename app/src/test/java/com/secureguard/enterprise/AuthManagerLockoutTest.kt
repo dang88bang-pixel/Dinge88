@@ -80,13 +80,12 @@ class AuthManagerLockoutTest {
     fun autoLockMinutes_configurable_and_bounded() {
         auth.setAutoLockMinutes(30)
         assertThat(auth.state.value.autoLockAfterMinutes).isEqualTo(30)
-        assertThat(auth.autoLockMinutes).isEqualTo(30)
 
         // Clamp auf 1–60
         auth.setAutoLockMinutes(500)
-        assertThat(auth.autoLockMinutes).isEqualTo(60)
+        assertThat(auth.state.value.autoLockAfterMinutes).isEqualTo(60)
         auth.setAutoLockMinutes(0)
-        assertThat(auth.autoLockMinutes).isEqualTo(1)
+        assertThat(auth.state.value.autoLockAfterMinutes).isEqualTo(1)
     }
 
     @Test
