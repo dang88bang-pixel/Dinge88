@@ -182,10 +182,11 @@ jobs:
           if [ -z "$KEYSTORE_BASE64" ]; then
             fallback "kein Secret ANDROID_KEYSTORE_BASE64 bzw. KEYSTORE_BASE64 gesetzt"
           fi
-          # Base64 dekodieren (Zeilenumbrüche/Whitespace tolerieren)
-          if ! printf '%s' "$KEYSTORE_BASE64" | tr -d ' \t\r\n' | base64 -d > secureguard-keystore.p12 2>/dev/null \
-             || [ ! -s secureguard-keystore.p12 ]; then
-            fallback "Secret ist kein gültiges Base64 (erwartet: base64 -w0 keystore.p12|.jks)"
+          # Base64 dekodieren (Zeilenumbrüche/Whitespace/Anführungszeichen tolerieren)
+          B64_DECODE_ERR=$(printf '%s' "$KEYSTORE_BASE64" | tr -d ' \t\r\n"\'' | base64 -d > secureguard-keystore.p12 2>&1)
+          B64_STATUS=$?
+          if [ $B64_STATUS -ne 0 ] || [ ! -s secureguard-keystore.p12 ]; then
+            fallback "Base64-Dekodierung fehlgeschlagen (Status $B64_STATUS, Error: $B64_DECODE_ERR, Bytes: $(wc -c < secureguard-keystore.p12 2>/dev/null || echo 0))"
           fi
           # Format prüfen: PKCS12 (ASN.1 SEQUENCE 30 82 …) oder JKS (FE ED FE ED)
           MAGIC=$(head -c 4 secureguard-keystore.p12 | od -An -tx1 | tr -d ' \n')
