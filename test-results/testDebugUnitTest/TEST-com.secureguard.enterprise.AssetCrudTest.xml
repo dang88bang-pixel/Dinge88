@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.secureguard.enterprise.AssetCrudTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-20T19:31:47" hostname="runnervmlun5p" time="7.157">
+  <properties/>
+  <testcase name="upsert_second_asset_and_paginate" classname="com.secureguard.enterprise.AssetCrudTest" time="6.901"/>
+  <testcase name="create_and_read_by_id_and_mac" classname="com.secureguard.enterprise.AssetCrudTest" time="0.114"/>
+  <testcase name="update_status_and_list" classname="com.secureguard.enterprise.AssetCrudTest" time="0.066"/>
+  <testcase name="delete_removes_asset" classname="com.secureguard.enterprise.AssetCrudTest" time="0.053"/>
+  <testcase name="invalid_mac_format_is_rejected_by_ui_regex_contract" classname="com.secureguard.enterprise.AssetCrudTest" time="0.023"/>
+  <system-out><![CDATA[WARNING: No manifest file found at ./AndroidManifest.xml.
+Falling back to the Android OS resources only.
+To remove this warning, annotate your test class with @Config(manifest=Config.NONE).
+If you're using Android Gradle Plugin, add testOptions.unitTests.includeAndroidResources = true to your build.gradle
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

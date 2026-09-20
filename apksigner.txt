@@ -1,0 +1,17 @@
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=SecureGuard CI Debug, OU=SecureGuard Enterprise, O=Dinge88, C=DE
+Signer #1 certificate SHA-256 digest: 028c8f5a1c7ad122ab6b20106f52448c474091f9fe32013c7f5f721c5423edb0
+Signer #1 certificate SHA-1 digest: 51bd4a80e01b8ea6a0c1ef3020886bdcb74b320d
+Signer #1 certificate MD5 digest: 6068c331e50be79d97a5c50076962b52
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 2048
+Signer #1 public key SHA-256 digest: 9ddfde60bf1e36a1c9a6182c99dd8a9cd5e8b15b91fd77b266d04bce935ff1a1
+Signer #1 public key SHA-1 digest: 5f981174b0134f705f2b51747a721ece83500109
+Signer #1 public key MD5 digest: 3ebe04cbe29a62f05aebcc643b0586ee

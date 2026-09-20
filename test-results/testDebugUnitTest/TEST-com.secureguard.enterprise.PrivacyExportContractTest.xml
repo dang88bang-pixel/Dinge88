@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.secureguard.enterprise.PrivacyExportContractTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-20T19:32:01" hostname="runnervmlun5p" time="0.042">
+  <properties/>
+  <testcase name="default_retention_is_90_days" classname="com.secureguard.enterprise.PrivacyExportContractTest" time="0.019"/>
+  <testcase name="export_json_must_not_contain_secret_keys" classname="com.secureguard.enterprise.PrivacyExportContractTest" time="0.023"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

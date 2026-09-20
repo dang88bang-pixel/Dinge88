@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.secureguard.enterprise.AuthManagerTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-09-20T19:31:59" hostname="runnervmlun5p" time="1.71">
+  <properties/>
+  <testcase name="initially_noPin_unlocked" classname="com.secureguard.enterprise.AuthManagerTest" time="0.065"/>
+  <testcase name="lock_after_manual_lock" classname="com.secureguard.enterprise.AuthManagerTest" time="0.25"/>
+  <testcase name="unlock_wrong_pin_decrements_attempts" classname="com.secureguard.enterprise.AuthManagerTest" time="0.227"/>
+  <testcase name="unlock_with_correct_pin" classname="com.secureguard.enterprise.AuthManagerTest" time="0.235"/>
+  <testcase name="configurePin_rejects_too_short" classname="com.secureguard.enterprise.AuthManagerTest" time="0.015"/>
+  <testcase name="disablePin_clears_configuration" classname="com.secureguard.enterprise.AuthManagerTest" time="0.136"/>
+  <testcase name="configurePin_locks_app" classname="com.secureguard.enterprise.AuthManagerTest" time="0.12"/>
+  <testcase name="exhausted_attempts_remain_locked" classname="com.secureguard.enterprise.AuthManagerTest" time="0.662"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

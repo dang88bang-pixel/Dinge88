@@ -1,0 +1,102 @@
+Downloading https://github.com/gradle/gradle-distributions/releases/download/v8.9.0/gradle-8.9-bin.zip
+............10%.............20%.............30%.............40%.............50%.............60%.............70%.............80%.............90%.............100%
+
+Welcome to Gradle 8.9!
+
+Here are the highlights of this release:
+ - Enhanced Error and Warning Messages
+ - IDE Integration Improvements
+ - Daemon JVM Information
+
+For more details see https://docs.gradle.org/8.9/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.9/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:mergeDebugResources
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :app:processDebugResources
+
+> Task :app:kaptGenerateStubsDebugKotlin
+w: Kapt currently doesn't support language version 2.0+. Falling back to 1.9.
+
+> Task :app:kaptDebugKotlin
+warning: Kapt support in Moshi Kotlin Code Gen is deprecated and will be removed in 2.0. Please migrate to KSP. https://github.com/square/moshi#codegen
+
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/theme/Theme.kt:89:20 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/actions/ActionsScreen.kt:81:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/actions/ActionsScreen.kt:117:38 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/actions/ActionsScreen.kt:184:81 'val Icons.Filled.Message: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Message.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/agent/AgentConfigScreen.kt:58:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/alerts/AlertsScreen.kt:55:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/assets/AddAssetScreen.kt:77:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/assets/AssetDetailScreen.kt:76:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/assets/AssetDetailScreen.kt:236:52 'val Icons.Filled.Message: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Message.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/assets/AssetDetailScreen.kt:250:56 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/assets/AssetListScreen.kt:69:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/assets/ScanQrScreen.kt:91:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/esp32/Esp32ConfigScreen.kt:65:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/esp32/Esp32ConfigScreen.kt:182:48 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/health/HealthScreen.kt:67:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/map/MapScreen.kt:76:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/map/MapScreen.kt:108:21 'fun setBuiltInZoomControls(p0: Boolean): Unit' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/nodes/NodeStatusScreen.kt:62:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/ports/AutomaticPortViewScreen.kt:68:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/security/SecurityScreen.kt:79:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/sensorfusion/SensorFusionScreen.kt:63:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/settings/SettingsScreen.kt:55:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/slack/SlackScreen.kt:66:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/slack/SlackScreen.kt:203:44 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/tempmail/TempMailScreen.kt:61:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/terminal/TerminalScreen.kt:75:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/presentation/ui/terminal/TerminalScreen.kt:169:40 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///home/runner/work/Dinge88/Dinge88/app/src/main/java/com/secureguard/enterprise/services/TelemetryService.kt:203:15 'open' has no effect on a final class.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltAggregateDepsDebug
+
+> Task :app:hiltJavaCompileDebug
+warning: Kapt support in Moshi Kotlin Code Gen is deprecated and will be removed in 2.0. Please migrate to KSP. https://github.com/square/moshi#codegen
+1 warning
+
+> Task :app:processDebugJavaRes
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:transformDebugClassesWithAsm
+> Task :app:bundleDebugClassesToRuntimeJar
+
+> Task :app:kaptGenerateStubsDebugUnitTestKotlin
+w: Kapt currently doesn't support language version 2.0+. Falling back to 1.9.
+
+> Task :app:kaptDebugUnitTestKotlin
+warning: Kapt support in Moshi Kotlin Code Gen is deprecated and will be removed in 2.0. Please migrate to KSP. https://github.com/square/moshi#codegen
+warning: The following options were not recognized by any processor: '[dagger.fastInit, dagger.hilt.android.internal.disableAndroidSuperclassValidation, dagger.hilt.android.internal.projectType, dagger.hilt.internal.useAggregatingRootProcessor, room.schemaLocation, kapt.kotlin.generated]'
+
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:hiltAggregateDepsDebugUnitTest
+> Task :app:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:transformDebugUnitTestClassesWithAsm
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :app:testDebugUnitTest
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_4-1789932487060.json
+
+BUILD SUCCESSFUL in 4m 4s
+33 actionable tasks: 32 executed, 1 from cache

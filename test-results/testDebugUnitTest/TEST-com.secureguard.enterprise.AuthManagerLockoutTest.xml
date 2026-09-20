@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.secureguard.enterprise.AuthManagerLockoutTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-20T19:31:54" hostname="runnervmlun5p" time="5.179">
+  <properties/>
+  <testcase name="correct_pin_resets_counter_and_lockout_after_expiry" classname="com.secureguard.enterprise.AuthManagerLockoutTest" time="3.557"/>
+  <testcase name="manual_lock_does_not_trigger_lockout" classname="com.secureguard.enterprise.AuthManagerLockoutTest" time="0.236"/>
+  <testcase name="autoLockMinutes_configurable_and_bounded" classname="com.secureguard.enterprise.AuthManagerLockoutTest" time="0.029"/>
+  <testcase name="lockout_persists_across_new_instance" classname="com.secureguard.enterprise.AuthManagerLockoutTest" time="0.66"/>
+  <testcase name="lockout_blocks_pin_entry_but_keeps_state" classname="com.secureguard.enterprise.AuthManagerLockoutTest" time="0.696"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

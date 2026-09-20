@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.secureguard.enterprise.MacValidationTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-20T19:32:01" hostname="runnervmlun5p" time="0.001">
+  <properties/>
+  <testcase name="rejectsMalformedMacAddresses" classname="com.secureguard.enterprise.MacValidationTest" time="0.0"/>
+  <testcase name="acceptsWellFormedMacAddresses" classname="com.secureguard.enterprise.MacValidationTest" time="0.0"/>
+  <testcase name="searchResultPicksBestRssi" classname="com.secureguard.enterprise.MacValidationTest" time="0.0"/>
+  <testcase name="notFoundHasNoDetection" classname="com.secureguard.enterprise.MacValidationTest" time="0.0"/>
+  <testcase name="assetStatusValuesAreStable" classname="com.secureguard.enterprise.MacValidationTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

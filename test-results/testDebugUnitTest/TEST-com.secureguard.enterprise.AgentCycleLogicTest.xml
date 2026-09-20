@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.secureguard.enterprise.AgentCycleLogicTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-20T19:31:47" hostname="runnervmlun5p" time="0.006">
+  <properties/>
+  <testcase name="learning_memory_stores_last_winning_channel" classname="com.secureguard.enterprise.AgentCycleLogicTest" time="0.001"/>
+  <testcase name="fuse_picks_strongest_rssi" classname="com.secureguard.enterprise.AgentCycleLogicTest" time="0.003"/>
+  <testcase name="cycle_result_aggregates_hits" classname="com.secureguard.enterprise.AgentCycleLogicTest" time="0.001"/>
+  <testcase name="settings_default_offlineOnly_safe" classname="com.secureguard.enterprise.AgentCycleLogicTest" time="0.001"/>
+  <testcase name="notFound_when_no_channels_hit" classname="com.secureguard.enterprise.AgentCycleLogicTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
