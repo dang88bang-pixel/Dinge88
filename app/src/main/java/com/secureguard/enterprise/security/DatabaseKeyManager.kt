@@ -115,7 +115,9 @@ class DatabaseKeyManager @Inject constructor(
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setKeySize(256)
             .setUserAuthenticationRequired(false)
-        if (strongBox) {
+        // StrongBox-API existiert erst ab API 28 (Lint NewApi) – strongBox ist
+        // durch supportsStrongBox() bereits nur ab P wahr, hier zusätzlich explizit.
+        if (strongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             builder.setIsStrongBoxBacked(true)
         }
         generator.init(builder.build())

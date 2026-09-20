@@ -300,8 +300,8 @@ jobs:
           "$TOOLS/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/apksigner.txt
           grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/apksigner.txt \
             || { echo "::error::$APK ist nicht v2-signiert – nicht installierbar."; exit 1; }
-          "$TOOLS/aapt2" dump badging "$APK" | grep -E "^(package|sdkVersion|targetSdkVersion):" | tee /tmp/badging.txt
-          grep -q "sdkVersion:'26'" /tmp/badging.txt || { echo "::error::minSdk != 26"; exit 1; }
+          "$TOOLS/aapt2" dump badging "$APK" | grep -E "^(package|minSdkVersion|sdkVersion|targetSdkVersion|native-code):" | tee /tmp/badging.txt
+          grep -qE "^(min)?[sS]dkVersion:'26'" /tmp/badging.txt || { echo "::error::minSdk != 26 ($(grep -iE 'sdkVersion' /tmp/badging.txt | tr '\n' ' '))"; exit 1; }
           grep -q "targetSdkVersion:'35'" /tmp/badging.txt || { echo "::error::targetSdk != 35"; exit 1; }
           if [ -n "${SIGNING_EXPECTED:-}" ]; then
             SHA=$(grep -m1 "SHA-256 digest" /tmp/apksigner.txt | awk '{print $NF}')

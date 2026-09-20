@@ -1,6 +1,7 @@
 package com.secureguard.enterprise.services
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -34,6 +35,9 @@ class WifiService @Inject constructor(
         ContextCompat.getSystemService(context, WifiManager::class.java)
     }
 
+    // MissingPermission: Standortprüfung erfolgt in hasLocationPermission(),
+    // alle WifiManager-Zugriffe sind zusätzlich in runCatching gekapselt.
+    @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     suspend fun searchAsset(asset: Asset): Detection? {
         if (!hasLocationPermission()) return null

@@ -1,6 +1,7 @@
 package com.secureguard.enterprise.services
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
@@ -71,6 +72,9 @@ class SatelliteService @Inject constructor(
     }
 
     /** Echte GPS-Position über Google Play Services (falls berechtigt). */
+    // Lint erkennt die Prüfung in hasLocationPermission() nicht; zusätzlich wird
+    // jede SecurityException im try/catch behandelt.
+    @SuppressLint("MissingPermission")
     suspend fun currentLocation(): Location? {
         if (!hasLocationPermission()) return null
         return withContext(Dispatchers.IO) {

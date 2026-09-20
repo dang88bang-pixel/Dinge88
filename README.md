@@ -813,10 +813,11 @@ Siehe [docs/TESTING.md](docs/TESTING.md). **Passwörter/PINs setzt der Anwender 
 ### GitHub Actions
 
 Workflow `.github/workflows/build-release.yml`:
-- **Trigger:** Push auf `main`/`develop`, Tags `v*`, Pull Requests, manuell
+- **Trigger:** Push auf `main`/`develop`/`arena/**`, Tags `v*`, Pull Requests, manuell (`build_type`: all/debug/release)
 - **JDK:** 17 · **SDK:** android-35 · **Build-Tools:** 35.0.0 · **Gradle:** 8.9
-- **Artefakte:** `secureguard-pro-debug` (Debug-APK), `secureguard-pro` (Release-APK)
-- **Release-Signing:** Optional via `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
+- **Jobs:** Backend-Tests (pytest) · Unit-Tests + Lint · `assembleDebug`/`assembleRelease` mit `apksigner`-/`aapt2`-Verifikation · Emulator-Smoke auf **API 30 (Android 11)** und **API 34 (Android 14)** · GitHub-Release bei Tags
+- **Artefakte:** `secureguard-pro-debug` (Debug-APK), `secureguard-pro` (Release-APK), Test-/Lint-Reports; zusätzlich Git-Branches `apk-delivery-*` (APKs) und `ci-logs-*` (vollständige Logs)
+- **Release-Signing:** Produktions-Keystore via Secrets `ANDROID_KEYSTORE_BASE64`/`ANDROID_KEYSTORE_PASSWORD`/`ANDROID_KEY_ALIAS`/`ANDROID_KEY_PASSWORD` **oder** `KEYSTORE_BASE64`/`KEYSTORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD`. Ohne (gültiges) Secret signiert die CI mit dem eingecheckten CI-Debug-Keystore (`SIGNING_MODE=ci-debug-fallback`, installierbar, aber ohne Herkunftsnachweis); Tag-Releases verlangen den Produktions-Keystore. Details: `docs/SQLCIPHER_AND_SIGNING.md`
 
 ### Lokal bauen
 
@@ -828,7 +829,8 @@ cp local.properties.example local.properties
 # 2. Debug-APK bauen
 ./gradlew :app:assembleDebug
 
-# 3. Release-APK bauen (unsiginiert ohne Keystore)
+# 3. Release-APK bauen (ohne Produktions-Keystore: Signatur mit CI-Debug-Keystore)
+export KEYSTORE_PASSWORD=… KEY_ALIAS=secureguard KEY_PASSWORD=…   # nur mit eigenem Keystore
 ./gradlew :app:assembleRelease
 ```
 
@@ -923,7 +925,13 @@ Vollständige Anleitung, manuelle Befehle und Troubleshooting:
 
 ## 📲 Installation
 
-1. **Debug-APK** aus GitHub Actions laden → `adb install secureguard-pro-debug.apk`  
+**Fertige APKs liegen im Repository:** [`releases/`](releases/) – `SecureGuard-<version>-release.apk`
+(empfohlen) bzw. `-debug.apk`, mit `SHA256SUMS.txt` und `BUILD-INFO-*.txt`
+(Commit, CI-Run, Signatur-Modus). Unterstützt Android 8.0+ (minSdk 26),
+verifiziert für **Android 11–14** (API 30–34), z. B. Honeywell CT45P XON.
+
+1. **APK installieren:** `sha256sum -c releases/SHA256SUMS.txt` → `adb install -r releases/SecureGuard-<version>-release.apk`
+   (oder Sideload/MDM). Alternativ: Artefakt aus GitHub Actions, `scripts/fetch-apk.sh release`
    *oder lokal:* `./gradlew :app:assembleDebug` (ggf. [Offline-Setup](#-offline-setup-air-gapped))
 2. Berechtigungen erteilen: Standort, Bluetooth, Kamera, Benachrichtigungen
 3. Einstellungen → Backend-Endpunkte konfigurieren (oder `local.properties` vor dem Build)
