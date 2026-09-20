@@ -1,0 +1,2 @@
+3005ceef1ed7941b496148830db085ae1a06eca9682746adff7deadac01b4881  SecureGuard-1.2.0-debug.apk
+f605f780884ade9141bcb4eb87a81793eff9fa563799d7b8a3e51d64f6791b86  SecureGuard-1.2.0-release.apk

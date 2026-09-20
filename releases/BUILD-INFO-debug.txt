@@ -1,0 +1,13 @@
+buildType      : debug
+versionName    : 1.2.0
+versionCode    : 3
+minSdk         : 26
+targetSdk      : 35
+compileSdk     : 35
+signing        : ci-debug-fallback
+ciRunId        : 35493001629
+branch/ref     : arena/01a0bd3f-dinge88
+commit         : db283eb52dfa0b9bbc9ad67bc00c5f30d7685bfc
+timestamp (UTC): 2026-09-20T06:01:29.008969004Z
+
+BUILD ERFOLGREICH

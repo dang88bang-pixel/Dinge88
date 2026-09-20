@@ -5,6 +5,11 @@ Ziel: **vollständige App mit allen Diensten angebunden und einsatzbereit**.
 
 > **Update 2026-08-26 (Vollbereitstellung):** `prepare-all.sh`, Docker-Healthchecks, Branch/PR-ready. Alle Funktionen erhalten.
 
+> **Update 2026-09-20 (Vollständige Überprüfung + APK im Repo):** 19 Befunde (`REVIEW_2026-09-20.md`, R-01…R-19)
+> behoben: Unit-Test-Build repariert (52 Tests grün in CI), Android-14-FGS/Receiver/GATT-API-33-Fixes,
+> Backup-Restore ohne offene DB, stabile Signatur (Produktions-Keystore oder gekennzeichneter CI-Fallback),
+> CI mit apksigner/aapt2-Verifikation + Emulator-Smoke API 30/34, **installierbare APKs unter `releases/`**.
+
 > **Update 2026-08-27 (Vollaudit-Reparatur):** 60 Befunde (`FEHLER_MANGEL_LISTE.md`) repariert:
 > StrongBox-Crash, Main-Thread-IO, PIN-Lockout, Backup-Validierung/WAL, MQTT-Wildcard,
 > SPI-Pin-Konflikt, Backend-Auth/CORS/Health-503, USB-Permission-Flow, Background-Location,
@@ -48,11 +53,11 @@ Legende:
 | Node-RED | ✅ | `flows.json` Telemetrie/Commands/Health |
 | ESP32-Firmware | ⚙️ | PlatformIO + `.ino`; flashen + WiFi/MQTT setzen |
 | Offline-Toolchain | ✅ | `scripts/offline/*` |
-| Release-Signing | ✅/⚙️ | `scripts/create-release-keystore.sh` + CI-Secrets |
+| Release-Signing | ✅/⚙️ | CI signiert immer (CI-Debug-Fallback); Produktions-Keystore via Secrets `ANDROID_KEYSTORE_*`/`KEYSTORE_*` hinterlegen |
 | SQLCipher (DB-Verschlüsselung) | ✅ | sqlcipher-android + KeyStore-Passphrase + Migration |
 | Produktiv-TLS / Zertifikate | ✅/⚙️ | release NSC verbietet Cleartext; MQTT ssl:// ready |
 | Instrumentierte UI-Tests | ✅/⚙️ | Compose Lock+Asset + Unit Auth/CRUD/Agent (lokal/CI) |
-| Verifizierter Gradle-Build (diese Sandbox) | ⚙️ | kein JDK hier – **lokal/CI** `./gradlew testDebugUnitTest assembleDebug` |
+| Verifizierter Gradle-Build | ✅ | CI (2026-09-20): `testDebugUnitTest` 52/52, `lintDebug`, `assembleDebug`/`assembleRelease` signiert; APKs in `releases/` |
 
 **Fazit:** Die App ist **feature-complete im Code**.  
 „Ready to go“ in der Praxis = **Build + Config + Keys + Backend + Hardware**.
@@ -168,9 +173,10 @@ Legende:
   ```bash
   ./gradlew :app:assembleDebug
   ```
-- [ ] APK installieren:
+- [ ] APK installieren (fertig gebaut: `releases/`, oder eigener Build):
   ```bash
-  adb install -r app/build/outputs/apk/debug/app-debug.apk
+  adb install -r releases/SecureGuard-1.2.0-release.apk
+  # bzw. adb install -r app/build/outputs/apk/debug/app-debug.apk
   ```
 - [ ] *(Optional air-gapped)* `./scripts/offline/download-all.sh` → USB → `install-offline.sh`
 
@@ -264,7 +270,7 @@ Ohne Key → Kanal liefert `null`/leer, App bleibt stabil.
 
 ### G) Release / Produktion (noch offen)
 
-- [ ] Release-Keystore erzeugen und CI-Secrets setzen (`KEYSTORE_*`)
+- [ ] Release-Keystore erzeugen und CI-Secrets setzen (`KEYSTORE_*` oder `ANDROID_KEYSTORE_*`; bis dahin CI-Debug-Fallback-Signatur)
 - [ ] `assembleRelease` signiert bauen
 - [ ] Mosquitto: `allow_anonymous false` + User/Pass + TLS 8883
 - [x] HTTPS/WSS statt Cleartext; `network_security_config` härten (release: cleartext=false)
@@ -298,7 +304,7 @@ Ohne Key → Kanal liefert `null`/leer, App bleibt stabil.
 | 17 | **i18n vollständig** | 🟡 | `values-de`/`en` minimal (App-Name + Channels) |
 | 18 | **MBTiles-Download in-app** | 🟡 | URL-Helfer da, kein DownloadManager-Flow |
 | 19 | **USB Permission Activity-Flow** | 🟡 | Service liest nur bei erteilter Permission; kein UI-Dialog-Flow |
-| 20 | **Verifizierter Clean-Build** | ⚙️ | CI/Host: `testDebugUnitTest` + `assembleDebug/Release` |
+| 20 | **Verifizierter Clean-Build** | ✅ | CI 2026-09-20: Unit-Tests, Lint, Debug/Release signiert, `apksigner`/`aapt2` geprüft |
 
 ### 4.2 Betriebs-Risiken (Pilot → Prod)
 
@@ -365,7 +371,7 @@ Danach sind **lokal**: BLE/WiFi/GPS/QR/NFC (Hardware), MQTT/WS/Crowd/MCP (Docker
 
 Priorität hoch → niedrig:
 
-1. ⚙️ Clean-Build lokal/`./gradlew assembleRelease` + CI grün  
+1. ✅ Clean-Build + CI grün (2026-09-20); ⚙️ Produktions-Keystore-Secret für `SIGNING_MODE=production`  
 2. ✅ MQTT Auth + Runtime-URLs + Release NSC (Cleartext aus)  
 3. ⚙️ Keys: BuildConfig + Settings; optional Backend-Proxy für WiGle/Google  
 4. ✅ Runtime-Settings Broker/URLs  

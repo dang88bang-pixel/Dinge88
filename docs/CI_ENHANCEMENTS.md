@@ -1,3 +1,16 @@
+> **2026-09-20: Erledigt – der aktive Workflow `.github/workflows/build-release.yml`
+> enthält alle hier beschriebenen Erweiterungen** (Branch-Trigger `arena/**`, Unit-Tests,
+> Lint, Test-/Lint-Report-Artefakte, Backend-pytest-Job) sowie darüber hinaus:
+> `build_type`-Auswahl, robuste Keystore-Validierung mit CI-Debug-Fallback,
+> `apksigner`/`aapt2`-Verifikation, Emulator-Smoke auf API 30 **und** 34,
+> Log-Branches `ci-logs-*`, APK-Delivery-Branches `apk-delivery-*`.
+> Die Kopie unter `docs/ci/build-release.yml` ist damit **historisch** (Stand 2026-08-27)
+> und wird nicht mehr gepflegt. Der Slack-MCP-Image-Job wurde bewusst nicht übernommen
+> (Docker-Build im Android-Workflow verlängert jeden Lauf; bei Bedarf als eigener Workflow).
+>
+> Hinweis: Das frühere Problem, dass Workflow-Dateien nicht gepusht werden konnten,
+> besteht nicht mehr – die Änderungen vom 2026-09-20 wurden direkt committet.
+
 > **2026-08-27: Die Komplett-Erweiterung ist fertig entwickelt** – als kopierfertige
 > Vorlage unter **`docs/ci/build-release.yml`** (enthält: `arena/**`-Trigger, `Unit tests`-Step,
 > Android-Lint, Test-Report-Artefakte, Backend-pytest-Job, Slack-MCP-Image-Job).

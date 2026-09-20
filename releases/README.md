@@ -6,10 +6,15 @@ und verifiziert hat (`apksigner verify`, `aapt2 dump badging`).
 
 | Datei | Inhalt |
 |-------|--------|
-| `SecureGuard-<version>-release.apk` | Release-Build (Cleartext-Traffic verboten, Logging aus) |
-| `SecureGuard-<version>-debug.apk` | Debug-Build (Demo-Daten, LAN/Emulator-Cleartext erlaubt) |
+| `SecureGuard-<version>-release.apk` | Release-Build (Cleartext-Traffic verboten → Backend/MQTT nur per HTTPS/WSS/TLS) |
+| `SecureGuard-<version>-debug.apk` | Debug-Build (Demo-Daten, Cleartext für LAN/Emulator erlaubt → passt zum Docker-Stack `http://…:8000`, `tcp://…:1883`) |
 | `SHA256SUMS.txt` | Prüfsummen aller APKs in diesem Ordner |
 | `BUILD-INFO-<type>.txt` | Commit, CI-Run, SDK-Level, Signatur-Modus |
+
+**Aktueller Stand: Version 1.2.0 (versionCode 3)** – gebaut von CI-Run
+[35493001629](https://github.com/dang88bang-pixel/Dinge88/actions/runs/35493001629)
+aus Commit `db283eb`, beide APKs mit `apksigner verify` (v2-Signatur) und
+`aapt2 dump badging` (minSdk 26, targetSdk 35) verifiziert; Unit-Tests 52/52 grün.
 
 ## Unterstützte Geräte
 
