@@ -4,10 +4,10 @@ versionCode    : 3
 minSdk         : 26
 targetSdk      : 35
 compileSdk     : 35
-signing        : ci-debug-fallback
-ciRunId        : 35493001629
+signing        : production
+ciRunId        : 35531677894
 branch/ref     : arena/01a0bd3f-dinge88
-commit         : db283eb52dfa0b9bbc9ad67bc00c5f30d7685bfc
-timestamp (UTC): 2026-09-20T06:00:38.916701029Z
+commit         : ec9ff242c4966028684605739776f4cb10554781
+timestamp (UTC): 2026-09-20T19:17:17.867314199Z
 
 BUILD ERFOLGREICH
