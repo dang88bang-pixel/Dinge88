@@ -159,6 +159,14 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.KEY_PASSWORD }}
         run: |
           set +e
+          mkdir -p ci-logs
+          {
+            echo "=== DIAGNOSE KEYSTORE SECRETS ==="
+            echo "KEYSTORE_BASE64 Laenge: ${#KEYSTORE_BASE64}"
+            echo "KEYSTORE_PASSWORD gesetzt: $([ -n "$KEYSTORE_PASSWORD" ] && echo ja || echo nein)"
+            echo "KEY_ALIAS: "$KEY_ALIAS""
+            echo "================================="
+          } | tee ci-logs/keystore-diag.log
           IS_TAG=0; [[ "${GITHUB_REF}" == refs/tags/v* ]] && IS_TAG=1
           fallback() {
             # $1 = Grund
