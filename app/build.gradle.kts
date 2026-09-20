@@ -12,12 +12,33 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// Keystore from environment (CI) or local.properties; falls back to the debug
-// keystore so `assembleRelease` always produces an installable signed APK.
-val keystoreFile = rootProject.file("secureguard-keystore.jks")
+// =====================================================================
+// Signing
+// ---------------------------------------------------------------------
+// 1) Produktions-Keystore (bevorzugt): CI dekodiert das Secret
+//    ANDROID_KEYSTORE_BASE64 / KEYSTORE_BASE64 nach
+//    <root>/secureguard-keystore.p12 (oder .jks). Lokal alternativ über
+//    SECUREGUARD_KEYSTORE=/pfad/zum/keystore. Passwörter/Alias kommen aus
+//    KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD (Umgebung) – nie committen.
+// 2) Fallback: eingecheckter CI-Debug-Keystore app/keystore/secureguard-ci-debug.p12
+//    (Alias androiddebugkey, Passwort "android" – bewusst öffentlich, wie der
+//    Android-Debug-Key). Damit sind Debug- UND Release-APKs aus der CI immer
+//    signiert, installierbar und untereinander updatefähig (stabile Signatur
+//    über alle Läufe). Für produktive Auslieferung IMMER den Produktions-
+//    Keystore hinterlegen – siehe docs/SQLCIPHER_AND_SIGNING.md.
+// =====================================================================
+val productionKeystore: File? = listOfNotNull(
+    System.getenv("SECUREGUARD_KEYSTORE")?.takeIf { it.isNotBlank() }?.let { File(it) },
+    rootProject.file("secureguard-keystore.p12"),
+    rootProject.file("secureguard-keystore.jks"),
+    rootProject.file("app/secureguard-keystore.p12"),
+    rootProject.file("app/secureguard-keystore.jks")
+).firstOrNull { it.isFile }
+val ciDebugKeystore: File = file("keystore/secureguard-ci-debug.p12")
 val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-val keyAlias = System.getenv("KEY_ALIAS") ?: "secureguard"
-val keyPassword = System.getenv("KEY_PASSWORD") ?: keystorePassword
+val keyAliasEnv = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "secureguard"
+val keyPasswordEnv = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: keystorePassword
+val signingMode = if (productionKeystore != null) "production" else "ci-debug-fallback"
 
 /**
  * Reads an API key from gradle.properties / local.properties / -P args
@@ -41,10 +62,12 @@ android {
 
     defaultConfig {
         applicationId = "com.secureguard.enterprise"
+        // Unterstützte Geräte: Android 8.0+ – verifiziert/zertifiziert für
+        // Android 11 (API 30) bis Android 14 (API 34), z. B. Honeywell CT45P XON.
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -78,40 +101,50 @@ android {
         buildConfigField("String", "SECUREGUARD_API_KEY", "\"${apiKey("SECUREGUARD_API_KEY")}\"")
         buildConfigField("String", "MQTT_USERNAME", "\"${apiKey("MQTT_USERNAME")}\"")
         buildConfigField("String", "MQTT_PASSWORD", "\"${apiKey("MQTT_PASSWORD")}\"")
+        // Signatur-Herkunft (About/Diagnose): "production" | "ci-debug-fallback"
+        buildConfigField("String", "SIGNING_MODE", "\"$signingMode\"")
     }
 
-    val releaseSigning = signingConfigs.create("release") {
-        if (keystoreFile.exists()) {
-            storeFile = keystoreFile
-            storePassword = keystorePassword
-            this.keyAlias = keyAlias
-            keyPassword = keyPassword
-        } else {
-            // No release keystore supplied — sign with the debug key so the
-            // release APK is installable. Override via KEYSTORE_* in CI.
-            val debugKeystore = file("${System.getProperty("user.home")}/.android/debug.keystore")
-            if (debugKeystore.exists()) {
-                storeFile = debugKeystore
+    signingConfigs {
+        // Debug-Builds: fester, eingecheckter Debug-Key statt des zufälligen
+        // ~/.android/debug.keystore des jeweiligen Rechners/Runners → jede
+        // Debug-APK aus CI oder lokal lässt sich über die vorherige installieren.
+        getByName("debug") {
+            storeFile = ciDebugKeystore
+            storeType = "PKCS12"
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+        create("release") {
+            val prod = productionKeystore
+            if (prod != null) {
+                storeFile = prod
+                storeType = if (prod.extension.equals("jks", ignoreCase = true)) "JKS" else "PKCS12"
+                storePassword = keystorePassword
+                keyAlias = keyAliasEnv
+                keyPassword = keyPasswordEnv
+            } else {
+                storeFile = ciDebugKeystore
+                storeType = "PKCS12"
                 storePassword = "android"
                 keyAlias = "androiddebugkey"
                 keyPassword = "android"
             }
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
-    // Nur signieren, wenn wirklich eine Keystore-Datei existiert (auf
-    // GitHub-Runnern gibt es z. B. keinen ~/.android/debug.keystore).
-    // Ohne Keystore wird die Release-APK unsigniert gebaut
-    // (app-release-unsigned.apk) – so schlägt packageRelease nicht fehl.
-    val debugKeystorePath = file("${System.getProperty("user.home")}/.android/debug.keystore")
-    val hasAnyKeystore = keystoreFile.exists() || debugKeystorePath.exists()
-
     buildTypes {
         release {
+            // R8 bewusst aus: Gson/Moshi-Reflection, Paho, SQLCipher-JNI – ein
+            // Shrinker-Fehler wäre erst auf dem Gerät sichtbar. Größe (~40 MB)
+            // ist für Enterprise-Sideload akzeptabel.
             isMinifyEnabled = false
-            if (hasAnyKeystore) {
-                signingConfig = releaseSigning
-            }
+            isShrinkResources = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -119,6 +152,7 @@ android {
         }
         debug {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -143,6 +177,33 @@ android {
             excludes += "/META-INF/INDEX.LIST"
             excludes += "/META-INF/io.netty.versions.properties"
         }
+    }
+
+    testOptions {
+        unitTests {
+            // Robolectric-Tests (AuthManager, Room-CRUD, PrivacyExport) brauchen
+            // Android-Ressourcen; nicht gemockte Framework-Methoden liefern
+            // Default-Werte statt "Method ... not mocked".
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
+
+    lint {
+        // Lint läuft in CI (Report als Artefakt), blockiert aber weder Tests noch
+        // die APK-Auslieferung; Befunde werden über den HTML/XML-Report gepflegt.
+        abortOnError = false
+        checkReleaseBuilds = true
+        htmlReport = true
+        xmlReport = true
+    }
+}
+
+// Room-Schema-Export (exportSchema = true in SecureGuardDatabase) – Zielordner
+// für Migrations-Tests; ohne diese Angabe warnt der Annotation-Processor.
+kapt {
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
     }
 }
 
@@ -242,12 +303,19 @@ dependencies {
     // Desugaring
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    // Unit tests
+    // Unit tests (JVM + Robolectric)
     testImplementation(libs.junit)
+    testImplementation(libs.truth)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.test.core.ktx)
 
     // Instrumented tests
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
@@ -273,6 +341,7 @@ val ghToken = System.getenv("GITHUB_TOKEN")
 val ghRepo = System.getenv("GITHUB_REPOSITORY")
 val ghRunId = System.getenv("GITHUB_RUN_ID") ?: ""
 val ghSha = System.getenv("GITHUB_SHA") ?: ""
+val ghRef = System.getenv("GITHUB_REF_NAME") ?: ""
 
 tasks.register("publishApkDelivery") {
     group = "build"
@@ -345,7 +414,9 @@ tasks.register("publishApkDelivery") {
                 appendLine("minSdk         : ${android.defaultConfig.minSdk}")
                 appendLine("targetSdk      : ${android.defaultConfig.targetSdk}")
                 appendLine("compileSdk     : ${android.compileSdk}")
+                appendLine("signing        : ${if (buildType == "release") signingMode else "ci-debug-fallback"}")
                 appendLine("ciRunId        : $ghRunId")
+                appendLine("branch/ref     : $ghRef")
                 appendLine("commit         : $ghSha")
                 appendLine("timestamp (UTC): ${Instant.now()}")
                 appendLine()
@@ -366,7 +437,7 @@ tasks.register("publishApkDelivery") {
             sh(listOf("git", "-C", workDir.absolutePath, "add", "-f", "apk-dist")).let { (cc, oo) ->
                 if (cc != 0) throw GradleException("git add: $oo")
             }
-            val commitMsg = "APK-Delivery: buildType=$buildType run=$ghRunId sha=${ghSha.take(7)}"
+            val commitMsg = "APK-Delivery: buildType=$buildType run=$ghRunId sha=${ghSha.take(7)} ref=$ghRef"
             sh(listOf("git", "-C", workDir.absolutePath, "commit", "-q", "-m", commitMsg)).let { (cc, oo) ->
                 if (cc != 0) throw GradleException("git commit: $oo")
             }
@@ -397,6 +468,8 @@ tasks.configureEach {
 afterEvaluate {
     listOf(
         "compileDebugKotlin", "compileReleaseKotlin",
+        "compileDebugUnitTestKotlin", "compileReleaseUnitTestKotlin",
+        "compileDebugAndroidTestKotlin",
         "kaptDebugKotlin", "kaptReleaseKotlin",
         "compileDebugJavaWithJavac", "compileReleaseJavaWithJavac"
     ).forEach { tn ->

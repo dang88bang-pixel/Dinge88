@@ -26,8 +26,9 @@ class BackupManager @Inject constructor(
     private val databaseKeyManager: com.secureguard.enterprise.security.DatabaseKeyManager
 ) {
 
+    /** Pfad der Room-DB (ohne sie zu öffnen – identisch zu Room.databaseBuilder). */
     private val dbFile: File
-        get() = File(database.openHelper.writableDatabase.path)
+        get() = context.getDatabasePath(SecureGuardDatabase.DATABASE_NAME)
 
     /**
      * Backup-Ordner. `getExternalFilesDir` kann null liefern (z. B. im
@@ -46,17 +47,19 @@ class BackupManager @Inject constructor(
      * Vor dem Kopieren wird ein WAL-Checkpoint (TRUNCATE) ausgeführt, damit die
      * -wal-Datei geleert ist und die Kopie alle committeten Transaktionen enthält.
      */
-    suspend fun createBackup(name: String = "secureguard_backup"): File {
-        runCatching {
-            database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
+    suspend fun createBackup(name: String = "secureguard_backup"): File =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                database.openHelper.writableDatabase
+                    .query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
+            }
+            val source = dbFile
+            val target = File(backupDir, "${name}_${System.currentTimeMillis()}.db")
+            source.inputStream().use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+            target
         }
-        val source = dbFile
-        val target = File(backupDir, "${name}_${System.currentTimeMillis()}.db")
-        source.inputStream().use { input ->
-            target.outputStream().use { output -> input.copyTo(output) }
-        }
-        return target
-    }
 
     /**
      * Stellt ein Backup wieder her. Die Datei wird hart validiert (Plain-SQLite
@@ -74,7 +77,12 @@ class BackupManager @Inject constructor(
         }
 
     /**
-     * Führt ein zuvor gestagtes Restore aus (im Application.onCreate).
+     * Führt ein zuvor gestagtes Restore aus (im Application.onCreate, **bevor**
+     * Room die Datenbank öffnet). Die DB wird dafür bewusst NICHT über den
+     * OpenHelper angefasst: Der Zielpfad kommt aus `getDatabasePath`, und die
+     * WAL-/SHM-/Journal-Reste der alten Datenbank werden entfernt – sonst würde
+     * SQLite beim nächsten Öffnen ein fremdes WAL auf die neue Datei anwenden
+     * („database disk image is malformed").
      * Robust gegen Direct-Boot: `getExternalFilesDir` liefert hier ggf. null –
      * [backupDir] weicht dann auf `filesDir` aus, zusätzlich schützt
      * `runCatching` vor jedem Startup-Crash.
@@ -86,6 +94,9 @@ class BackupManager @Inject constructor(
         runCatching {
             val target = dbFile
             target.parentFile?.mkdirs()
+            listOf("-wal", "-shm", "-journal").forEach { suffix ->
+                File(target.path + suffix).takeIf { it.exists() }?.delete()
+            }
             copyFile(staged, target)
             staged.delete()
         }

@@ -18,7 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.secureguard.enterprise.presentation.navigation.SecureGuardApp
 import com.secureguard.enterprise.presentation.theme.SecureGuardTheme
 import com.secureguard.enterprise.presentation.ui.auth.LockScreen
-import androidx.core.content.ContextCompat
+import androidx.core.content.IntentCompat
 import com.secureguard.enterprise.presentation.ui.common.missingBackgroundPermissions
 import com.secureguard.enterprise.presentation.ui.common.missingPermissions
 import com.secureguard.enterprise.services.AuthManager
@@ -38,8 +38,11 @@ class MainActivity : ComponentActivity() {
     private val usbPermissionReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != UsbSerialService.ACTION_USB_PERMISSION) return
-            val device: android.hardware.usb.UsbDevice? =
-                intent.getParcelableExtra(android.hardware.usb.UsbManager.EXTRA_DEVICE)
+            val device: android.hardware.usb.UsbDevice? = IntentCompat.getParcelableExtra(
+                intent,
+                android.hardware.usb.UsbManager.EXTRA_DEVICE,
+                android.hardware.usb.UsbDevice::class.java
+            )
             val granted = intent.getBooleanExtra(
                 android.hardware.usb.UsbManager.EXTRA_PERMISSION_GRANTED, false
             )
@@ -90,25 +93,32 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Runtime-Permissions einmalig anfragen
-            val permissionLauncher = rememberLauncherForActivityResult(
+            // Runtime-Permissions in zwei Stufen (Android 11+ verlangt, dass
+            // ACCESS_BACKGROUND_LOCATION getrennt und erst NACH erteilter
+            // Fine-Location angefragt wird – sonst wird der Dialog still
+            // abgelehnt). Stufe 2 startet deshalb erst im Ergebnis-Callback
+            // von Stufe 1, nie parallel (zwei gleichzeitige Launches würden
+            // sich gegenseitig das Ergebnis überschreiben).
+            val backgroundLocationLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions()
             ) { /* Ergebnis wird von den Services zur Laufzeit geprüft */ }
+            val permissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions()
+            ) {
+                val bgMissing = missingBackgroundPermissions(context)
+                if (bgMissing.isNotEmpty()) {
+                    backgroundLocationLauncher.launch(bgMissing.toTypedArray())
+                }
+            }
             LaunchedEffect(Unit) {
                 val missing = missingPermissions(context)
                 if (missing.isNotEmpty()) {
                     permissionLauncher.launch(missing.toTypedArray())
-                }
-                // Stufe 2: Background-Location (ab Android 10, NUR nachdem
-                // Fine-Location gewährt wurde – sonst wird der Dialog nicht
-                // angezeigt bzw. automatisch abgelehnt).
-                val bgMissing = missingBackgroundPermissions(context)
-                if (bgMissing.isNotEmpty() &&
-                    ContextCompat.checkSelfPermission(
-                        context, android.Manifest.permission.ACCESS_FINE_LOCATION
-                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                ) {
-                    permissionLauncher.launch(bgMissing.toTypedArray())
+                } else {
+                    val bgMissing = missingBackgroundPermissions(context)
+                    if (bgMissing.isNotEmpty()) {
+                        backgroundLocationLauncher.launch(bgMissing.toTypedArray())
+                    }
                 }
             }
 
@@ -149,16 +159,13 @@ class MainActivity : ComponentActivity() {
      */
     private fun handleUsbAttachIntent(intent: Intent?) {
         if (intent?.action != android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED) return
-        val device: android.hardware.usb.UsbDevice? =
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(
-                    android.hardware.usb.UsbManager.EXTRA_DEVICE,
-                    android.hardware.usb.UsbDevice::class.java
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                intent.getParcelableExtra(android.hardware.usb.UsbManager.EXTRA_DEVICE)
-            }
+        // IntentCompat: nutzt die typisierte API erst ab API 34 (die API-33-
+        // Variante hat bekannte Bugs) und sonst den kompatiblen Legacy-Pfad.
+        val device: android.hardware.usb.UsbDevice? = IntentCompat.getParcelableExtra(
+            intent,
+            android.hardware.usb.UsbManager.EXTRA_DEVICE,
+            android.hardware.usb.UsbDevice::class.java
+        )
         device ?: return
         val driver = usbSerialService.availableDrivers()
             .firstOrNull { it.device.deviceId == device.deviceId } ?: return

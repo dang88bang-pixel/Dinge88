@@ -6,7 +6,7 @@ import android.nfc.NdefMessage
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.Ndef
-import android.os.Build
+import androidx.core.content.IntentCompat
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -35,12 +35,8 @@ class NfcService @Inject constructor(
 
     /** Liest die Asset-ID (MAC) aus einem NDEF-Tag. */
     fun readTagId(intent: Intent): String? {
-        val tag = getTag(intent) ?: return null
-        val ndef = Ndef.get(tag) ?: return null
+        val message: NdefMessage = readNdefMessage(intent) ?: return null
         return runCatching {
-            ndef.connect()
-            val message: NdefMessage = ndef.ndefMessage ?: return null
-            ndef.close()
             val record = message.records.firstOrNull() ?: return null
             // RTD-Text: Byte 0 = Status (Bit 7: UTF-16, Bits 5..0: Sprachcode-Länge)
             val payload = record.payload
@@ -77,14 +73,32 @@ class NfcService @Inject constructor(
         return detection
     }
 
-    @Suppress("DEPRECATION")
-    private fun getTag(intent: Intent): Tag? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
-        } else {
-            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
-        }
+    /**
+     * NDEF-Nachricht ohne Tag-I/O auf dem Main-Thread:
+     * 1. `EXTRA_NDEF_MESSAGES` – vom System bereits geparst (ACTION_NDEF_DISCOVERED),
+     * 2. `Ndef.cachedNdefMessage` – beim Erkennen gelesen, kein `connect()` nötig,
+     * 3. Fallback: kurzer `connect()`/`close()` (TECH_/TAG_DISCOVERED ohne Cache).
+     */
+    private fun readNdefMessage(intent: Intent): NdefMessage? {
+        IntentCompat.getParcelableArrayExtra(
+            intent, NfcAdapter.EXTRA_NDEF_MESSAGES, NdefMessage::class.java
+        )?.filterIsInstance<NdefMessage>()?.firstOrNull()?.let { return it }
+
+        val tag = getTag(intent) ?: return null
+        val ndef = Ndef.get(tag) ?: return null
+        ndef.cachedNdefMessage?.let { return it }
+        return runCatching {
+            ndef.connect()
+            try {
+                ndef.ndefMessage
+            } finally {
+                runCatching { ndef.close() }
+            }
+        }.getOrNull()
     }
+
+    private fun getTag(intent: Intent): Tag? =
+        IntentCompat.getParcelableExtra(intent, NfcAdapter.EXTRA_TAG, Tag::class.java)
 
     companion object {
         private val MAC_PATTERN = Regex("^([0-9A-F]{2}:){5}[0-9A-F]{2}$")

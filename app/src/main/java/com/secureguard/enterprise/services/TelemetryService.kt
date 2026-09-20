@@ -7,7 +7,9 @@ import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.bluetooth.BluetoothStatusCodes
 import android.content.Context
+import android.os.Build
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.model.Detection
 import com.secureguard.enterprise.data.model.DetectionSource
@@ -108,14 +110,33 @@ class TelemetryService @Inject constructor(
                 g.readCharacteristic(characteristic)
             }
 
+            // Android 13+ (API 33): neue Signatur mit Wert-Parameter – die
+            // Plattform ruft nur noch diese Variante auf.
+            override fun onCharacteristicRead(
+                g: BluetoothGatt,
+                characteristic: BluetoothGattCharacteristic,
+                value: ByteArray,
+                status: Int
+            ) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    readDeferred.complete(String(value, Charsets.UTF_8))
+                } else {
+                    readDeferred.complete(null)
+                }
+            }
+
+            // Android ≤ 12 (API < 33): alte Signatur, Wert steckt in characteristic.value
             @Deprecated("Deprecated in Java")
             override fun onCharacteristicRead(
                 g: BluetoothGatt,
                 characteristic: BluetoothGattCharacteristic,
                 status: Int
             ) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    val value = characteristic.value?.let { String(it) }
+                    @Suppress("DEPRECATION")
+                    val raw: ByteArray? = characteristic.value
+                    val value = raw?.let { String(it, Charsets.UTF_8) }
                     readDeferred.complete(value)
                 } else {
                     readDeferred.complete(null)
@@ -199,6 +220,7 @@ class TelemetryService @Inject constructor(
                 }
             }
 
+            @Suppress("DEPRECATION")
             override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     writeDeferred.complete(false)
@@ -212,12 +234,20 @@ class TelemetryService @Inject constructor(
                     writeDeferred.complete(false)
                     return
                 }
-                @Suppress("DEPRECATION")
-                characteristic.value = command.toByteArray(Charsets.UTF_8)
-                @Suppress("DEPRECATION")
-                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                @Suppress("DEPRECATION")
-                g.writeCharacteristic(characteristic)
+                val payload = command.toByteArray(Charsets.UTF_8)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // API 33+: Wert wird direkt übergeben; Rückgabe = BluetoothStatusCodes
+                    val rc = g.writeCharacteristic(
+                        characteristic,
+                        payload,
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    )
+                    if (rc != BluetoothStatusCodes.SUCCESS) writeDeferred.complete(false)
+                } else {
+                    characteristic.value = payload
+                    characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    if (!g.writeCharacteristic(characteristic)) writeDeferred.complete(false)
+                }
             }
 
             @Deprecated("Deprecated in Java")

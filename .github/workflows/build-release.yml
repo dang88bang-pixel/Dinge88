@@ -1,9 +1,32 @@
 name: 🛡️ Build SecureGuard APK
 
+# =====================================================================
+# Baut Debug- und Release-APK (Android 8.0+, verifiziert für Android 11–14),
+# führt Unit-Tests (JVM/Robolectric), Lint, Backend-Tests und einen
+# Emulator-Smoke-Test (API 30 = Android 11, API 34 = Android 14) aus.
+#
+# APK-Kanäle:
+#   1. Workflow-Artefakte (secureguard-pro / secureguard-pro-debug)
+#   2. Git-Branches apk-delivery-release / apk-delivery-debug
+#      (Task `publishApkDelivery` in app/build.gradle.kts; Abholen mit
+#      scripts/fetch-apk.sh → releases/)
+#   3. GitHub Release bei Tags v* (nur mit Produktions-Signatur)
+#
+# Signatur: Produktions-Keystore aus Secret ANDROID_KEYSTORE_BASE64 (oder
+# KEYSTORE_BASE64). Fehlt das Secret, signiert Gradle mit dem eingecheckten
+# CI-Debug-Keystore (app/keystore/secureguard-ci-debug.p12) → APK bleibt
+# installierbar/updatefähig, wird aber als "ci-debug-fallback" markiert.
+# Tag-Releases (v*) verlangen zwingend den Produktions-Keystore.
+# =====================================================================
+
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'arena/**', 'agent/**' ]
     tags: [ 'v*' ]
+    paths-ignore:
+      - 'releases/**'
+      - 'docs/**'
+      - '**.md'
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
@@ -17,7 +40,13 @@ on:
           - all
           - debug
           - release
+      run_emulator_smoke:
+        description: 'Emulator-Smoke-Tests (API 30/34) ausführen'
+        type: boolean
+        required: false
+        default: true
 
+# Nur der neueste Lauf pro Branch/Ref wird ausgeführt; überholte werden abgebrochen.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -26,22 +55,66 @@ env:
   JAVA_VERSION: '17'
   COMPILE_SDK: 'android-35'
   BUILD_TOOLS: '35.0.0'
-  GRADLE_CACHE_FOLDER: ~/.gradle/caches
-  GRADLE_WRAPPER_FOLDER: ~/.gradle/wrapper
 
 jobs:
-  build:
+  # -------------------------------------------------------------------
+  # Plan: welche Build-Typen (workflow_dispatch-Auswahl, sonst beide)
+  # -------------------------------------------------------------------
+  plan:
     runs-on: ubuntu-latest
+    outputs:
+      tasks: ${{ steps.plan.outputs.tasks }}
+    steps:
+      - id: plan
+        env:
+          BUILD_TYPE: ${{ github.event.inputs.build_type || 'all' }}
+        run: |
+          case "$BUILD_TYPE" in
+            debug)   echo 'tasks=["assembleDebug"]' >> "$GITHUB_OUTPUT" ;;
+            release) echo 'tasks=["assembleRelease"]' >> "$GITHUB_OUTPUT" ;;
+            *)       echo 'tasks=["assembleDebug","assembleRelease"]' >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "build_type=$BUILD_TYPE"
+
+  # -------------------------------------------------------------------
+  # Backend (FastAPI) – schnelle Python-Tests, unabhängig vom Android-Build
+  # -------------------------------------------------------------------
+  backend-tests:
+    name: Backend tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install backend deps
+        run: pip install -r backend/requirements-dev.txt
+      - name: Run backend tests
+        run: python -m pytest backend/tests -q
+
+  # -------------------------------------------------------------------
+  # Android: Unit-Tests, Lint, APK-Build, Signatur-Verifikation, Delivery
+  # -------------------------------------------------------------------
+  build:
+    name: ${{ matrix.task }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write   # publishApkDelivery pusht apk-delivery-* Branches
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - task: assembleDebug
-            artifact: secureguard-pro-debug
-            retention: 14
-          - task: assembleRelease
-            artifact: secureguard-pro
-            retention: 30
+        task: ${{ fromJSON(needs.plan.outputs.tasks) }}
+    env:
+      ARTIFACT: ${{ matrix.task == 'assembleRelease' && 'secureguard-pro' || 'secureguard-pro-debug' }}
+      RETENTION: ${{ matrix.task == 'assembleRelease' && 30 || 14 }}
+    outputs:
+      signing_mode_release: ${{ steps.siginfo.outputs.signing_mode }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,159 +130,257 @@ jobs:
         with:
           cache-read-only: false
 
-      - name: Install Android SDK
+      - name: Install Android SDK packages
         run: |
-          ANDROID_ROOT="${ANDROID_HOME:-$HOME/android-sdk}"
-          mkdir -p "$ANDROID_ROOT/cmdline-tools"
-          echo "ANDROID_HOME=$ANDROID_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$ANDROID_ROOT" >> "$GITHUB_ENV"
-          if [ ! -x "$ANDROID_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
-            CMDLINE_VERSION=$(curl -s https://dl.google.com/android/repository/repository2-1.xml | \
-              grep -oP 'commandlinetools-linux-\K[0-9]+' | sort -V | tail -1)
-            if [ -z "$CMDLINE_VERSION" ]; then CMDLINE_VERSION=11076708; fi
-            curl -fSL -o /tmp/cmdline.zip \
-              "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_VERSION}_latest.zip"
-            unzip -q -o /tmp/cmdline.zip -d "$ANDROID_ROOT/cmdline-tools"
-            mv "$ANDROID_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_ROOT/cmdline-tools/latest"
+          # ubuntu-latest bringt ein vorinstalliertes SDK mit; fehlende Pakete
+          # werden nachinstalliert (kein Cache über den SDK-Baum → keine
+          # tar-Fehler durch read-only Dateien).
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          if [ -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMAN="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          else
+            SDKMAN="sdkmanager"
           fi
-          yes | "$ANDROID_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_ROOT/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;${{ env.COMPILE_SDK }}" "build-tools;${{ env.BUILD_TOOLS }}" "platform-tools"
+          yes | "$SDKMAN" --licenses > /dev/null || true
+          "$SDKMAN" "platforms;${{ env.COMPILE_SDK }}" "build-tools;${{ env.BUILD_TOOLS }}" "platform-tools"
 
-      - name: Cache Android SDK
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.ANDROID_HOME }}
-          key: android-sdk-${{ env.COMPILE_SDK }}-${{ env.BUILD_TOOLS }}
-
-      # IMPORTANT: app/build.gradle.kts expects the keystore at the project root.
-      - name: Decode release keystore
+      # Produktions-Keystore (optional). Unterstützt beide Secret-Namen:
+      #   ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD
+      #   KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD   (Legacy, scripts/create-release-keystore.sh)
+      # Ohne Secret: Fallback auf den eingecheckten CI-Debug-Keystore (nur Branch-Builds!).
+      - name: Provide release keystore
         if: matrix.task == 'assembleRelease'
         env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::KEYSTORE_BASE64 fehlt. Ein Release darf nicht unsigniert ausgeliefert werden."
-            exit 1
+            if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+              echo "::error::Kein Signing-Secret (ANDROID_KEYSTORE_BASE64 bzw. KEYSTORE_BASE64). Tag-Releases werden nur mit Produktions-Keystore gebaut – siehe docs/SQLCIPHER_AND_SIGNING.md."
+              exit 1
+            fi
+            echo "::warning::Kein Signing-Secret gesetzt – Release-APK wird mit dem CI-Debug-Keystore signiert (SIGNING_MODE=ci-debug-fallback). Für produktive Auslieferung ANDROID_KEYSTORE_* Secrets hinterlegen."
+            echo "SIGNING_EXPECTED=ci-debug-fallback" >> "$GITHUB_ENV"
+            exit 0
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > secureguard-keystore.jks
-          test -s secureguard-keystore.jks
-          echo "Release keystore bereitgestellt."
+          echo "$KEYSTORE_BASE64" | base64 -d > secureguard-keystore.p12
+          test -s secureguard-keystore.p12
+          echo "SIGNING_EXPECTED=production" >> "$GITHUB_ENV"
+          echo "Produktions-Keystore bereitgestellt ($(wc -c < secureguard-keystore.p12) Bytes)."
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      # Unit-Tests (JVM + Robolectric) – Pflicht, bricht den Debug-Leg ab.
       - name: Unit tests
         if: matrix.task == 'assembleDebug'
-        run: ./gradlew test --no-daemon --stacktrace
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
-      - name: Lint
+      - name: Upload unit test reports
+        if: matrix.task == 'assembleDebug' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # Lint: Report als Artefakt; abortOnError=false in app/build.gradle.kts.
+      - name: Android Lint
         if: matrix.task == 'assembleDebug'
-        run: ./gradlew lint --no-daemon --stacktrace
+        run: ./gradlew lintDebug --no-daemon --stacktrace
+
+      - name: Upload lint report
+        if: matrix.task == 'assembleDebug' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-debug.xml
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Build ${{ matrix.task }}
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.KEY_PASSWORD }}
         run: ./gradlew ${{ matrix.task }} --no-daemon --stacktrace
 
-      - name: Verify release APK is signed
-        if: matrix.task == 'assembleRelease'
+      # Jede APK (Debug UND Release) muss signiert sein; zusätzlich werden
+      # minSdk/targetSdk gegen die Zielplattformen Android 11–14 geprüft.
+      - name: Verify APK (signature, SDK levels)
+        id: siginfo
         run: |
-          APK=$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)
-          test -n "$APK"
-          "$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}/apksigner" verify --verbose "$APK"
-          "$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}/apksigner" verify --print-certs "$APK"
-          echo "Verified signed release APK: $APK"
+          set -euo pipefail
+          BT=$([ "${{ matrix.task }}" = "assembleRelease" ] && echo release || echo debug)
+          APK=$(find "app/build/outputs/apk/$BT" -maxdepth 1 -type f -name '*.apk' | head -n 1)
+          test -n "$APK" || { echo "::error::Keine APK unter app/build/outputs/apk/$BT erzeugt."; exit 1; }
+          TOOLS="$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}"
+          "$TOOLS/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/apksigner.txt
+          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/apksigner.txt \
+            || { echo "::error::$APK ist nicht v2-signiert – nicht installierbar."; exit 1; }
+          "$TOOLS/aapt2" dump badging "$APK" | grep -E "^(package|sdkVersion|targetSdkVersion):" | tee /tmp/badging.txt
+          grep -q "sdkVersion:'26'" /tmp/badging.txt || { echo "::error::minSdk != 26"; exit 1; }
+          grep -q "targetSdkVersion:'35'" /tmp/badging.txt || { echo "::error::targetSdk != 35"; exit 1; }
+          if [ -n "${SIGNING_EXPECTED:-}" ]; then
+            SHA=$(grep -m1 "SHA-256 digest" /tmp/apksigner.txt | awk '{print $NF}')
+            CI_SHA="028c8f5a1c7ad122ab6b20106f52448c474091f9fe32013c7f5f721c5423edb0" # SHA-256 des CI-Debug-Zertifikats
+            if [ "$SIGNING_EXPECTED" = "production" ] && [[ "$SHA" == $CI_SHA* ]]; then
+              echo "::error::Produktions-Keystore erwartet, aber APK mit CI-Debug-Zertifikat signiert."; exit 1
+            fi
+            echo "signing_mode=$SIGNING_EXPECTED" >> "$GITHUB_OUTPUT"
+          fi
+          echo "✅ $APK signiert und für Android 8.0+ (Ziel: Android 11–14) gebaut."
 
       - name: Prepare APK artifacts
         run: |
+          set -euo pipefail
+          BT=$([ "${{ matrix.task }}" = "assembleRelease" ] && echo release || echo debug)
           mkdir -p apk-out
-          if [ "${{ matrix.task }}" = "assembleRelease" ]; then
-            cp app/build/outputs/apk/release/*.apk apk-out/
-          else
-            cp app/build/outputs/apk/debug/*.apk apk-out/
-          fi
+          cp app/build/outputs/apk/$BT/*.apk apk-out/
           cd apk-out
           sha256sum *.apk > SHA256SUMS.txt
+          {
+            echo "buildType : $BT"
+            echo "commit    : ${GITHUB_SHA}"
+            echo "ref       : ${GITHUB_REF_NAME}"
+            echo "run       : ${GITHUB_RUN_ID}"
+            echo "signing   : ${SIGNING_EXPECTED:-ci-debug-fallback}"
+            echo "built (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            cat /tmp/badging.txt
+          } > BUILD-INFO.txt
           ls -la
 
-      - name: Upload APK (${{ matrix.artifact }})
+      - name: Upload APK (${{ env.ARTIFACT }})
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: ${{ env.ARTIFACT }}
           path: apk-out/*.apk
           if-no-files-found: error
-          retention-days: ${{ matrix.retention }}
+          retention-days: ${{ env.RETENTION }}
 
-      - name: Upload SHA256 checksums
+      - name: Upload checksums + build info
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}-checksums
-          path: apk-out/SHA256SUMS.txt
+          name: ${{ env.ARTIFACT }}-checksums
+          path: |
+            apk-out/SHA256SUMS.txt
+            apk-out/BUILD-INFO.txt
           if-no-files-found: error
-          retention-days: ${{ matrix.retention }}
+          retention-days: ${{ env.RETENTION }}
 
-  android-11-smoke:
-    name: Android 11 / API 30 smoke tests
+  # -------------------------------------------------------------------
+  # Emulator-Smoke: Android 11 (API 30) und Android 14 (API 34)
+  # -------------------------------------------------------------------
+  emulator-smoke:
+    name: Android ${{ matrix.name }} (API ${{ matrix.api }}) smoke tests
     runs-on: ubuntu-latest
     needs: build
+    if: ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || github.event.inputs.run_emulator_smoke != 'false') }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api: 30
+            name: '11'
+            target: default
+          - api: 34
+            name: '14'
+            target: google_apis
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+      - name: Enable KVM (hardware acceleration)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules || true
+          sudo udevadm trigger --name-match=kvm || true
+          ls -l /dev/kvm || echo "::warning::/dev/kvm nicht verfügbar – Software-Emulation (langsam)"
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
-      - name: Android 11 instrumentation tests
+      - name: Instrumentation tests (API ${{ matrix.api }})
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
-          target: default
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
           arch: x86_64
           profile: pixel_2
+          cores: 2
+          ram-size: 2048M
+          heap-size: 512M
+          disable-animations: true
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           script: ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
+      - name: Upload instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: androidTest-report-api${{ matrix.api }}
+          path: app/build/reports/androidTests/
+          if-no-files-found: ignore
+          retention-days: 14
 
+  # -------------------------------------------------------------------
+  # GitHub Release bei Tags v* – nur mit Produktions-Signatur
+  # -------------------------------------------------------------------
   release:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, backend-tests]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
+      - name: Require production signature
+        env:
+          MODE: ${{ needs.build.outputs.signing_mode_release }}
+        run: |
+          if [ "$MODE" != "production" ]; then
+            echo "::error::Release-APK ist nicht mit dem Produktions-Keystore signiert (Modus: '${MODE:-unbekannt}'). Kein GitHub-Release."
+            exit 1
+          fi
       - name: Download release APK
         uses: actions/download-artifact@v4
         with:
           name: secureguard-pro
           path: ./apk
-
       - name: Download checksums
         uses: actions/download-artifact@v4
         with:
           name: secureguard-pro-checksums
           path: ./apk
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "🛡️ SecureGuard Pro ${{ github.ref_name }}"
+          name: "🛡️ SecureGuard Enterprise ${{ github.ref_name }}"
           body: |
-            ## 🛡️ SecureGuard Enterprise
+            ## 🛡️ SecureGuard Enterprise ${{ github.ref_name }}
 
             ### 📦 Download
-            - **APK**: `release.apk`
-            - **SHA-256**: `SHA256SUMS.txt`
+            - **APK**: `release.apk` (Android 8.0+, verifiziert Android 11–14)
+            - **SHA-256**: `SHA256SUMS.txt`, Build-Metadaten: `BUILD-INFO.txt`
 
             ### 🔑 Signatur
-            - Release wird nur veröffentlicht, wenn `KEYSTORE_*`-Secrets vorhanden sind.
-            - Der CI-Schritt `apksigner verify` muss erfolgreich sein.
+            - Mit Produktions-Keystore signiert (`apksigner verify` in CI erfolgreich).
+            - Installation: `adb install -r release.apk` bzw. Sideload/MDM.
           files: |
             ./apk/*.apk
             ./apk/SHA256SUMS.txt
+            ./apk/BUILD-INFO.txt
           draft: false
           prerelease: false
           generate_release_notes: true

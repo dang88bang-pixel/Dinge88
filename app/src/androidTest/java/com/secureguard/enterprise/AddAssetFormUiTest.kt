@@ -6,7 +6,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import android.content.Context
 import androidx.navigation.compose.rememberNavController
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.secureguard.enterprise.data.model.Alert
 import com.secureguard.enterprise.data.model.AlertSeverity
@@ -18,6 +20,7 @@ import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.presentation.theme.SecureGuardTheme
 import com.secureguard.enterprise.presentation.ui.assets.AddAssetScreen
 import com.secureguard.enterprise.presentation.ui.assets.AddAssetViewModel
+import com.secureguard.enterprise.security.RoleManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
@@ -43,7 +46,11 @@ class AddAssetFormUiTest {
     @Before
     fun setUp() {
         repo = FakeAssetRepository()
-        vm = AddAssetViewModel(repo)
+        // RBAC (F-44): Standard-Rolle ADMIN besitzt EDIT_ASSETS.
+        val roleManager = RoleManager(
+            ApplicationProvider.getApplicationContext<Context>()
+        )
+        vm = AddAssetViewModel(repo, roleManager)
     }
 
     @Test

@@ -75,21 +75,35 @@ internal object PortViewEndpoints {
     fun parseHostPort(raw: String, defaultPort: Int): HostPort? {
         val input = raw.trim().trimEnd('/')
         if (input.isEmpty()) return null
+
+        // Ein Host darf keine Whitespaces oder Pfad-/Trennzeichen enthalten
+        // (F-Fix: "nicht eine url:::" darf nicht als Host "nicht eine url" gelten).
+        fun validHost(host: String): Boolean =
+            host.isNotBlank() &&
+                host.none { it.isWhitespace() || it == '/' || it == '\\' }
+
+        fun portOrDefault(p: Int): Int = if (p in 1..65535) p else defaultPort
+
         return try {
             if (input.contains("://")) {
                 val uri = URI(input)
-                val host = uri.host?.takeIf { it.isNotBlank() }
-                    ?: uri.rawAuthority?.substringBefore(':')?.takeIf { it.isNotBlank() }
-                    ?: return null
-                val explicit = uri.port
-                HostPort(host, if (explicit in 1..65535) explicit else defaultPort)
+                val host = (uri.host ?: uri.rawAuthority?.substringBefore(':')).orEmpty()
+                if (!validHost(host)) return null
+                HostPort(host, portOrDefault(uri.port))
             } else {
                 val idx = input.lastIndexOf(':')
                 val maybePort = idx.takeIf { it > 0 }
                     ?.let { input.substring(it + 1).toIntOrNull() }
                 when {
-                    maybePort != null -> HostPort(input.substring(0, idx), maybePort)
-                    else -> HostPort(input, defaultPort)
+                    maybePort != null -> {
+                        val host = input.substring(0, idx)
+                        if (!validHost(host)) return null
+                        HostPort(host, portOrDefault(maybePort))
+                    }
+                    else -> {
+                        if (!validHost(input)) return null
+                        HostPort(input, defaultPort)
+                    }
                 }
             }
         } catch (e: Exception) {

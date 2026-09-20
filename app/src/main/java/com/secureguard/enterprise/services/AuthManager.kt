@@ -54,6 +54,10 @@ class AuthManager @Inject constructor(
         get() = prefs.getInt(KEY_AUTO_LOCK_MINUTES, AUTO_LOCK_MINUTES).coerceIn(1, 60)
         private set(value) = prefs.edit().putInt(KEY_AUTO_LOCK_MINUTES, value).apply()
 
+    /** Aktuelle Auto-Lock-Dauer in Minuten (1–60, persistent). */
+    val autoLockMinutes: Int
+        get() = autoLockMinutesPref
+
     /** Setzt die Auto-Lock-Dauer (UI: Security-Center). */
     fun setAutoLockMinutes(minutes: Int) {
         autoLockMinutesPref = minutes.coerceIn(1, 60)

@@ -59,7 +59,14 @@ class WifiService @Inject constructor(
         }
 
         val filter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
-        runCatching { context.registerReceiver(receiver, filter) }
+        // Android 14 (targetSdk 34) verlangt ein explizites Export-Flag für
+        // dynamisch registrierte Receiver. SCAN_RESULTS ist ein geschützter
+        // System-Broadcast (nur das System darf ihn senden) → EXPORTED ist
+        // korrekt und funktioniert auf allen API-Levels via ContextCompat.
+        val registered = runCatching {
+            ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
+        }.isSuccess
+        if (!registered) return null
 
         val started = runCatching { wm.startScan() }.getOrDefault(false)
         if (!started) {

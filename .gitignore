@@ -15,6 +15,8 @@ captures/
 *.aab
 *.apk
 output-metadata.json
+# Ausnahme: ausgelieferte APKs im Repo (siehe releases/README.md)
+!releases/*.apk
 
 # IntelliJ
 *.iml
@@ -23,9 +25,14 @@ misc.xml
 deploymentTargetDropDown.xml
 render.experimental.xml
 
-# Keystore files
+# Keystore files (Produktions-Keystores niemals committen)
 *.jks
 *.keystore
+*.p12
+*.pfx
+# Ausnahme: öffentlicher CI-Debug-Keystore (Passwort "android", nur für
+# stabile Debug-/Fallback-Signaturen – KEIN Produktions-Key)
+!app/keystore/secureguard-ci-debug.p12
 
 # Google Services (e.g. APIs or Firebase)
 google-services.json

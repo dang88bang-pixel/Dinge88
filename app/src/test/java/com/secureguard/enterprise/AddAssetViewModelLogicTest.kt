@@ -4,8 +4,11 @@ import com.google.common.truth.Truth.assertThat
 import com.secureguard.enterprise.data.model.Asset
 import com.secureguard.enterprise.data.repository.SecureGuardRepository
 import com.secureguard.enterprise.presentation.ui.assets.AddAssetViewModel
+import com.secureguard.enterprise.security.Permission
+import com.secureguard.enterprise.security.RoleManager
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,7 +37,9 @@ class AddAssetViewModelLogicTest {
         Dispatchers.setMain(dispatcher)
         repo = mockk(relaxed = true)
         coEvery { repo.upsertAsset(any()) } returns Unit
-        vm = AddAssetViewModel(repo)
+        val roleManager = mockk<RoleManager>(relaxed = true)
+        every { roleManager.require(Permission.EDIT_ASSETS) } returns true
+        vm = AddAssetViewModel(repo, roleManager)
     }
 
     @After
