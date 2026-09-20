@@ -154,20 +154,52 @@ jobs:
         if: matrix.task == 'assembleRelease'
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.KEY_PASSWORD }}
         run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-              echo "::error::Kein Signing-Secret (ANDROID_KEYSTORE_BASE64 bzw. KEYSTORE_BASE64). Tag-Releases werden nur mit Produktions-Keystore gebaut – siehe docs/SQLCIPHER_AND_SIGNING.md."
+          set +e
+          IS_TAG=0; [[ "${GITHUB_REF}" == refs/tags/v* ]] && IS_TAG=1
+          fallback() {
+            # $1 = Grund
+            rm -f secureguard-keystore.p12 secureguard-keystore.jks
+            if [ "$IS_TAG" = "1" ]; then
+              echo "::error::Release-Signatur nicht möglich: $1 – Tag-Releases werden nur mit gültigem Produktions-Keystore gebaut (docs/SQLCIPHER_AND_SIGNING.md)."
               exit 1
             fi
-            echo "::warning::Kein Signing-Secret gesetzt – Release-APK wird mit dem CI-Debug-Keystore signiert (SIGNING_MODE=ci-debug-fallback). Für produktive Auslieferung ANDROID_KEYSTORE_* Secrets hinterlegen."
+            echo "::warning::Release-Signatur: $1 – Release-APK wird mit dem CI-Debug-Keystore signiert (SIGNING_MODE=ci-debug-fallback). Für produktive Auslieferung ANDROID_KEYSTORE_*/KEYSTORE_* Secrets korrekt hinterlegen."
             echo "SIGNING_EXPECTED=ci-debug-fallback" >> "$GITHUB_ENV"
             exit 0
+          }
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            fallback "kein Secret ANDROID_KEYSTORE_BASE64 bzw. KEYSTORE_BASE64 gesetzt"
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > secureguard-keystore.p12
-          test -s secureguard-keystore.p12
+          # Base64 dekodieren (Zeilenumbrüche/Whitespace tolerieren)
+          if ! printf '%s' "$KEYSTORE_BASE64" | tr -d ' \t\r\n' | base64 -d > secureguard-keystore.p12 2>/dev/null \
+             || [ ! -s secureguard-keystore.p12 ]; then
+            fallback "Secret ist kein gültiges Base64 (erwartet: base64 -w0 keystore.p12|.jks)"
+          fi
+          # Format prüfen: PKCS12 (ASN.1 SEQUENCE 30 82 …) oder JKS (FE ED FE ED)
+          MAGIC=$(head -c 4 secureguard-keystore.p12 | od -An -tx1 | tr -d ' \n')
+          case "$MAGIC" in
+            3082*) ;;
+            feedfeed) mv secureguard-keystore.p12 secureguard-keystore.jks ;;
+            *) fallback "dekodierte Datei ist weder PKCS12 noch JKS (Magic: $MAGIC)" ;;
+          esac
+          KS=$(ls secureguard-keystore.p12 secureguard-keystore.jks 2>/dev/null | head -n1)
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            fallback "Keystore vorhanden, aber ANDROID_KEYSTORE_PASSWORD/KEYSTORE_PASSWORD fehlt"
+          fi
+          # Passwort + Alias prüfen, bevor Gradle mit einer kryptischen Meldung scheitert
+          if ! keytool -list -keystore "$KS" -storepass "$KEYSTORE_PASSWORD" > /tmp/keytool.txt 2>&1; then
+            fallback "Keystore-Passwort falsch oder Datei beschädigt ($(tail -n1 /tmp/keytool.txt))"
+          fi
+          ALIAS="${KEY_ALIAS:-secureguard}"
+          if ! grep -qi "^${ALIAS}," /tmp/keytool.txt; then
+            fallback "Key-Alias '$ALIAS' nicht im Keystore (vorhanden: $(grep -iE 'KeyEntry|CertEntry' /tmp/keytool.txt | cut -d, -f1 | tr '\n' ' '))"
+          fi
           echo "SIGNING_EXPECTED=production" >> "$GITHUB_ENV"
-          echo "Produktions-Keystore bereitgestellt ($(wc -c < secureguard-keystore.p12) Bytes)."
+          echo "Produktions-Keystore bereitgestellt: $KS ($(wc -c < "$KS") Bytes), Alias '$ALIAS' gefunden."
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
@@ -175,21 +207,58 @@ jobs:
       # Unit-Tests (JVM + Robolectric) – Pflicht, bricht den Debug-Leg ab.
       - name: Unit tests
         if: matrix.task == 'assembleDebug'
-        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+        run: |
+          mkdir -p ci-logs
+          set -o pipefail
+          ./gradlew testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee ci-logs/unit-tests.log
+
+      # Fehlgeschlagene Tests / Compile-Fehler als GitHub-Annotations (auch ohne
+      # Log-Zugriff sichtbar) – limitiert auf 10 Einträge pro Schritt.
+      - name: Annotate unit test failures
+        if: matrix.task == 'assembleDebug' && failure()
+        run: |
+          python3 - <<'PY'
+          import glob, re, xml.etree.ElementTree as ET
+          n = 0
+          for f in sorted(glob.glob("app/build/test-results/testDebugUnitTest/*.xml")):
+              for tc in ET.parse(f).getroot().iter("testcase"):
+                  for tag in ("failure", "error"):
+                      el = tc.find(tag)
+                      if el is not None and n < 8:
+                          msg = (el.get("message") or (el.text or "").strip().splitlines()[0:1] or [""])
+                          msg = msg if isinstance(msg, str) else (msg[0] if msg else "")
+                          print(f"::error title=Unit-Test {tag}::{tc.get('classname')}.{tc.get('name')}: {msg[:600]}")
+                          n += 1
+          try:
+              log = open("ci-logs/unit-tests.log", encoding="utf-8", errors="replace").read()
+          except OSError:
+              log = ""
+          for line in log.splitlines():
+              if n >= 10: break
+              if re.match(r"^e: file://", line) or "Unresolved reference" in line or "Compilation error" in line or "* What went wrong" in line:
+                  print("::error title=Build::" + line[:800]); n += 1
+          if n == 0:
+              print("::error::Unit-Tests fehlgeschlagen – Details in ci-logs/unit-tests.log (Branch ci-logs-debug) bzw. Artefakt unit-test-reports.")
+          PY
 
       - name: Upload unit test reports
         if: matrix.task == 'assembleDebug' && always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-reports
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
           if-no-files-found: ignore
           retention-days: 14
 
       # Lint: Report als Artefakt; abortOnError=false in app/build.gradle.kts.
       - name: Android Lint
         if: matrix.task == 'assembleDebug'
-        run: ./gradlew lintDebug --no-daemon --stacktrace
+        run: |
+          mkdir -p ci-logs
+          set -o pipefail
+          ./gradlew lintDebug --no-daemon --stacktrace 2>&1 | tee ci-logs/lint.log
 
       - name: Upload lint report
         if: matrix.task == 'assembleDebug' && always()
@@ -207,7 +276,16 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.KEY_PASSWORD }}
-        run: ./gradlew ${{ matrix.task }} --no-daemon --stacktrace
+        run: |
+          mkdir -p ci-logs
+          set -o pipefail
+          ./gradlew ${{ matrix.task }} --no-daemon --stacktrace 2>&1 | tee ci-logs/build.log
+
+      - name: Annotate build failure
+        if: failure()
+        run: |
+          grep -E "^e: file://|Unresolved reference|\* What went wrong|FAILURE: Build failed|Execution failed for task" ci-logs/build.log 2>/dev/null \
+            | head -n 10 | sed 's/^/::error title=Build::/' || true
 
       # Jede APK (Debug UND Release) muss signiert sein; zusätzlich werden
       # minSdk/targetSdk gegen die Zielplattformen Android 11–14 geprüft.
@@ -271,6 +349,37 @@ jobs:
             apk-out/BUILD-INFO.txt
           if-no-files-found: error
           retention-days: ${{ env.RETENTION }}
+
+      # Vollständige Logs + Test-/Lint-Ergebnisse als Git-Branch ci-logs-<debug|release>
+      # (überlebt die Artefakt-Aufbewahrung, lesbar ohne Actions-UI: git fetch origin ci-logs-debug).
+      - name: Publish CI logs (branch ci-logs-*)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          BT=$([ "${{ matrix.task }}" = "assembleRelease" ] && echo release || echo debug)
+          mkdir -p ci-logs
+          cp -r app/build/test-results ci-logs/test-results 2>/dev/null
+          cp app/build/reports/lint-results-debug.xml ci-logs/ 2>/dev/null
+          cp app/build/reports/lint-results-debug.txt ci-logs/ 2>/dev/null
+          cp apk-out/BUILD-INFO.txt apk-out/SHA256SUMS.txt ci-logs/ 2>/dev/null
+          cp /tmp/apksigner.txt /tmp/badging.txt ci-logs/ 2>/dev/null
+          {
+            echo "run      : ${GITHUB_RUN_ID} (attempt ${GITHUB_RUN_ATTEMPT})"
+            echo "job      : ${{ matrix.task }} / status=${{ job.status }}"
+            echo "commit   : ${GITHUB_SHA}"
+            echo "ref      : ${GITHUB_REF_NAME}"
+            echo "time UTC : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > ci-logs/RUN-INFO.txt
+          cd ci-logs
+          git init -q -b "ci-logs-$BT"
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            add -A >/dev/null && \
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "CI logs: ${{ matrix.task }} run=${GITHUB_RUN_ID} sha=${GITHUB_SHA:0:7} status=${{ job.status }}"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/ci-logs-$BT" \
+            && echo "Logs → Branch ci-logs-$BT" || echo "::warning::CI-Logs konnten nicht gepusht werden."
 
   # -------------------------------------------------------------------
   # Emulator-Smoke: Android 11 (API 30) und Android 14 (API 34)

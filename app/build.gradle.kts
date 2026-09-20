@@ -181,10 +181,12 @@ android {
 
     testOptions {
         unitTests {
-            // Robolectric-Tests (AuthManager, Room-CRUD, PrivacyExport) brauchen
-            // Android-Ressourcen; nicht gemockte Framework-Methoden liefern
-            // Default-Werte statt "Method ... not mocked".
-            isIncludeAndroidResources = true
+            // Bewusst KEIN isIncludeAndroidResources: Robolectric würde sonst das
+            // echte App-Manifest laden und die @HiltAndroidApp-Application samt
+            // DI-Graph/SQLCipher-JNI hochfahren – die JVM-Tests (AuthManager,
+            // Room-CRUD in-memory, PrivacyExport) brauchen nur die Default-App.
+            // Nicht gemockte Framework-Methoden liefern Default-Werte statt
+            // "Method ... not mocked" (reine JUnit-Tests ohne Robolectric).
             isReturnDefaultValues = true
         }
     }
