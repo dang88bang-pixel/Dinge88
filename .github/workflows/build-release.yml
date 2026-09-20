@@ -182,18 +182,32 @@ jobs:
           if [ -z "$KEYSTORE_BASE64" ]; then
             fallback "kein Secret ANDROID_KEYSTORE_BASE64 bzw. KEYSTORE_BASE64 gesetzt"
           fi
-          # Base64 dekodieren (Zeilenumbrüche/Whitespace/Anführungszeichen tolerieren + automatisches Padding)
-          CLEAN_B64=$(printf '%s' "$KEYSTORE_BASE64" | tr -d ' \t\r\n"\'')
-          MOD=$((${#CLEAN_B64} % 4))
-          if [ $MOD -eq 2 ]; then
-            CLEAN_B64="${CLEAN_B64}=="
-          elif [ $MOD -eq 3 ]; then
-            CLEAN_B64="${CLEAN_B64}="
-          fi
-          B64_DECODE_ERR=$(printf '%s' "$CLEAN_B64" | base64 -d > secureguard-keystore.p12 2>&1)
+          # Base64 dekodieren (nur gültige Base64-Zeichen behalten)
+          python3 -c "
+import os, sys, base64
+
+raw_b64 = os.environ.get('KEYSTORE_BASE64', '')
+clean = ''.join(c for c in raw_b64 if c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=')
+if not clean:
+    sys.exit(1)
+# Padding ergänzen falls nötig
+rem = len(clean) % 4
+if rem == 2:
+    clean += '=='
+elif rem == 3:
+    clean += '='
+try:
+    decoded = base64.b64decode(clean)
+    with open('secureguard-keystore.p12', 'wb') as f:
+        f.write(decoded)
+    sys.exit(0)
+except Exception as e:
+    sys.stderr.write(str(e) + '\n')
+    sys.exit(2)
+"
           B64_STATUS=$?
           if [ $B64_STATUS -ne 0 ] || [ ! -s secureguard-keystore.p12 ]; then
-            fallback "Base64-Dekodierung fehlgeschlagen (Status $B64_STATUS, Error: $B64_DECODE_ERR, Bytes: $(wc -c < secureguard-keystore.p12 2>/dev/null || echo 0))"
+            fallback "Base64-Dekodierung fehlgeschlagen (Exit-Code $B64_STATUS, Bytes: $(wc -c < secureguard-keystore.p12 2>/dev/null || echo 0))"
             exit 0
           fi
           # Format prüfen: PKCS12 (ASN.1 SEQUENCE 30 82 …) oder JKS (FE ED FE ED)
